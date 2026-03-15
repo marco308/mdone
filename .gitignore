@@ -37,3 +37,12 @@ Package.resolved
 # Playgrounds
 timeline.xctimeline
 playground.xcworkspace
+
+# Generated Xcode project (regenerate with xcodegen)
+mDone.xcodeproj/
+
+# Screenshot debug output
+screenshots/ipad-debug/
+
+# Claude Code
+.claude/

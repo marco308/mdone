@@ -1,6 +1,28 @@
 # mDone
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform: iOS & macOS](https://img.shields.io/badge/Platform-iOS%2018%20%7C%20macOS%2015-orange.svg)]()
+[![Swift 5.9](https://img.shields.io/badge/Swift-5.9-FA7343.svg)](https://swift.org)
+
 A native iOS and macOS task management app for your self-hosted [Vikunja](https://vikunja.io) server. A polished, focused interface for your self-hosted productivity setup.
+
+## Screenshots
+
+### iPhone
+
+<p align="center">
+  <img src="screenshots/01-Inbox.png" width="200" alt="Inbox view with today and upcoming tasks" />
+  <img src="screenshots/02-Projects.png" width="200" alt="Projects view with favorites" />
+  <img src="screenshots/03-Calendar.png" width="200" alt="Calendar view" />
+  <img src="screenshots/04-TaskDetail.png" width="200" alt="Task detail editor" />
+</p>
+
+### iPad
+
+<p align="center">
+  <img src="screenshots/ipad/01-Inbox.png" width="400" alt="iPad inbox view" />
+  <img src="screenshots/ipad/02-Projects.png" width="400" alt="iPad projects view" />
+</p>
 
 ## Features
 
@@ -21,7 +43,7 @@ A native iOS and macOS task management app for your self-hosted [Vikunja](https:
 
 ## Building from Source
 
-The project uses [XcodeGen](https://github.com/yonaskolb/XcodeGen) to generate the Xcode project from `project.yml`.
+The project uses [XcodeGen](https://github.com/yonaskolb/XcodeGen) to generate the Xcode project from `project.yml`. Pure Swift with SwiftUI — no external dependencies.
 
 ```bash
 # Install XcodeGen (if needed)
@@ -42,7 +64,9 @@ xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator \
   -destination 'platform=iOS Simulator,name=iPhone 16' test
 ```
 
-Pure Swift with SwiftUI — no external dependencies.
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Privacy
 
@@ -56,3 +80,4 @@ mDone does not collect, track, or share any personal data. The app communicates 
 
 - [Vikunja](https://vikunja.io) — The open-source task management platform mDone connects to
 - [Issues](https://github.com/marco308/mdone/issues) — Report bugs or request features
+- [Roadmap](docs/ISSUES.md) — Planned features and enhancements
