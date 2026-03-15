@@ -1,6 +1,6 @@
 # mDone
 
-A native iOS and macOS task management app for your self-hosted [Vikunja](https://vikunja.io) server. Inspired by the clean design of TickTick, mDone brings a polished, focused interface to your self-hosted productivity setup.
+A native iOS and macOS task management app for your self-hosted [Vikunja](https://vikunja.io) server. A polished, focused interface for your self-hosted productivity setup.
 
 ## Features
 
