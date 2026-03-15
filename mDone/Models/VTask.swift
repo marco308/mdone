@@ -133,8 +133,30 @@ struct TaskUpdateRequest: Encodable {
     var labels: [LabelRef]?
     var repeatAfter: Int64?
     var reminders: [TaskReminder]?
+    var clearDueDate: Bool?
 
     struct LabelRef: Encodable {
         var id: Int64
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case title, description, done, dueDate, priority, projectId, labels, repeatAfter, reminders
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(title, forKey: .title)
+        try container.encodeIfPresent(description, forKey: .description)
+        try container.encodeIfPresent(done, forKey: .done)
+        if clearDueDate == true {
+            try container.encode(Date.distantPast, forKey: .dueDate)
+        } else {
+            try container.encodeIfPresent(dueDate, forKey: .dueDate)
+        }
+        try container.encodeIfPresent(priority, forKey: .priority)
+        try container.encodeIfPresent(projectId, forKey: .projectId)
+        try container.encodeIfPresent(labels, forKey: .labels)
+        try container.encodeIfPresent(repeatAfter, forKey: .repeatAfter)
+        try container.encodeIfPresent(reminders, forKey: .reminders)
     }
 }

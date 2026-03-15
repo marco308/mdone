@@ -35,20 +35,16 @@ struct ReminderEditor: View {
     }
 
     var body: some View {
-        ForEach(Array(reminders.enumerated()), id: \.offset) { index, reminder in
+        ForEach(Array(reminders.enumerated()), id: \.offset) { _, reminder in
             HStack {
                 Image(systemName: "bell")
                     .foregroundStyle(.secondary)
                 Text(displayText(for: reminder))
                 Spacer()
-                Button {
-                    reminders.remove(at: index)
-                } label: {
-                    Image(systemName: "minus.circle.fill")
-                        .foregroundStyle(.red)
-                }
-                .buttonStyle(.plain)
             }
+        }
+        .onDelete { offsets in
+            reminders.remove(atOffsets: offsets)
         }
 
         Button {

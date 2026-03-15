@@ -11,7 +11,7 @@ settings:
   base:
     SWIFT_VERSION: "5.9"
     MARKETING_VERSION: "1.0.0"
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "2"
     DEVELOPMENT_TEAM: "Z62E7MGREE"
     CODE_SIGN_IDENTITY: "Apple Development"
     CODE_SIGN_STYLE: Automatic
@@ -22,6 +22,10 @@ targets:
     platform: iOS
     sources:
       - mDone
+      - mDoneShared
+    dependencies:
+      - target: mDoneWidgets
+        embed: true
     settings:
       base:
         INFOPLIST_FILE: mDone/Info.plist
@@ -67,6 +71,18 @@ targets:
         basedOnDependencyAnalysis: false
     scheme:
       testTargets: []
+
+  mDoneWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - mDoneWidgets
+      - mDoneShared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.widgets
+        CODE_SIGN_ENTITLEMENTS: mDoneWidgets/mDoneWidgets.entitlements
+        INFOPLIST_FILE: mDoneWidgets/Info.plist
 
   mDoneTests:
     type: bundle.unit-test

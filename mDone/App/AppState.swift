@@ -17,6 +17,8 @@ final class AppState {
     var activeFilter: TaskFilter? = nil
     var advancedFilterString: String? = nil
     var pendingOperationsCount: Int = 0
+    var onTaskCompleted: ((Int64) -> Void)?
+    var onTaskDeleted: ((Int64) -> Void)?
 
     var unreadNotificationCount: Int {
         notifications.filter { $0.read != true }.count
@@ -65,7 +67,8 @@ final class AppState {
     }
 
     var overdueTasks: [VTask] {
-        tasks.filter(\.isOverdue).sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
+        tasks.filter { $0.isOverdue && !$0.isDueToday }
+            .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
     }
 
     var todayTasks: [VTask] {
@@ -100,19 +103,18 @@ final class AppState {
         return result
     }
 
-    func checkAuth() {
-        isAuthenticated = authService.isAuthenticated()
-        if isAuthenticated {
-            configureAPIClient()
+    func checkAuth() async {
+        let authenticated = authService.isAuthenticated()
+        if authenticated {
+            await configureAPIClient()
         }
+        isAuthenticated = authenticated
     }
 
-    func configureAPIClient() {
+    func configureAPIClient() async {
         guard let serverURL = authService.getServerURL(),
               let token = authService.getToken() else { return }
-        Task {
-            await APIClient.shared.configure(serverURL: serverURL, token: token)
-        }
+        await APIClient.shared.configure(serverURL: serverURL, token: token)
     }
 
     @MainActor
@@ -236,6 +238,9 @@ final class AppState {
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
+            if updated.done {
+                onTaskCompleted?(updated.id)
+            }
             #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             #endif
@@ -273,8 +278,10 @@ final class AppState {
     @MainActor
     func deleteTask(_ task: VTask) async {
         do {
-            try await taskService.deleteTask(id: task.id)
-            tasks.removeAll { $0.id == task.id }
+            let taskId = task.id
+            try await taskService.deleteTask(id: taskId)
+            tasks.removeAll { $0.id == taskId }
+            onTaskDeleted?(taskId)
             #if os(iOS)
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
             #endif
@@ -338,10 +345,17 @@ final class AppState {
 
     // MARK: - Task Reordering
 
+    func listViewId(for task: VTask) -> Int64 {
+        let project = projects.first { $0.id == task.projectId }
+        return project?.listViewId ?? 0
+    }
+
     @MainActor
-    func moveTask(_ task: VTask, toPosition position: Double, viewId: Int64) async {
+    func moveTask(_ task: VTask, toPosition position: Double, viewId: Int64 = 0) async {
+        let resolvedViewId = viewId > 0 ? viewId : listViewId(for: task)
+        guard resolvedViewId > 0 else { return }
         do {
-            try await taskService.updatePosition(taskId: task.id, position: position, viewId: viewId)
+            try await taskService.updatePosition(taskId: task.id, position: position, viewId: resolvedViewId)
             if let index = tasks.firstIndex(where: { $0.id == task.id }) {
                 tasks[index].position = position
             }

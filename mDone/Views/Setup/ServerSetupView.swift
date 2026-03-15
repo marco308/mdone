@@ -112,7 +112,10 @@ struct ServerSetupView: View {
         isConnecting = true
         errorMessage = nil
 
-        let url = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        var url = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !url.hasPrefix("http://") && !url.hasPrefix("https://") {
+            url = "https://" + url
+        }
         let token = apiToken.trimmingCharacters(in: .whitespacesAndNewlines)
 
         Task {

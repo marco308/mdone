@@ -82,6 +82,8 @@ struct TaskFilterSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Reset") {
                         resetFilters()
+                        onApply(nil)
+                        dismiss()
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {

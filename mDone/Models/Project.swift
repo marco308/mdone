@@ -14,6 +14,7 @@ struct Project: Codable, Identifiable, Hashable {
     var parentProjectId: Int64?
     var defaultBucketId: Int64?
     var doneBucketId: Int64?
+    var views: [ProjectView]?
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
@@ -21,6 +22,10 @@ struct Project: Codable, Identifiable, Hashable {
 
     static func == (lhs: Project, rhs: Project) -> Bool {
         lhs.id == rhs.id
+    }
+
+    var listViewId: Int64? {
+        views?.first(where: { $0.viewKind == "list" })?.id
     }
 }
 

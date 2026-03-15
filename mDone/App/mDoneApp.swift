@@ -5,6 +5,9 @@ import SwiftUI
 struct mDoneApp: App {
     private let dependencies = AppDependencies()
     @State private var appState = AppState()
+    #if os(iOS)
+    @State private var focusManager = FocusManager()
+    #endif
 
     var body: some Scene {
         WindowGroup {
@@ -21,6 +24,9 @@ struct mDoneApp: App {
             }
             .environment(appState)
             .environment(dependencies.networkMonitor)
+            #if os(iOS)
+            .environment(focusManager)
+            #endif
             .modelContainer(dependencies.modelContainer)
             .onAppear {
                 let syncService = SyncService(
@@ -29,6 +35,15 @@ struct mDoneApp: App {
                     modelContainer: dependencies.modelContainer
                 )
                 appState.configureSyncService(syncService, networkMonitor: dependencies.networkMonitor)
+
+                #if os(iOS)
+                appState.onTaskCompleted = { taskId in
+                    focusManager.handleTaskCompleted(taskId: taskId)
+                }
+                appState.onTaskDeleted = { taskId in
+                    focusManager.handleTaskDeleted(taskId: taskId)
+                }
+                #endif
 
                 // Support auto-login via UserDefaults for testing (set via simctl)
                 let defaults = UserDefaults.standard
@@ -43,12 +58,21 @@ struct mDoneApp: App {
                         try? await appState.login(serverURL: serverURL, token: token)
                     }
                 } else {
-                    appState.checkAuth()
+                    Task {
+                        await appState.checkAuth()
+                    }
                 }
             }
             .onChange(of: dependencies.networkMonitor.isConnected) { _, isConnected in
                 appState.handleConnectivityChange(isConnected: isConnected)
             }
+            #if os(iOS)
+            .onOpenURL { url in
+                if url.scheme == "mdone", url.host == "focus" {
+                    focusManager.showFocusView = true
+                }
+            }
+            #endif
         }
     }
 }

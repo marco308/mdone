@@ -2,6 +2,9 @@ import SwiftUI
 
 struct MainTabView: View {
     @Environment(AppState.self) private var appState
+    #if os(iOS)
+    @Environment(FocusManager.self) private var focusManager
+    #endif
     @State private var selectedTab: Tab = .inbox
     @State private var showNotifications = false
 
@@ -48,6 +51,9 @@ struct MainTabView: View {
         }
         .sheet(isPresented: $showNotifications) {
             NotificationListView()
+        }
+        .fullScreenCover(isPresented: Bindable(focusManager).showFocusView) {
+            FocusSessionView()
         }
         #else
         Text("macOS")

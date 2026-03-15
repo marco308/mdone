@@ -3,6 +3,9 @@ import SwiftUI
 struct TaskListScreen: View {
     @Environment(AppState.self) private var appState
     @Environment(NetworkMonitor.self) private var networkMonitor
+    #if os(iOS)
+    @Environment(FocusManager.self) private var focusManager
+    #endif
     var projectFilter: Project?
     @State private var showAdvancedFilter = false
 
@@ -13,6 +16,14 @@ struct TaskListScreen: View {
                 FilterBar(activeFilter: $bindableAppState.activeFilter)
 
                 List {
+                    #if os(iOS)
+                    if let session = focusManager.currentSession {
+                        FocusBanner(session: session) {
+                            focusManager.showFocusView = true
+                        }
+                    }
+                    #endif
+
                     if !networkMonitor.isConnected {
                         offlineBanner
                     }
@@ -46,6 +57,7 @@ struct TaskListScreen: View {
                 #if os(iOS)
                 .listStyle(.insetGrouped)
                 #endif
+                .contentMargins(.bottom, 72, for: .scrollContent)
                 .refreshable {
                     await appState.refreshAll()
                 }
@@ -85,7 +97,12 @@ struct TaskListScreen: View {
 
     @ViewBuilder
     private var filteredTaskSection: some View {
-        let tasks = appState.filteredTasks
+        let allFiltered = appState.filteredTasks
+        let tasks = if let projectFilter {
+            allFiltered.filter { $0.projectId == projectFilter.id }
+        } else {
+            allFiltered
+        }
         if tasks.isEmpty {
             Section {
                 EmptyStateView(

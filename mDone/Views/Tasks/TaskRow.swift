@@ -2,20 +2,27 @@ import SwiftUI
 
 struct TaskRow: View {
     @Environment(AppState.self) private var appState
+    #if os(iOS)
+    @Environment(FocusManager.self) private var focusManager
+    #endif
     let task: VTask
     @State private var showDetail = false
+
+    #if os(iOS)
+    private var isFocused: Bool {
+        focusManager.focusedTaskId == task.id
+    }
+    #endif
 
     var body: some View {
         Button {
             showDetail = true
         } label: {
             HStack(spacing: 12) {
-                // Priority color bar
                 RoundedRectangle(cornerRadius: 2)
                     .fill(priorityColor)
                     .frame(width: 4, height: 36)
 
-                // Checkbox
                 Button {
                     Task {
                         await appState.toggleTaskDone(task)
@@ -28,7 +35,6 @@ struct TaskRow: View {
                 }
                 .buttonStyle(.plain)
 
-                // Content
                 VStack(alignment: .leading, spacing: 4) {
                     Text(task.title)
                         .font(.body)
@@ -72,12 +78,38 @@ struct TaskRow: View {
                 if task.priority > 0 {
                     PriorityBadge(priority: task.priorityLevel)
                 }
+
+                #if os(iOS)
+                if isFocused {
+                    Image(systemName: "scope")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .symbolEffect(.pulse)
+                }
+                #endif
             }
             .padding(.vertical, 4)
             .opacity(task.done ? 0.6 : 1)
         }
         .buttonStyle(.plain)
+        #if os(iOS)
+        .listRowBackground(isFocused ? Color.orange.opacity(0.08) : nil)
+        #endif
         .swipeActions(edge: .leading) {
+            #if os(iOS)
+            Button {
+                if isFocused {
+                    focusManager.endFocus()
+                } else {
+                    let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
+                    focusManager.switchFocus(task: task, projectName: projectName)
+                }
+            } label: {
+                Label(isFocused ? "End Focus" : "Focus", systemImage: "scope")
+            }
+            .tint(.orange)
+            #endif
+
             Button {
                 Task { await appState.toggleTaskDone(task) }
             } label: {
@@ -92,6 +124,24 @@ struct TaskRow: View {
                 Label("Delete", systemImage: "trash")
             }
         }
+        #if os(iOS)
+        .contextMenu {
+            if isFocused {
+                Button {
+                    focusManager.endFocus()
+                } label: {
+                    Label("End Focus", systemImage: "scope")
+                }
+            } else {
+                Button {
+                    let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
+                    focusManager.switchFocus(task: task, projectName: projectName)
+                } label: {
+                    Label("Start Focus", systemImage: "scope")
+                }
+            }
+        }
+        #endif
         .sheet(isPresented: $showDetail) {
             TaskDetailSheet(task: task)
         }

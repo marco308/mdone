@@ -9,6 +9,25 @@ struct MacSidebarView: View {
             Section("Smart Lists") {
                 Label {
                     HStack {
+                        Text("Inbox")
+                        Spacer()
+                        if !appState.activeTasks.isEmpty {
+                            Text("\(appState.activeTasks.count)")
+                                .font(.caption2)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.accentColor, in: Capsule())
+                        }
+                    }
+                } icon: {
+                    Image(systemName: "tray")
+                        .foregroundStyle(.indigo)
+                }
+                .tag(MacContentView.SidebarSection.inbox)
+
+                Label {
+                    HStack {
                         Text("Today")
                         Spacer()
                         if !appState.todayTasks.isEmpty {

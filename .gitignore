@@ -1,0 +1,39 @@
+# Build
+build/
+DerivedData/
+*.build/
+
+# Xcode
+*.xcuserdata/
+*.xcworkspace/xcuserdata/
+xcuserdata/
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+Packages/
+Package.pins
+Package.resolved
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Archives
+*.xcarchive
+
+# Provisioning
+*.mobileprovision
+*.provisionprofile
+
+# Playgrounds
+timeline.xctimeline
+playground.xcworkspace

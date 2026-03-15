@@ -3,6 +3,9 @@ import SwiftUI
 struct TaskDetailSheet: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+    #if os(iOS)
+    @Environment(FocusManager.self) private var focusManager
+    #endif
     let task: VTask
 
     @State private var title: String
@@ -20,8 +23,8 @@ struct TaskDetailSheet: View {
         self.task = task
         _title = State(initialValue: task.title)
         _description = State(initialValue: task.description ?? "")
-        _dueDate = State(initialValue: task.dueDate)
-        _hasDueDate = State(initialValue: task.dueDate != nil)
+        _dueDate = State(initialValue: task.effectiveDueDate)
+        _hasDueDate = State(initialValue: task.effectiveDueDate != nil)
         _priority = State(initialValue: task.priority)
         _selectedProjectId = State(initialValue: task.projectId)
         _repeatInterval = State(initialValue: task.repeatAfter ?? 0)
@@ -69,6 +72,26 @@ struct TaskDetailSheet: View {
                         }
                     }
                 }
+
+                #if os(iOS)
+                Section("Focus") {
+                    if focusManager.focusedTaskId == task.id {
+                        Button {
+                            focusManager.endFocus()
+                        } label: {
+                            Label("End Focus", systemImage: "scope")
+                                .foregroundStyle(.orange)
+                        }
+                    } else {
+                        Button {
+                            let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
+                            focusManager.startFocus(task: task, projectName: projectName)
+                        } label: {
+                            Label("Focus on This Task", systemImage: "scope")
+                        }
+                    }
+                }
+                #endif
 
                 Section {
                     Toggle("Due Date", isOn: $hasDueDate.animation())
@@ -183,7 +206,8 @@ struct TaskDetailSheet: View {
             priority: priority,
             projectId: selectedProjectId,
             repeatAfter: repeatInterval,
-            reminders: reminders
+            reminders: reminders,
+            clearDueDate: !hasDueDate
         )
         Task {
             await appState.updateTask(id: task.id, request: request)
