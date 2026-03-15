@@ -164,6 +164,8 @@ final class PendingOperation {
     var method: String
     var bodyData: Data?
     var timestamp: Date
+    var retryCount: Int
+    var failed: Bool
 
     init(endpointPath: String, method: String, bodyData: Data? = nil) {
         id = UUID()
@@ -171,5 +173,7 @@ final class PendingOperation {
         self.method = method
         self.bodyData = bodyData
         timestamp = Date()
+        retryCount = 0
+        failed = false
     }
 }

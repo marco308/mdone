@@ -23,7 +23,31 @@ struct mDoneApp: App {
             .environment(dependencies.networkMonitor)
             .modelContainer(dependencies.modelContainer)
             .onAppear {
-                appState.checkAuth()
+                let syncService = SyncService(
+                    taskService: TaskService(),
+                    projectService: ProjectService(),
+                    modelContainer: dependencies.modelContainer
+                )
+                appState.configureSyncService(syncService, networkMonitor: dependencies.networkMonitor)
+
+                // Support auto-login via UserDefaults for testing (set via simctl)
+                let defaults = UserDefaults.standard
+                if !appState.isAuthenticated,
+                   let serverURL = defaults.string(forKey: "MDONE_SERVER_URL"),
+                   let token = defaults.string(forKey: "MDONE_TOKEN"),
+                   !serverURL.isEmpty, !token.isEmpty
+                {
+                    defaults.removeObject(forKey: "MDONE_SERVER_URL")
+                    defaults.removeObject(forKey: "MDONE_TOKEN")
+                    Task {
+                        try? await appState.login(serverURL: serverURL, token: token)
+                    }
+                } else {
+                    appState.checkAuth()
+                }
+            }
+            .onChange(of: dependencies.networkMonitor.isConnected) { _, isConnected in
+                appState.handleConnectivityChange(isConnected: isConnected)
             }
         }
     }

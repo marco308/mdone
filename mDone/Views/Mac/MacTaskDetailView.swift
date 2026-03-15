@@ -10,7 +10,10 @@ struct MacTaskDetailView: View {
     @State private var hasDueDate: Bool
     @State private var priority: Int64
     @State private var selectedProjectId: Int64
+    @State private var repeatInterval: Int64
+    @State private var reminders: [TaskReminder]
     @State private var showDeleteConfirm = false
+    @State private var isPreviewingMarkdown = false
 
     init(task: VTask) {
         self.task = task
@@ -20,6 +23,8 @@ struct MacTaskDetailView: View {
         _hasDueDate = State(initialValue: task.dueDate != nil)
         _priority = State(initialValue: task.priority)
         _selectedProjectId = State(initialValue: task.projectId)
+        _repeatInterval = State(initialValue: task.repeatAfter ?? 0)
+        _reminders = State(initialValue: task.reminders ?? [])
     }
 
     var body: some View {
@@ -30,11 +35,43 @@ struct MacTaskDetailView: View {
                     .textFieldStyle(.plain)
             }
 
-            Section("Description") {
-                TextEditor(text: $descriptionText)
-                    .font(.body)
-                    .frame(minHeight: 100, maxHeight: 200)
-                    .scrollContentBackground(.hidden)
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Description")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button {
+                            isPreviewingMarkdown.toggle()
+                        } label: {
+                            Image(systemName: isPreviewingMarkdown ? "pencil" : "eye")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.borderless)
+                        .help(isPreviewingMarkdown ? "Edit" : "Preview Markdown")
+                    }
+
+                    if isPreviewingMarkdown {
+                        if descriptionText.isEmpty {
+                            Text("No description")
+                                .font(.body)
+                                .foregroundStyle(.secondary)
+                                .italic()
+                                .frame(minHeight: 100, alignment: .topLeading)
+                        } else {
+                            Text(markdownAttributedString(from: descriptionText))
+                                .font(.body)
+                                .textSelection(.enabled)
+                                .frame(minHeight: 100, maxHeight: 200, alignment: .topLeading)
+                        }
+                    } else {
+                        TextEditor(text: $descriptionText)
+                            .font(.body)
+                            .frame(minHeight: 100, maxHeight: 200)
+                            .scrollContentBackground(.hidden)
+                    }
+                }
             }
 
             Section("Due Date") {
@@ -50,6 +87,21 @@ struct MacTaskDetailView: View {
                         displayedComponents: [.date, .hourAndMinute]
                     )
                 }
+            }
+
+            Section("Repeat") {
+                Picker("Repeat", selection: $repeatInterval) {
+                    Text("Never").tag(Int64(0))
+                    Text("Daily").tag(Int64(86400))
+                    Text("Weekly").tag(Int64(604800))
+                    Text("Every 2 Weeks").tag(Int64(1209600))
+                    Text("Monthly").tag(Int64(2592000))
+                    Text("Yearly").tag(Int64(31536000))
+                }
+            }
+
+            Section("Reminders") {
+                ReminderEditor(reminders: $reminders)
             }
 
             Section("Priority") {
@@ -132,7 +184,13 @@ struct MacTaskDetailView: View {
             hasDueDate = newTask.dueDate != nil
             priority = newTask.priority
             selectedProjectId = newTask.projectId
+            repeatInterval = newTask.repeatAfter ?? 0
+            reminders = newTask.reminders ?? []
         }
+    }
+
+    private func markdownAttributedString(from markdown: String) -> AttributedString {
+        (try? AttributedString(markdown: markdown, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(markdown)
     }
 
     private func saveTask() {
@@ -141,7 +199,9 @@ struct MacTaskDetailView: View {
             description: descriptionText.isEmpty ? nil : descriptionText,
             dueDate: hasDueDate ? (dueDate ?? Date()) : nil,
             priority: priority,
-            projectId: selectedProjectId
+            projectId: selectedProjectId,
+            repeatAfter: repeatInterval,
+            reminders: reminders
         )
         Task {
             await appState.updateTask(id: task.id, request: request)

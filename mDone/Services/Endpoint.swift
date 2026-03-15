@@ -38,11 +38,24 @@ struct Endpoint {
 
     // MARK: - Tasks
 
-    static func allTasks(page: Int = 1, perPage: Int = 50) -> Endpoint {
-        Endpoint(path: "/api/v1/tasks", queryItems: [
+    static func allTasks(page: Int = 1, perPage: Int = 50, filter: String? = nil, search: String? = nil, sortBy: String? = nil, orderBy: String? = nil) -> Endpoint {
+        var items = [
             URLQueryItem(name: "page", value: "\(page)"),
             URLQueryItem(name: "per_page", value: "\(perPage)"),
-        ])
+        ]
+        if let filter, !filter.isEmpty {
+            items.append(URLQueryItem(name: "filter", value: filter))
+        }
+        if let search, !search.isEmpty {
+            items.append(URLQueryItem(name: "s", value: search))
+        }
+        if let sortBy, !sortBy.isEmpty {
+            items.append(URLQueryItem(name: "sort_by", value: sortBy))
+        }
+        if let orderBy, !orderBy.isEmpty {
+            items.append(URLQueryItem(name: "order_by", value: orderBy))
+        }
+        return Endpoint(path: "/api/v1/tasks", queryItems: items)
     }
 
     static func projectTasks(projectId: Int64, viewId: Int64, page: Int = 1, perPage: Int = 50) -> Endpoint {
@@ -79,6 +92,21 @@ struct Endpoint {
 
     // MARK: - Notifications
 
-    static let notifications = Endpoint(path: "/api/v1/notifications")
+    static func notifications(page: Int = 1) -> Endpoint {
+        Endpoint(path: "/api/v1/notifications", queryItems: [
+            URLQueryItem(name: "page", value: "\(page)"),
+        ])
+    }
+
+    static func markNotificationRead(id: Int64) -> Endpoint {
+        Endpoint(path: "/api/v1/notifications/\(id)", method: .POST)
+    }
+
     static let markAllNotificationsRead = Endpoint(path: "/api/v1/notifications", method: .POST)
+
+    // MARK: - Task Position
+
+    static func updateTaskPosition(taskId: Int64) -> Endpoint {
+        Endpoint(path: "/api/v1/tasks/\(taskId)/position", method: .POST)
+    }
 }

@@ -131,6 +131,8 @@ struct TaskUpdateRequest: Encodable {
     var priority: Int64?
     var projectId: Int64?
     var labels: [LabelRef]?
+    var repeatAfter: Int64?
+    var reminders: [TaskReminder]?
 
     struct LabelRef: Encodable {
         var id: Int64

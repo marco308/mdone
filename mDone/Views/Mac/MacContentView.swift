@@ -8,7 +8,7 @@ struct MacContentView: View {
     enum SidebarSection: Hashable {
         case inbox, today, upcoming, overdue, noDate
         case project(Project)
-        case calendar, settings
+        case notifications, calendar, settings
     }
 
     var body: some View {
@@ -31,6 +31,7 @@ struct MacContentView: View {
         .frame(minWidth: 900, minHeight: 600)
         .task {
             await appState.refreshAll()
+            await appState.fetchNotifications()
         }
     }
 }

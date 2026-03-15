@@ -4,8 +4,8 @@ struct MacTaskListView: View {
     @Environment(AppState.self) private var appState
     let section: MacContentView.SidebarSection?
     @Binding var selectedTask: VTask?
-    @State private var searchText = ""
     @State private var sortOrder: SortOrder = .dueDate
+    @State private var showAdvancedFilter = false
 
     enum SortOrder: String, CaseIterable {
         case dueDate = "Due Date"
@@ -20,6 +20,8 @@ struct MacTaskListView: View {
                 CalendarScreen()
             case .settings:
                 SettingsScreen()
+            case .notifications:
+                NotificationListView()
             case .none:
                 ContentUnavailableView(
                     "Select a Section",
@@ -35,52 +37,88 @@ struct MacTaskListView: View {
 
     @ViewBuilder
     private var taskListContent: some View {
+        @Bindable var appState = appState
         let tasks = filteredAndSortedTasks
-        if tasks.isEmpty, searchText.isEmpty {
-            EmptyStateView(
-                icon: emptyStateIcon,
-                title: emptyStateTitle,
-                subtitle: emptyStateSubtitle
-            )
-        } else if tasks.isEmpty {
-            ContentUnavailableView.search(text: searchText)
-        } else {
-            List(tasks, selection: $selectedTask) { task in
-                TaskRow(task: task)
-                    .tag(task)
+        VStack(spacing: 0) {
+            FilterBar(activeFilter: $appState.activeFilter)
+
+            if tasks.isEmpty, appState.searchQuery.isEmpty {
+                EmptyStateView(
+                    icon: emptyStateIcon,
+                    title: emptyStateTitle,
+                    subtitle: emptyStateSubtitle
+                )
+                .frame(maxHeight: .infinity)
+            } else if tasks.isEmpty {
+                ContentUnavailableView.search(text: appState.searchQuery)
+                    .frame(maxHeight: .infinity)
+            } else {
+                List(tasks, selection: $selectedTask) { task in
+                    TaskRow(task: task)
+                        .tag(task)
+                        .draggable(String(task.id)) {
+                            Text(task.title)
+                                .padding(8)
+                                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                        }
+                }
+                .listStyle(.inset)
+                .dropDestination(for: String.self) { droppedIds, location in
+                    guard let draggedIdStr = droppedIds.first,
+                          let draggedId = Int64(draggedIdStr) else { return false }
+                    handleDrop(taskId: draggedId, in: tasks, at: location)
+                    return true
+                }
             }
-            .listStyle(.inset)
-            .searchable(text: $searchText, prompt: "Filter tasks")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        ForEach(SortOrder.allCases, id: \.self) { order in
-                            Button {
-                                sortOrder = order
-                            } label: {
-                                HStack {
-                                    Text(order.rawValue)
-                                    if sortOrder == order {
-                                        Image(systemName: "checkmark")
-                                    }
+        }
+        .searchable(text: $appState.searchQuery, prompt: "Filter tasks")
+        .onSubmit(of: .search) {
+            Task { await appState.searchTasks(query: appState.searchQuery) }
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showAdvancedFilter.toggle()
+                } label: {
+                    Image(systemName: appState.advancedFilterString != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                }
+                .help("Advanced Filter")
+                .popover(isPresented: $showAdvancedFilter) {
+                    TaskFilterSheet { filterString in
+                        Task { await appState.applyAdvancedFilter(filterString) }
+                    }
+                    .frame(width: 350, height: 450)
+                }
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    ForEach(SortOrder.allCases, id: \.self) { order in
+                        Button {
+                            sortOrder = order
+                        } label: {
+                            HStack {
+                                Text(order.rawValue)
+                                if sortOrder == order {
+                                    Image(systemName: "checkmark")
                                 }
                             }
                         }
-                    } label: {
-                        Image(systemName: "arrow.up.arrow.down")
                     }
-                    .help("Sort tasks")
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
                 }
+                .help("Sort tasks")
+            }
 
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        Task { await appState.refreshAll() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .help("Refresh")
-                    .keyboardShortcut("r", modifiers: .command)
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Task { await appState.refreshAll() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
                 }
+                .help("Refresh")
+                .keyboardShortcut("r", modifiers: .command)
             }
         }
     }
@@ -94,6 +132,7 @@ struct MacTaskListView: View {
         case .overdue: return "Overdue"
         case .noDate: return "No Date"
         case let .project(project): return project.title
+        case .notifications: return "Notifications"
         case .calendar: return "Calendar"
         case .settings: return "Settings"
         }
@@ -108,15 +147,48 @@ struct MacTaskListView: View {
         case .overdue: return appState.overdueTasks
         case .noDate: return appState.noDateTasks
         case let .project(project): return appState.tasksForProject(project.id)
-        case .calendar, .settings: return []
+        case .notifications, .calendar, .settings: return []
+        }
+    }
+
+    private func handleDrop(taskId: Int64, in tasks: [VTask], at location: CGPoint) {
+        guard let task = tasks.first(where: { $0.id == taskId }) else { return }
+
+        // Estimate the target index based on list position
+        // Use a simple approach: calculate position as midpoint between neighbors
+        let estimatedRowHeight: CGFloat = 60
+        let targetIndex = min(max(Int(location.y / estimatedRowHeight), 0), tasks.count - 1)
+
+        let newPosition: Double
+        if tasks.count <= 1 {
+            newPosition = 0
+        } else if targetIndex == 0 {
+            newPosition = (tasks[0].position ?? 0) - 1
+        } else if targetIndex >= tasks.count - 1 {
+            newPosition = (tasks[tasks.count - 1].position ?? Double(tasks.count)) + 1
+        } else {
+            let before = tasks[targetIndex].position ?? Double(targetIndex)
+            let after = tasks[targetIndex + 1].position ?? Double(targetIndex + 1)
+            newPosition = (before + after) / 2
+        }
+
+        // Default view ID; ideally this would come from the project's default view
+        let viewId: Int64 = 0
+
+        Task {
+            await appState.moveTask(task, toPosition: newPosition, viewId: viewId)
         }
     }
 
     private var filteredAndSortedTasks: [VTask] {
         var tasks = tasksForSection
 
-        if !searchText.isEmpty {
-            let query = searchText.lowercased()
+        if let activeFilter = appState.activeFilter {
+            tasks = activeFilter.apply(to: tasks)
+        }
+
+        if !appState.searchQuery.isEmpty {
+            let query = appState.searchQuery.lowercased()
             tasks = tasks.filter { $0.title.lowercased().contains(query) }
         }
 
@@ -141,6 +213,7 @@ struct MacTaskListView: View {
         case .noDate: return "tray"
         case .inbox: return "tray"
         case .project: return "folder"
+        case .notifications: return "bell"
         case .calendar, .settings: return "tray"
         }
     }
@@ -154,6 +227,7 @@ struct MacTaskListView: View {
         case .noDate: return "No Undated Tasks"
         case .inbox: return "No Active Tasks"
         case .project: return "No Tasks in Project"
+        case .notifications: return "No Notifications"
         case .calendar, .settings: return "No Tasks"
         }
     }
@@ -167,6 +241,7 @@ struct MacTaskListView: View {
         case .noDate: return "All your tasks have due dates."
         case .inbox: return "Create a task to get started."
         case .project: return "Add a task to this project."
+        case .notifications: return "You're all caught up!"
         case .calendar, .settings: return ""
         }
     }

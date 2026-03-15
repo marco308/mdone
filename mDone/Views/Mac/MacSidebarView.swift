@@ -85,6 +85,25 @@ struct MacSidebarView: View {
             }
 
             Section {
+                Label {
+                    HStack {
+                        Text("Notifications")
+                        Spacer()
+                        if appState.unreadNotificationCount > 0 {
+                            Text("\(appState.unreadNotificationCount)")
+                                .font(.caption2)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.red, in: Capsule())
+                        }
+                    }
+                } icon: {
+                    Image(systemName: "bell.fill")
+                        .foregroundStyle(.orange)
+                }
+                .tag(MacContentView.SidebarSection.notifications)
+
                 Label("Calendar", systemImage: "calendar")
                     .tag(MacContentView.SidebarSection.calendar)
 

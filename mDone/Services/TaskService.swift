@@ -35,4 +35,14 @@ actor TaskService {
     func deleteTask(id: Int64) async throws {
         try await apiClient.delete(Endpoint.deleteTask(id: id))
     }
+
+    func updatePosition(taskId: Int64, position: Double, viewId: Int64) async throws {
+        let request = TaskPositionRequest(position: position, projectViewId: viewId)
+        try await apiClient.sendExpectingEmpty(Endpoint.updateTaskPosition(taskId: taskId), body: request)
+    }
+}
+
+struct TaskPositionRequest: Encodable {
+    var position: Double
+    var projectViewId: Int64
 }

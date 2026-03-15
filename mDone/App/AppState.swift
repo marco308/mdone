@@ -10,12 +10,59 @@ final class AppState {
     var tasks: [VTask] = []
     var projects: [Project] = []
     var labels: [VLabel] = []
+    var notifications: [VNotification] = []
     var selectedProject: Project?
+
+    var searchQuery: String = ""
+    var activeFilter: TaskFilter? = nil
+    var advancedFilterString: String? = nil
+    var pendingOperationsCount: Int = 0
+
+    var unreadNotificationCount: Int {
+        notifications.filter { $0.read != true }.count
+    }
 
     private let taskService = TaskService()
     private let projectService = ProjectService()
     private let authService = AuthService.shared
     private let notificationService = NotificationService.shared
+
+    private var syncService: SyncService?
+    private var networkMonitor: NetworkMonitor?
+    private var wasDisconnected: Bool = false
+    private var temporaryIdCounter: Int64 = 0
+
+    var isOffline: Bool {
+        !(networkMonitor?.isConnected ?? true)
+    }
+
+    func configureSyncService(_ syncService: SyncService, networkMonitor: NetworkMonitor) {
+        self.syncService = syncService
+        self.networkMonitor = networkMonitor
+        wasDisconnected = !networkMonitor.isConnected
+    }
+
+    @MainActor
+    func handleConnectivityChange(isConnected: Bool) {
+        if isConnected, wasDisconnected {
+            wasDisconnected = false
+            Task { await onNetworkRestored() }
+        } else if !isConnected {
+            wasDisconnected = true
+        }
+    }
+
+    @MainActor
+    func onNetworkRestored() async {
+        await syncService?.processPendingOperations()
+        updatePendingCount()
+        await refreshAll()
+    }
+
+    @MainActor
+    private func updatePendingCount() {
+        pendingOperationsCount = (try? syncService?.pendingOperationCount()) ?? 0
+    }
 
     var overdueTasks: [VTask] {
         tasks.filter(\.isOverdue).sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
@@ -36,6 +83,21 @@ final class AppState {
 
     var activeTasks: [VTask] {
         tasks.filter { !$0.done }
+    }
+
+    var filteredTasks: [VTask] {
+        var result = tasks
+
+        if let activeFilter {
+            result = activeFilter.apply(to: result)
+        }
+
+        if !searchQuery.isEmpty {
+            let query = searchQuery.lowercased()
+            result = result.filter { $0.title.lowercased().contains(query) }
+        }
+
+        return result
     }
 
     func checkAuth() {
@@ -81,6 +143,7 @@ final class AppState {
         tasks = []
         projects = []
         labels = []
+        notifications = []
         isAuthenticated = false
     }
 
@@ -119,6 +182,49 @@ final class AppState {
             errorMessage = error.errorDescription
         } catch {
             print("[mDone] refreshAll: other error: \(error)")
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    func searchTasks(query: String) async {
+        guard !query.isEmpty else {
+            await refreshAll()
+            return
+        }
+
+        do {
+            let results: [VTask] = try await APIClient.shared.fetch(
+                Endpoint.allTasks(perPage: 200, search: query)
+            )
+            tasks = results
+            errorMessage = nil
+        } catch let error as NetworkError {
+            if case .unauthorized = error {
+                await logout()
+            }
+            errorMessage = error.errorDescription
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    func applyAdvancedFilter(_ filterString: String?) async {
+        advancedFilterString = filterString
+
+        do {
+            let results: [VTask] = try await APIClient.shared.fetch(
+                Endpoint.allTasks(perPage: 200, filter: filterString)
+            )
+            tasks = results
+            errorMessage = nil
+        } catch let error as NetworkError {
+            if case .unauthorized = error {
+                await logout()
+            }
+            errorMessage = error.errorDescription
+        } catch {
             errorMessage = error.localizedDescription
         }
     }
@@ -186,6 +292,61 @@ final class AppState {
         return tasks.filter { task in
             guard let dueDate = task.effectiveDueDate else { return false }
             return calendar.isDate(dueDate, inSameDayAs: date)
+        }
+    }
+
+    // MARK: - Notifications
+
+    @MainActor
+    func fetchNotifications() async {
+        do {
+            let result: [VNotification] = try await APIClient.shared.fetch(Endpoint.notifications())
+            notifications = result
+        } catch {
+            print("[mDone] fetchNotifications error: \(error)")
+        }
+    }
+
+    @MainActor
+    func markNotificationRead(_ id: Int64) async {
+        do {
+            // Send empty body to mark as read
+            struct EmptyBody: Encodable {}
+            let _: VNotification = try await APIClient.shared.send(Endpoint.markNotificationRead(id: id), body: EmptyBody())
+            if let index = notifications.firstIndex(where: { $0.id == id }) {
+                notifications[index].read = true
+                notifications[index].readAt = Date()
+            }
+        } catch {
+            print("[mDone] markNotificationRead error: \(error)")
+        }
+    }
+
+    @MainActor
+    func markAllNotificationsRead() async {
+        do {
+            struct EmptyBody: Encodable {}
+            try await APIClient.shared.sendExpectingEmpty(Endpoint.markAllNotificationsRead, body: EmptyBody())
+            for index in notifications.indices {
+                notifications[index].read = true
+                notifications[index].readAt = Date()
+            }
+        } catch {
+            print("[mDone] markAllNotificationsRead error: \(error)")
+        }
+    }
+
+    // MARK: - Task Reordering
+
+    @MainActor
+    func moveTask(_ task: VTask, toPosition position: Double, viewId: Int64) async {
+        do {
+            try await taskService.updatePosition(taskId: task.id, position: position, viewId: viewId)
+            if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+                tasks[index].position = position
+            }
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

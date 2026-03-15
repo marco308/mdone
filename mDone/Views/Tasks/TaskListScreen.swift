@@ -4,48 +4,101 @@ struct TaskListScreen: View {
     @Environment(AppState.self) private var appState
     @Environment(NetworkMonitor.self) private var networkMonitor
     var projectFilter: Project?
+    @State private var showAdvancedFilter = false
 
     var body: some View {
+        @Bindable var bindableAppState = appState
         ZStack(alignment: .bottom) {
-            List {
-                if !networkMonitor.isConnected {
-                    offlineBanner
-                }
+            VStack(spacing: 0) {
+                FilterBar(activeFilter: $bindableAppState.activeFilter)
 
-                if let projectFilter {
-                    let projectTasks = appState.tasksForProject(projectFilter.id)
-                    if projectTasks.isEmpty {
-                        Section {
-                            EmptyStateView(
-                                icon: "checkmark.circle",
-                                title: "No tasks",
-                                subtitle: "Add a task to get started"
-                            )
-                        }
-                    } else {
-                        Section {
-                            ForEach(projectTasks) { task in
-                                TaskRow(task: task)
+                List {
+                    if !networkMonitor.isConnected {
+                        offlineBanner
+                    }
+
+                    if isFiltering {
+                        filteredTaskSection
+                    } else if let projectFilter {
+                        let projectTasks = appState.tasksForProject(projectFilter.id)
+                        if projectTasks.isEmpty {
+                            Section {
+                                EmptyStateView(
+                                    icon: "checkmark.circle",
+                                    title: "No tasks",
+                                    subtitle: "Add a task to get started"
+                                )
+                            }
+                        } else {
+                            Section {
+                                ForEach(projectTasks) { task in
+                                    TaskRow(task: task)
+                                }
+                                .onMove { source, destination in
+                                    handleMove(tasks: projectTasks, from: source, to: destination)
+                                }
                             }
                         }
+                    } else {
+                        smartListSections
                     }
-                } else {
-                    smartListSections
                 }
-            }
-            #if os(iOS)
-            .listStyle(.insetGrouped)
-            #endif
-            .refreshable {
-                await appState.refreshAll()
+                #if os(iOS)
+                .listStyle(.insetGrouped)
+                #endif
+                .refreshable {
+                    await appState.refreshAll()
+                }
             }
 
             QuickAddBar(projectId: projectFilter?.id ?? defaultProjectId)
         }
+        .searchable(text: $bindableAppState.searchQuery, prompt: "Search tasks")
+        .onSubmit(of: .search) {
+            Task { await appState.searchTasks(query: appState.searchQuery) }
+        }
         .navigationTitle(projectFilter?.title ?? "Inbox")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showAdvancedFilter = true
+                } label: {
+                    Image(systemName: appState.advancedFilterString != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                }
+            }
+        }
+        .sheet(isPresented: $showAdvancedFilter) {
+            TaskFilterSheet { filterString in
+                Task { await appState.applyAdvancedFilter(filterString) }
+            }
+        }
         .overlay {
             if appState.isLoading, appState.tasks.isEmpty {
                 LoadingOverlay()
+            }
+        }
+    }
+
+    private var isFiltering: Bool {
+        !appState.searchQuery.isEmpty || appState.activeFilter != nil
+    }
+
+    @ViewBuilder
+    private var filteredTaskSection: some View {
+        let tasks = appState.filteredTasks
+        if tasks.isEmpty {
+            Section {
+                EmptyStateView(
+                    icon: "magnifyingglass",
+                    title: "No results",
+                    subtitle: "Try a different search or filter"
+                )
+            }
+        } else {
+            Section("Results (\(tasks.count))") {
+                ForEach(tasks) { task in
+                    TaskRow(task: task)
+                }
             }
         }
     }
@@ -96,6 +149,36 @@ struct TaskListScreen: View {
                     subtitle: "No pending tasks"
                 )
             }
+        }
+    }
+
+    private func handleMove(tasks: [VTask], from source: IndexSet, to destination: Int) {
+        var reordered = tasks
+        reordered.move(fromOffsets: source, toOffset: destination)
+
+        guard let movedIndex = source.first else { return }
+        let task = tasks[movedIndex]
+
+        // Calculate the new position as midpoint between neighbors
+        let actualDestination = movedIndex < destination ? destination - 1 : destination
+        let newPosition: Double
+        if reordered.count <= 1 {
+            newPosition = 0
+        } else if actualDestination == 0 {
+            newPosition = (reordered[1].position ?? 1) - 1
+        } else if actualDestination >= reordered.count - 1 {
+            newPosition = (reordered[reordered.count - 2].position ?? Double(reordered.count - 2)) + 1
+        } else {
+            let before = reordered[actualDestination - 1].position ?? Double(actualDestination - 1)
+            let after = reordered[actualDestination + 1].position ?? Double(actualDestination + 1)
+            newPosition = (before + after) / 2
+        }
+
+        // Default view ID; ideally this would come from the project's default view
+        let viewId: Int64 = 0
+
+        Task {
+            await appState.moveTask(task, toPosition: newPosition, viewId: viewId)
         }
     }
 

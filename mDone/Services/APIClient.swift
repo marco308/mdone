@@ -142,6 +142,28 @@ actor APIClient {
         }
     }
 
+    /// Sends a request with pre-encoded JSON body data. Used for replaying pending offline operations.
+    func sendRawData(_ endpoint: Endpoint, bodyData: Data?) async throws {
+        var request = try buildRequest(for: endpoint)
+        request.httpBody = bodyData
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.unknown(URLError(.badServerResponse))
+        }
+
+        switch httpResponse.statusCode {
+        case 200 ... 299:
+            return
+        case 401:
+            throw NetworkError.unauthorized
+        default:
+            let apiError = try? decoder.decode(APIError.self, from: data)
+            throw NetworkError.serverError(statusCode: httpResponse.statusCode, message: apiError?.message)
+        }
+    }
+
     func delete(_ endpoint: Endpoint) async throws {
         let request = try buildRequest(for: endpoint)
         let (data, response) = try await session.data(for: request)
