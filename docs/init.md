@@ -1,0 +1,3 @@
+I want to build an iso app for https://vikunja.io/docs/api-documentation/ I already have a self-hosted instance of Vikunja running on my server, and I want to create a native iOS app that interacts with it using the provided REST API. The app should allow me to manage my tasks, view my calendar, and receive notifications for upcoming deadlines.
+
+I like the design of the official TickTick app, so I want to create an app with a similar look and feel, but tailored to work with my self-hosted Vikunja instance. The app should have a clean and intuitive interface, with features like list view, and calendar integration.
