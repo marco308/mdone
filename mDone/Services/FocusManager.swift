@@ -59,8 +59,12 @@ final class FocusManager {
             isPaused: false
         )
 
-        // Start Live Activity
+        // Start Live Activity — first end any lingering activities to avoid stale display
         if ActivityAuthorizationInfo().areActivitiesEnabled {
+            for existingActivity in Activity<FocusTaskAttributes>.activities {
+                Task { await existingActivity.end(nil, dismissalPolicy: .immediate) }
+            }
+
             let attributes = FocusTaskAttributes(
                 taskId: task.id,
                 taskTitle: task.title,
@@ -138,23 +142,31 @@ final class FocusManager {
     }
 
     func endFocus() {
+        let activityToEnd = activity
+        let elapsed = currentSession?.totalElapsed() ?? 0
+
+        activity = nil
+        currentSession = nil
+        clearPersistedSession()
+
         Task {
-            await activity?.end(
+            // End the specific activity
+            await activityToEnd?.end(
                 .init(
                     state: FocusTaskAttributes.ContentState(
                         focusStartDate: Date(),
                         isPaused: true,
-                        elapsedBeforePause: currentSession?.totalElapsed() ?? 0
+                        elapsedBeforePause: elapsed
                     ),
                     staleDate: nil
                 ),
                 dismissalPolicy: .immediate
             )
+            // Also end any other lingering activities
+            for existingActivity in Activity<FocusTaskAttributes>.activities {
+                await existingActivity.end(nil, dismissalPolicy: .immediate)
+            }
         }
-
-        activity = nil
-        currentSession = nil
-        clearPersistedSession()
 
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         #if DEBUG
@@ -163,8 +175,34 @@ final class FocusManager {
     }
 
     func switchFocus(task: VTask, projectName: String) {
-        endFocus()
-        startFocus(task: task, projectName: projectName)
+        let activityToEnd = activity
+        let elapsed = currentSession?.totalElapsed() ?? 0
+
+        // Clear state immediately
+        activity = nil
+        currentSession = nil
+        clearPersistedSession()
+
+        // End old activity and start new focus sequentially
+        Task {
+            await activityToEnd?.end(
+                .init(
+                    state: FocusTaskAttributes.ContentState(
+                        focusStartDate: Date(),
+                        isPaused: true,
+                        elapsedBeforePause: elapsed
+                    ),
+                    staleDate: nil
+                ),
+                dismissalPolicy: .immediate
+            )
+            // End any other lingering activities
+            for existingActivity in Activity<FocusTaskAttributes>.activities {
+                await existingActivity.end(nil, dismissalPolicy: .immediate)
+            }
+            // Now start the new focus on the main actor
+            startFocus(task: task, projectName: projectName)
+        }
     }
 
     func handleTaskCompleted(taskId: Int64) {
