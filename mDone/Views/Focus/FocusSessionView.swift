@@ -49,6 +49,12 @@ struct FocusSessionView: View {
                     endPoint: .bottom
                 )
             )
+        } else {
+            // Session was ended (e.g. task completed externally) — auto-dismiss
+            Color(.systemBackground)
+                .onAppear {
+                    dismiss()
+                }
         }
     }
 

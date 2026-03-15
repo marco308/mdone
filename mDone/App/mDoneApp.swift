@@ -74,7 +74,9 @@ struct mDoneApp: App {
             }
             #if os(iOS)
             .onOpenURL { url in
-                if url.scheme == "mdone", url.host == "focus" {
+                if url.scheme == "mdone", url.host == "focus",
+                   focusManager.currentSession != nil
+                {
                     focusManager.showFocusView = true
                 }
             }
