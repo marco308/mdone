@@ -28,7 +28,7 @@ actor AuthService {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: tokenKeychainKey,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
+            kSecMatchLimit as String: kSecMatchLimitOne,
         ]
 
         var result: AnyObject?
@@ -50,7 +50,7 @@ actor AuthService {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: tokenKeychainKey,
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
         ]
 
         SecItemAdd(query as CFDictionary, nil)
@@ -59,7 +59,7 @@ actor AuthService {
     nonisolated func deleteToken() {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: tokenKeychainKey
+            kSecAttrAccount as String: tokenKeychainKey,
         ]
 
         SecItemDelete(query as CFDictionary)

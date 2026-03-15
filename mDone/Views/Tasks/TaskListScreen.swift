@@ -3,7 +3,7 @@ import SwiftUI
 struct TaskListScreen: View {
     @Environment(AppState.self) private var appState
     @Environment(NetworkMonitor.self) private var networkMonitor
-    var projectFilter: Project? = nil
+    var projectFilter: Project?
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -34,8 +34,8 @@ struct TaskListScreen: View {
                 }
             }
             #if os(iOS)
-        .listStyle(.insetGrouped)
-        #endif
+            .listStyle(.insetGrouped)
+            #endif
             .refreshable {
                 await appState.refreshAll()
             }
@@ -44,7 +44,7 @@ struct TaskListScreen: View {
         }
         .navigationTitle(projectFilter?.title ?? "Inbox")
         .overlay {
-            if appState.isLoading && appState.tasks.isEmpty {
+            if appState.isLoading, appState.tasks.isEmpty {
                 LoadingOverlay()
             }
         }
@@ -88,7 +88,7 @@ struct TaskListScreen: View {
             )
         }
 
-        if appState.activeTasks.isEmpty && !appState.isLoading {
+        if appState.activeTasks.isEmpty, !appState.isLoading {
             Section {
                 EmptyStateView(
                     icon: "checkmark.circle",

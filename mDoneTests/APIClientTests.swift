@@ -2,7 +2,6 @@ import XCTest
 @testable import mDone
 
 final class APIClientTests: XCTestCase {
-
     func testVTaskDecoding() throws {
         let json = """
         {

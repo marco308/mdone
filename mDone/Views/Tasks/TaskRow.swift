@@ -37,13 +37,24 @@ struct TaskRow: View {
                         .lineLimit(2)
 
                     HStack(spacing: 8) {
-                        if let dueDate = task.dueDate {
+                        if let dueDate = task.effectiveDueDate {
                             HStack(spacing: 4) {
                                 Image(systemName: "calendar")
                                 Text(dueDate, style: .date)
                             }
                             .font(.caption)
                             .foregroundStyle(task.isOverdue ? .red : .secondary)
+                        }
+
+                        if task.isRepeating {
+                            HStack(spacing: 4) {
+                                Image(systemName: "repeat")
+                                if let desc = task.repeatDescription {
+                                    Text(desc)
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         }
 
                         if let labels = task.labels, !labels.isEmpty {

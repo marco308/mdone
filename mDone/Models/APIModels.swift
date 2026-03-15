@@ -20,17 +20,17 @@ enum NetworkError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "Invalid server URL"
+            "Invalid server URL"
         case .unauthorized:
-            return "Authentication failed. Please check your API token."
-        case .serverError(let code, let message):
-            return message ?? "Server error (\(code))"
+            "Authentication failed. Please check your API token."
+        case let .serverError(code, message):
+            message ?? "Server error (\(code))"
         case .decodingError:
-            return "Failed to parse server response"
+            "Failed to parse server response"
         case .networkUnavailable:
-            return "No internet connection"
-        case .unknown(let error):
-            return error.localizedDescription
+            "No internet connection"
+        case let .unknown(error):
+            error.localizedDescription
         }
     }
 }

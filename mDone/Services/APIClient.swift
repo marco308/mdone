@@ -12,7 +12,7 @@ actor APIClient {
     init(session: URLSession = .shared) {
         self.session = session
 
-        self.decoder = JSONDecoder()
+        decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         let dateFormatter = ISO8601DateFormatter()
         dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -33,19 +33,19 @@ actor APIClient {
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date: \(dateString)")
         }
 
-        self.encoder = JSONEncoder()
+        encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
         encoder.dateEncodingStrategy = .iso8601
     }
 
     func configure(serverURL: String, token: String) {
         self.serverURL = serverURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        self.apiToken = token
+        apiToken = token
     }
 
     func clearCredentials() {
-        self.serverURL = nil
-        self.apiToken = nil
+        serverURL = nil
+        apiToken = nil
     }
 
     private func buildRequest(for endpoint: Endpoint) throws -> URLRequest {
@@ -82,7 +82,7 @@ actor APIClient {
         }
 
         switch httpResponse.statusCode {
-        case 200...299:
+        case 200 ... 299:
             do {
                 return try decoder.decode(T.self, from: data)
             } catch {
@@ -96,7 +96,7 @@ actor APIClient {
         }
     }
 
-    func send<T: Encodable, R: Decodable>(_ endpoint: Endpoint, body: T) async throws -> R {
+    func send<R: Decodable>(_ endpoint: Endpoint, body: some Encodable) async throws -> R {
         var request = try buildRequest(for: endpoint)
         request.httpBody = try encoder.encode(body)
 
@@ -107,7 +107,7 @@ actor APIClient {
         }
 
         switch httpResponse.statusCode {
-        case 200...299:
+        case 200 ... 299:
             do {
                 return try decoder.decode(R.self, from: data)
             } catch {
@@ -121,7 +121,7 @@ actor APIClient {
         }
     }
 
-    func sendExpectingEmpty<T: Encodable>(_ endpoint: Endpoint, body: T) async throws {
+    func sendExpectingEmpty(_ endpoint: Endpoint, body: some Encodable) async throws {
         var request = try buildRequest(for: endpoint)
         request.httpBody = try encoder.encode(body)
 
@@ -132,7 +132,7 @@ actor APIClient {
         }
 
         switch httpResponse.statusCode {
-        case 200...299:
+        case 200 ... 299:
             return
         case 401:
             throw NetworkError.unauthorized
@@ -151,7 +151,7 @@ actor APIClient {
         }
 
         switch httpResponse.statusCode {
-        case 200...299:
+        case 200 ... 299:
             return
         case 401:
             throw NetworkError.unauthorized

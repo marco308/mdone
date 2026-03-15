@@ -18,11 +18,11 @@ final class AppState {
     private let notificationService = NotificationService.shared
 
     var overdueTasks: [VTask] {
-        tasks.filter { $0.isOverdue }.sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
+        tasks.filter(\.isOverdue).sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
     }
 
     var todayTasks: [VTask] {
-        tasks.filter { $0.isDueToday }.sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
+        tasks.filter(\.isDueToday).sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
     }
 
     var upcomingTasks: [VTask] {
@@ -31,7 +31,7 @@ final class AppState {
     }
 
     var noDateTasks: [VTask] {
-        tasks.filter { $0.dueDate == nil && !$0.done }
+        tasks.filter { $0.effectiveDueDate == nil && !$0.done }
     }
 
     var activeTasks: [VTask] {
@@ -184,7 +184,7 @@ final class AppState {
     func tasksForDate(_ date: Date) -> [VTask] {
         let calendar = Calendar.current
         return tasks.filter { task in
-            guard let dueDate = task.dueDate else { return false }
+            guard let dueDate = task.effectiveDueDate else { return false }
             return calendar.isDate(dueDate, inSameDayAs: date)
         }
     }
@@ -195,11 +195,11 @@ final class AppState {
         var result: [Date: [VTask]] = [:]
 
         for task in tasks {
-            guard let dueDate = task.dueDate else { continue }
+            guard let dueDate = task.effectiveDueDate else { continue }
             guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: month)),
                   let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else { continue }
 
-            if dueDate >= monthStart && dueDate < monthEnd {
+            if dueDate >= monthStart, dueDate < monthEnd {
                 let dayStart = calendar.startOfDay(for: dueDate)
                 result[dayStart, default: []].append(task)
             }

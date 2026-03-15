@@ -16,13 +16,15 @@ struct Endpoint {
     }
 
     // MARK: - User
+
     static let currentUser = Endpoint(path: "/api/v1/user")
 
     // MARK: - Projects
+
     static func projects(page: Int = 1, perPage: Int = 50) -> Endpoint {
         Endpoint(path: "/api/v1/projects", queryItems: [
             URLQueryItem(name: "page", value: "\(page)"),
-            URLQueryItem(name: "per_page", value: "\(perPage)")
+            URLQueryItem(name: "per_page", value: "\(perPage)"),
         ])
     }
 
@@ -35,17 +37,18 @@ struct Endpoint {
     }
 
     // MARK: - Tasks
+
     static func allTasks(page: Int = 1, perPage: Int = 50) -> Endpoint {
         Endpoint(path: "/api/v1/tasks", queryItems: [
             URLQueryItem(name: "page", value: "\(page)"),
-            URLQueryItem(name: "per_page", value: "\(perPage)")
+            URLQueryItem(name: "per_page", value: "\(perPage)"),
         ])
     }
 
     static func projectTasks(projectId: Int64, viewId: Int64, page: Int = 1, perPage: Int = 50) -> Endpoint {
         Endpoint(path: "/api/v1/projects/\(projectId)/views/\(viewId)/tasks", queryItems: [
             URLQueryItem(name: "page", value: "\(page)"),
-            URLQueryItem(name: "per_page", value: "\(perPage)")
+            URLQueryItem(name: "per_page", value: "\(perPage)"),
         ])
     }
 
@@ -66,14 +69,16 @@ struct Endpoint {
     }
 
     // MARK: - Labels
+
     static func labels(page: Int = 1, perPage: Int = 50) -> Endpoint {
         Endpoint(path: "/api/v1/labels", queryItems: [
             URLQueryItem(name: "page", value: "\(page)"),
-            URLQueryItem(name: "per_page", value: "\(perPage)")
+            URLQueryItem(name: "per_page", value: "\(perPage)"),
         ])
     }
 
     // MARK: - Notifications
+
     static let notifications = Endpoint(path: "/api/v1/notifications")
     static let markAllNotificationsRead = Endpoint(path: "/api/v1/notifications", method: .POST)
 }

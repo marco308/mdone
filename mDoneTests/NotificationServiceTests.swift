@@ -2,7 +2,6 @@ import XCTest
 @testable import mDone
 
 final class NotificationServiceTests: XCTestCase {
-
     func testReminderOffsetValues() {
         XCTAssertEqual(NotificationService.ReminderOffset.fifteenMinutes.timeInterval, 900)
         XCTAssertEqual(NotificationService.ReminderOffset.thirtyMinutes.timeInterval, 1800)

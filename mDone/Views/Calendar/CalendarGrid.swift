@@ -90,7 +90,8 @@ struct CalendarGrid: View {
 
     private func daysInMonth() -> [Date?] {
         guard let monthInterval = calendar.dateInterval(of: .month, for: displayedMonth),
-              let range = calendar.range(of: .day, in: .month, for: displayedMonth) else {
+              let range = calendar.range(of: .day, in: .month, for: displayedMonth)
+        else {
             return []
         }
 
@@ -132,7 +133,7 @@ struct DayCell: View {
 
             // Task dots
             HStack(spacing: 2) {
-                ForEach(0..<min(tasks.count, 3), id: \.self) { index in
+                ForEach(0 ..< min(tasks.count, 3), id: \.self) { index in
                     Circle()
                         .fill(dotColor(for: tasks[index]))
                         .frame(width: 5, height: 5)

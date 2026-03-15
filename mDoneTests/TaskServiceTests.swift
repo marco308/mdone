@@ -2,8 +2,7 @@ import XCTest
 @testable import mDone
 
 final class TaskServiceTests: XCTestCase {
-
-    func testVTaskSmartListFiltering() {
+    func testVTaskSmartListFiltering() throws {
         let now = Date()
         let calendar = Calendar.current
 
@@ -13,7 +12,7 @@ final class TaskServiceTests: XCTestCase {
             priority: 3, projectId: 1
         )
 
-        let todayEndOfDay = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: now)!
+        let todayEndOfDay = try XCTUnwrap(calendar.date(bySettingHour: 23, minute: 59, second: 59, of: now))
         let todayTask = VTask(
             id: 2, title: "Today", done: false,
             dueDate: todayEndOfDay,

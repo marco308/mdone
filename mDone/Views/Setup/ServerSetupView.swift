@@ -37,14 +37,14 @@ struct ServerSetupView: View {
 
                             TextField("https://vikunja.example.com", text: $serverURL)
                                 .textFieldStyle(.roundedBorder)
-                                #if os(iOS)
+                            #if os(iOS)
                                 .textContentType(.URL)
-                                #endif
+                            #endif
                                 .autocorrectionDisabled()
-                                #if os(iOS)
+                            #if os(iOS)
                                 .textInputAutocapitalization(.never)
                                 .keyboardType(.URL)
-                                #endif
+                            #endif
                         }
 
                         VStack(alignment: .leading, spacing: 6) {
@@ -55,13 +55,13 @@ struct ServerSetupView: View {
 
                             SecureField("Paste your API token", text: $apiToken)
                                 .textFieldStyle(.roundedBorder)
-                                #if os(iOS)
+                            #if os(iOS)
                                 .textContentType(.password)
-                                #endif
+                            #endif
                                 .autocorrectionDisabled()
-                                #if os(iOS)
+                            #if os(iOS)
                                 .textInputAutocapitalization(.never)
-                                #endif
+                            #endif
                         }
                     }
                     .padding(.horizontal)

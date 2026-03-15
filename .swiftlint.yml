@@ -1,0 +1,41 @@
+included:
+  - mDone
+  - mDoneTests
+
+excluded:
+  - mDone/Resources
+
+disabled_rules:
+  - trailing_whitespace
+  - line_length
+  - type_body_length
+  - file_length
+  - function_body_length
+  - cyclomatic_complexity
+  - implicit_optional_initialization
+  - non_optional_string_data_conversion
+
+opt_in_rules:
+  - empty_count
+  - closure_spacing
+  - contains_over_filter_count
+  - empty_string
+  - modifier_order
+  - overridden_super_call
+  - redundant_nil_coalescing
+  - toggle_bool
+  - unneeded_parentheses_in_closure_argument
+
+identifier_name:
+  min_length: 1
+  max_length: 60
+
+type_name:
+  min_length: 2
+  max_length: 50
+  excluded:
+    - mDoneApp
+
+nesting:
+  type_level: 3
+  function_level: 3

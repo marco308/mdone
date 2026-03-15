@@ -2,8 +2,8 @@ import SwiftUI
 
 struct CalendarScreen: View {
     @Environment(AppState.self) private var appState
-    @State private var selectedDate: Date = Date()
-    @State private var displayedMonth: Date = Date()
+    @State private var selectedDate: Date = .init()
+    @State private var displayedMonth: Date = .init()
 
     var body: some View {
         VStack(spacing: 0) {

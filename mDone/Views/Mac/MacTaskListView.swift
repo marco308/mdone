@@ -36,7 +36,7 @@ struct MacTaskListView: View {
     @ViewBuilder
     private var taskListContent: some View {
         let tasks = filteredAndSortedTasks
-        if tasks.isEmpty && searchText.isEmpty {
+        if tasks.isEmpty, searchText.isEmpty {
             EmptyStateView(
                 icon: emptyStateIcon,
                 title: emptyStateTitle,
@@ -93,7 +93,7 @@ struct MacTaskListView: View {
         case .upcoming: return "Upcoming"
         case .overdue: return "Overdue"
         case .noDate: return "No Date"
-        case .project(let project): return project.title
+        case let .project(project): return project.title
         case .calendar: return "Calendar"
         case .settings: return "Settings"
         }
@@ -107,7 +107,7 @@ struct MacTaskListView: View {
         case .upcoming: return appState.upcomingTasks
         case .overdue: return appState.overdueTasks
         case .noDate: return appState.noDateTasks
-        case .project(let project): return appState.tasksForProject(project.id)
+        case let .project(project): return appState.tasksForProject(project.id)
         case .calendar, .settings: return []
         }
     }

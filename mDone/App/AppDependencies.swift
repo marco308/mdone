@@ -10,17 +10,17 @@ struct AppDependencies {
             CachedTask.self,
             CachedProject.self,
             CachedLabel.self,
-            PendingOperation.self
+            PendingOperation.self,
         ])
 
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
         do {
-            self.modelContainer = try ModelContainer(for: schema, configurations: [config])
+            modelContainer = try ModelContainer(for: schema, configurations: [config])
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }
 
-        self.networkMonitor = NetworkMonitor()
+        networkMonitor = NetworkMonitor()
     }
 }

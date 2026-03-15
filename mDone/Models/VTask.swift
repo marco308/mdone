@@ -41,21 +41,46 @@ struct VTask: Codable, Identifiable, Hashable {
         PriorityLevel(rawValue: Int(priority)) ?? .none
     }
 
+    var isRepeating: Bool {
+        (repeatAfter ?? 0) > 0
+    }
+
+    var repeatDescription: String? {
+        guard let interval = repeatAfter, interval > 0 else { return nil }
+        let hours = interval / 3600
+        let days = hours / 24
+        if days == 1 { return "Daily" }
+        if days == 7 { return "Weekly" }
+        if days >= 28 && days <= 31 { return "Monthly" }
+        if days == 365 || days == 366 { return "Yearly" }
+        if days > 0 { return "Every \(days) days" }
+        if hours > 0 { return "Every \(hours) hours" }
+        return "Repeating"
+    }
+
+    /// Returns nil for Vikunja's zero-date sentinel (year 1)
+    var effectiveDueDate: Date? {
+        guard let dueDate else { return nil }
+        if Calendar.current.component(.year, from: dueDate) <= 1 { return nil }
+        return dueDate
+    }
+
     var isOverdue: Bool {
-        guard let dueDate, !done else { return false }
+        guard let dueDate = effectiveDueDate, !done else { return false }
         return dueDate < Date()
     }
 
     var isDueToday: Bool {
-        guard let dueDate, !done else { return false }
+        guard let dueDate = effectiveDueDate, !done else { return false }
         return Calendar.current.isDateInToday(dueDate)
     }
 
     var isDueThisWeek: Bool {
-        guard let dueDate, !done else { return false }
+        guard let dueDate = effectiveDueDate, !done else { return false }
         let now = Date()
         let calendar = Calendar.current
-        guard let weekEnd = calendar.date(byAdding: .day, value: 7, to: calendar.startOfDay(for: now)) else { return false }
+        guard let weekEnd = calendar.date(byAdding: .day, value: 7, to: calendar.startOfDay(for: now))
+        else { return false }
         return dueDate > now && dueDate <= weekEnd
     }
 }

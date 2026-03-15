@@ -29,6 +29,15 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_EMIT_LOC_STRINGS: "YES"
+    postBuildScripts:
+      - script: |
+          if which swiftlint > /dev/null; then
+            swiftlint lint --quiet
+          else
+            echo "warning: SwiftLint not installed"
+          fi
+        name: SwiftLint
+        basedOnDependencyAnalysis: false
     scheme:
       testTargets:
         - mDoneTests
@@ -47,6 +56,15 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_EMIT_LOC_STRINGS: "YES"
         SUPPORTS_MACCATALYST: "NO"
+    postBuildScripts:
+      - script: |
+          if which swiftlint > /dev/null; then
+            swiftlint lint --quiet
+          else
+            echo "warning: SwiftLint not installed"
+          fi
+        name: SwiftLint
+        basedOnDependencyAnalysis: false
     scheme:
       testTargets: []
 

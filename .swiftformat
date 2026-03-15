@@ -1,0 +1,17 @@
+--swiftversion 5.9
+--indent 4
+--indentcase false
+--trimwhitespace always
+--voidtype void
+--wrapcollections beforefirst
+--wraparguments beforefirst
+--wrapparameters beforefirst
+--maxwidth 120
+--self remove
+--importgrouping testable-bottom
+--semicolons never
+--commas always
+--stripunusedargs closure-only
+--ifdef no-indent
+
+--exclude mDone/Resources

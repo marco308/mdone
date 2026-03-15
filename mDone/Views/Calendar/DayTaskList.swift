@@ -31,8 +31,8 @@ struct DayTaskList: View {
                     }
                 }
                 #if os(iOS)
-        .listStyle(.insetGrouped)
-        #endif
+                .listStyle(.insetGrouped)
+                #endif
             }
         }
     }

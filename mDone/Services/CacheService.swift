@@ -19,20 +19,20 @@ final class CachedTask {
     var labelsData: Data?
 
     init(from task: VTask) {
-        self.id = task.id
-        self.title = task.title
-        self.taskDescription = task.description
-        self.done = task.done
-        self.doneAt = task.doneAt
-        self.dueDate = task.dueDate
-        self.priority = task.priority
-        self.projectId = task.projectId
-        self.hexColor = task.hexColor
-        self.percentDone = task.percentDone
-        self.isFavorite = task.isFavorite ?? false
-        self.created = task.created
-        self.updated = task.updated
-        self.labelsData = try? JSONEncoder().encode(task.labels)
+        id = task.id
+        title = task.title
+        taskDescription = task.description
+        done = task.done
+        doneAt = task.doneAt
+        dueDate = task.dueDate
+        priority = task.priority
+        projectId = task.projectId
+        hexColor = task.hexColor
+        percentDone = task.percentDone
+        isFavorite = task.isFavorite ?? false
+        created = task.created
+        updated = task.updated
+        labelsData = try? JSONEncoder().encode(task.labels)
     }
 
     func toVTask() -> VTask {
@@ -61,19 +61,19 @@ final class CachedTask {
     }
 
     func update(from task: VTask) {
-        self.title = task.title
-        self.taskDescription = task.description
-        self.done = task.done
-        self.doneAt = task.doneAt
-        self.dueDate = task.dueDate
-        self.priority = task.priority
-        self.projectId = task.projectId
-        self.hexColor = task.hexColor
-        self.percentDone = task.percentDone
-        self.isFavorite = task.isFavorite ?? false
-        self.created = task.created
-        self.updated = task.updated
-        self.labelsData = try? JSONEncoder().encode(task.labels)
+        title = task.title
+        taskDescription = task.description
+        done = task.done
+        doneAt = task.doneAt
+        dueDate = task.dueDate
+        priority = task.priority
+        projectId = task.projectId
+        hexColor = task.hexColor
+        percentDone = task.percentDone
+        isFavorite = task.isFavorite ?? false
+        created = task.created
+        updated = task.updated
+        labelsData = try? JSONEncoder().encode(task.labels)
     }
 }
 
@@ -90,15 +90,15 @@ final class CachedProject {
     var updated: Date?
 
     init(from project: Project) {
-        self.id = project.id
-        self.title = project.title
-        self.projectDescription = project.description
-        self.hexColor = project.hexColor
-        self.isArchived = project.isArchived ?? false
-        self.isFavorite = project.isFavorite ?? false
-        self.position = project.position
-        self.created = project.created
-        self.updated = project.updated
+        id = project.id
+        title = project.title
+        projectDescription = project.description
+        hexColor = project.hexColor
+        isArchived = project.isArchived ?? false
+        isFavorite = project.isFavorite ?? false
+        position = project.position
+        created = project.created
+        updated = project.updated
     }
 
     func toProject() -> Project {
@@ -116,14 +116,14 @@ final class CachedProject {
     }
 
     func update(from project: Project) {
-        self.title = project.title
-        self.projectDescription = project.description
-        self.hexColor = project.hexColor
-        self.isArchived = project.isArchived ?? false
-        self.isFavorite = project.isFavorite ?? false
-        self.position = project.position
-        self.created = project.created
-        self.updated = project.updated
+        title = project.title
+        projectDescription = project.description
+        hexColor = project.hexColor
+        isArchived = project.isArchived ?? false
+        isFavorite = project.isFavorite ?? false
+        position = project.position
+        created = project.created
+        updated = project.updated
     }
 }
 
@@ -137,12 +137,12 @@ final class CachedLabel {
     var updated: Date?
 
     init(from label: VLabel) {
-        self.id = label.id
-        self.title = label.title
-        self.hexColor = label.hexColor
-        self.labelDescription = label.description
-        self.created = label.created
-        self.updated = label.updated
+        id = label.id
+        title = label.title
+        hexColor = label.hexColor
+        labelDescription = label.description
+        created = label.created
+        updated = label.updated
     }
 
     func toLabel() -> VLabel {
@@ -166,10 +166,10 @@ final class PendingOperation {
     var timestamp: Date
 
     init(endpointPath: String, method: String, bodyData: Data? = nil) {
-        self.id = UUID()
+        id = UUID()
         self.endpointPath = endpointPath
         self.method = method
         self.bodyData = bodyData
-        self.timestamp = Date()
+        timestamp = Date()
     }
 }

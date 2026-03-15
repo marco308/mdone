@@ -31,7 +31,7 @@ struct TaskDetailSheet: View {
                         .font(.headline)
 
                     TextField("Description", text: $description, axis: .vertical)
-                        .lineLimit(3...8)
+                        .lineLimit(3 ... 8)
                         .font(.body)
                 }
 
@@ -92,29 +92,29 @@ struct TaskDetailSheet: View {
             }
             .navigationTitle("Edit Task")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(.inline)
             #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { saveTask() }
-                        .fontWeight(.semibold)
-                        .disabled(title.isEmpty)
-                }
-            }
-            .alert("Delete Task?", isPresented: $showDeleteConfirm) {
-                Button("Delete", role: .destructive) {
-                    Task {
-                        await appState.deleteTask(task)
-                        dismiss()
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") { saveTask() }
+                            .fontWeight(.semibold)
+                            .disabled(title.isEmpty)
                     }
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This action cannot be undone.")
-            }
+                .alert("Delete Task?", isPresented: $showDeleteConfirm) {
+                    Button("Delete", role: .destructive) {
+                        Task {
+                            await appState.deleteTask(task)
+                            dismiss()
+                        }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("This action cannot be undone.")
+                }
         }
         #if os(iOS)
         .presentationDetents([.medium, .large])
@@ -149,7 +149,10 @@ struct FlowLayout: Layout {
         let positions = layout(sizes: sizes, containerWidth: bounds.width).positions
 
         for (index, subview) in subviews.enumerated() {
-            subview.place(at: CGPoint(x: bounds.minX + positions[index].x, y: bounds.minY + positions[index].y), proposal: .unspecified)
+            subview.place(
+                at: CGPoint(x: bounds.minX + positions[index].x, y: bounds.minY + positions[index].y),
+                proposal: .unspecified
+            )
         }
     }
 
@@ -161,7 +164,7 @@ struct FlowLayout: Layout {
         var maxWidth: CGFloat = 0
 
         for size in sizes {
-            if x + size.width > containerWidth && x > 0 {
+            if x + size.width > containerWidth, x > 0 {
                 x = 0
                 y += maxHeight + spacing
                 maxHeight = 0

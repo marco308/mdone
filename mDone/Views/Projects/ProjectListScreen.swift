@@ -25,7 +25,7 @@ struct ProjectListScreen: View {
                 }
             }
 
-            if appState.projects.isEmpty && !appState.isLoading {
+            if appState.projects.isEmpty, !appState.isLoading {
                 Section {
                     EmptyStateView(
                         icon: "folder",

@@ -2,7 +2,6 @@ import XCTest
 @testable import mDone
 
 final class SyncServiceTests: XCTestCase {
-
     func testCachedTaskRoundTrip() {
         let task = VTask(
             id: 42,
