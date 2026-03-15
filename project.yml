@@ -52,6 +52,7 @@ targets:
     platform: macOS
     sources:
       - mDone
+      - mDoneShared
     settings:
       base:
         INFOPLIST_FILE: mDone/Info.plist

@@ -15,10 +15,12 @@ actor AuthService {
 
     nonisolated func saveServerURL(_ url: String) {
         UserDefaults.standard.set(url, forKey: serverURLKey)
+        SharedKeys.sharedDefaults.set(url, forKey: SharedKeys.serverURLKey)
     }
 
     nonisolated func clearServerURL() {
         UserDefaults.standard.removeObject(forKey: serverURLKey)
+        SharedKeys.sharedDefaults.removeObject(forKey: SharedKeys.serverURLKey)
     }
 
     // MARK: - API Token (Keychain)
@@ -54,6 +56,9 @@ actor AuthService {
         ]
 
         SecItemAdd(query as CFDictionary, nil)
+
+        // Also persist to shared App Group UserDefaults so widgets can access it
+        SharedKeys.sharedDefaults.set(token, forKey: SharedKeys.apiTokenKey)
     }
 
     nonisolated func deleteToken() {
@@ -63,6 +68,8 @@ actor AuthService {
         ]
 
         SecItemDelete(query as CFDictionary)
+
+        SharedKeys.sharedDefaults.removeObject(forKey: SharedKeys.apiTokenKey)
     }
 
     // MARK: - Auth State

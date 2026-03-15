@@ -15,140 +15,141 @@ struct TaskRow: View {
     #endif
 
     var body: some View {
-        Button {
-            showDetail = true
-        } label: {
-            HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(priorityColor)
-                    .frame(width: 4, height: 36)
-
-                Button {
-                    Task {
-                        await appState.toggleTaskDone(task)
-                    }
-                } label: {
-                    Image(systemName: task.done ? "checkmark.circle.fill" : "circle")
-                        .font(.title3)
-                        .foregroundStyle(task.done ? .green : checkboxColor)
-                        .contentTransition(.symbolEffect(.replace))
-                }
-                .buttonStyle(.plain)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(task.title)
-                        .font(.body)
-                        .strikethrough(task.done)
-                        .foregroundStyle(task.done ? .secondary : .primary)
-                        .lineLimit(2)
-
-                    HStack(spacing: 8) {
-                        if let dueDate = task.effectiveDueDate {
-                            HStack(spacing: 4) {
-                                Image(systemName: "calendar")
-                                if task.hasSpecificTime {
-                                    Text(dueDate, format: .dateTime.month().day().year().hour().minute())
-                                } else {
-                                    Text(dueDate, style: .date)
-                                }
-                            }
-                            .font(.caption)
-                            .foregroundStyle(task.isOverdue ? .red : .secondary)
-                        }
-
-                        if task.isRepeating {
-                            HStack(spacing: 4) {
-                                Image(systemName: "repeat")
-                                if let desc = task.repeatDescription {
-                                    Text(desc)
-                                }
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-
-                        if let labels = task.labels, !labels.isEmpty {
-                            HStack(spacing: 4) {
-                                ForEach(labels.prefix(3)) { label in
-                                    LabelChip(label: label)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Spacer()
-
-                if task.priority > 0 {
-                    PriorityBadge(priority: task.priorityLevel)
-                }
-
+        rowContent
+        #if os(iOS)
+            .contentShape(Rectangle())
+            .onTapGesture { showDetail = true }
+            .listRowBackground(isFocused ? Color.orange.opacity(0.08) : nil)
+        #endif
+            .swipeActions(edge: .leading) {
                 #if os(iOS)
-                if isFocused {
-                    Image(systemName: "scope")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .symbolEffect(.pulse)
+                Button {
+                    if isFocused {
+                        focusManager.endFocus()
+                    } else {
+                        let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
+                        focusManager.switchFocus(task: task, projectName: projectName)
+                    }
+                } label: {
+                    Label(isFocused ? "End Focus" : "Focus", systemImage: "scope")
                 }
+                .tint(.orange)
                 #endif
-            }
-            .padding(.vertical, 4)
-            .opacity(task.done ? 0.6 : 1)
-        }
-        .buttonStyle(.plain)
-        #if os(iOS)
-        .listRowBackground(isFocused ? Color.orange.opacity(0.08) : nil)
-        #endif
-        .swipeActions(edge: .leading) {
-            #if os(iOS)
-            Button {
-                if isFocused {
-                    focusManager.endFocus()
-                } else {
-                    let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
-                    focusManager.switchFocus(task: task, projectName: projectName)
+
+                Button {
+                    Task { await appState.toggleTaskDone(task) }
+                } label: {
+                    Label(task.done ? "Undo" : "Done", systemImage: task.done ? "arrow.uturn.backward" : "checkmark")
                 }
-            } label: {
-                Label(isFocused ? "End Focus" : "Focus", systemImage: "scope")
+                .tint(.green)
             }
-            .tint(.orange)
-            #endif
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                Button(role: .destructive) {
+                    Task { await appState.deleteTask(task) }
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        #if os(iOS)
+            .contextMenu {
+                if isFocused {
+                    Button {
+                        focusManager.endFocus()
+                    } label: {
+                        Label("End Focus", systemImage: "scope")
+                    }
+                } else {
+                    Button {
+                        let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
+                        focusManager.switchFocus(task: task, projectName: projectName)
+                    } label: {
+                        Label("Start Focus", systemImage: "scope")
+                    }
+                }
+            }
+            .sheet(isPresented: $showDetail) {
+                TaskDetailSheet(task: task)
+            }
+        #endif
+    }
+
+    private var rowContent: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(priorityColor)
+                .frame(width: 4, height: 36)
 
             Button {
-                Task { await appState.toggleTaskDone(task) }
+                Task {
+                    await appState.toggleTaskDone(task)
+                }
             } label: {
-                Label(task.done ? "Undo" : "Done", systemImage: task.done ? "arrow.uturn.backward" : "checkmark")
+                Image(systemName: task.done ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(task.done ? .green : checkboxColor)
+                    .contentTransition(.symbolEffect(.replace))
             }
-            .tint(.green)
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button(role: .destructive) {
-                Task { await appState.deleteTask(task) }
-            } label: {
-                Label("Delete", systemImage: "trash")
+            .buttonStyle(.plain)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(task.title)
+                    .font(.body)
+                    .strikethrough(task.done)
+                    .foregroundStyle(task.done ? .secondary : .primary)
+                    .lineLimit(2)
+
+                HStack(spacing: 8) {
+                    if let dueDate = task.effectiveDueDate {
+                        HStack(spacing: 4) {
+                            Image(systemName: "calendar")
+                            if task.hasSpecificTime {
+                                Text(dueDate, format: .dateTime.month().day().year().hour().minute())
+                            } else {
+                                Text(dueDate, style: .date)
+                            }
+                        }
+                        .font(.caption)
+                        .foregroundStyle(task.isOverdue ? .red : .secondary)
+                    }
+
+                    if task.isRepeating {
+                        HStack(spacing: 4) {
+                            Image(systemName: "repeat")
+                            if let desc = task.repeatDescription {
+                                Text(desc)
+                            }
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+
+                    if let labels = task.labels, !labels.isEmpty {
+                        HStack(spacing: 4) {
+                            ForEach(labels.prefix(3)) { label in
+                                LabelChip(label: label)
+                            }
+                        }
+                    }
+                }
             }
-        }
-        #if os(iOS)
-        .contextMenu {
+
+            Spacer()
+
+            if task.priority > 0 {
+                PriorityBadge(priority: task.priorityLevel)
+            }
+
+            #if os(iOS)
             if isFocused {
-                Button {
-                    focusManager.endFocus()
-                } label: {
-                    Label("End Focus", systemImage: "scope")
-                }
-            } else {
-                Button {
-                    let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
-                    focusManager.switchFocus(task: task, projectName: projectName)
-                } label: {
-                    Label("Start Focus", systemImage: "scope")
-                }
+                Image(systemName: "scope")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .symbolEffect(.pulse)
             }
+            #endif
         }
-        #endif
-        .sheet(isPresented: $showDetail) {
-            TaskDetailSheet(task: task)
-        }
+        .padding(.vertical, 4)
+        .opacity(task.done ? 0.6 : 1)
     }
 
     private var priorityColor: Color {

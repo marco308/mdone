@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import WidgetKit
 
 @Observable
 final class AppState {
@@ -176,6 +177,10 @@ final class AppState {
         labels = []
         notifications = []
         isAuthenticated = false
+
+        // Clear cached widget data and refresh widgets
+        SharedKeys.sharedDefaults.removeObject(forKey: SharedKeys.widgetDataKey)
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     @MainActor
@@ -204,6 +209,9 @@ final class AppState {
 
             errorMessage = nil
             print("[mDone] refreshAll: SUCCESS")
+
+            pushWidgetData()
+            WidgetCenter.shared.reloadAllTimelines()
         } catch let error as NetworkError {
             print("[mDone] refreshAll: NetworkError: \(error)")
             if case .unauthorized = error {
@@ -273,6 +281,7 @@ final class AppState {
             #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             #endif
+            WidgetCenter.shared.reloadAllTimelines()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -287,6 +296,7 @@ final class AppState {
             #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             #endif
+            WidgetCenter.shared.reloadAllTimelines()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -299,6 +309,7 @@ final class AppState {
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
+            WidgetCenter.shared.reloadAllTimelines()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -314,6 +325,7 @@ final class AppState {
             #if os(iOS)
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
             #endif
+            WidgetCenter.shared.reloadAllTimelines()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -443,5 +455,61 @@ final class AppState {
             }
         }
         return result
+    }
+
+    // MARK: - Widget Data
+
+    /// Serializes current task data as WidgetData to the shared App Group UserDefaults
+    /// so widgets have instant access without needing to make API calls.
+    private func pushWidgetData() {
+        let now = Date()
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: now)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? now
+
+        let projectLookup = Dictionary(uniqueKeysWithValues: projects.map { ($0.id, $0.title) })
+
+        func toWidgetTask(_ task: VTask) -> WidgetTask {
+            WidgetTask(
+                id: task.id,
+                title: task.title,
+                done: task.done,
+                dueDate: task.effectiveDueDate,
+                priority: Int(task.priority),
+                projectId: task.projectId,
+                projectTitle: projectLookup[task.projectId],
+                isOverdue: task.isOverdue
+            )
+        }
+
+        let today = tasks
+            .filter { $0.isDueToday && !$0.done }
+            .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
+            .prefix(10)
+            .map(toWidgetTask)
+
+        let upcoming = tasks
+            .filter {
+                guard let due = $0.effectiveDueDate, !$0.done else { return false }
+                return due > endOfDay
+            }
+            .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
+            .prefix(10)
+            .map(toWidgetTask)
+
+        let overdue = tasks
+            .filter { $0.isOverdue && !$0.isDueToday }
+            .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
+            .prefix(10)
+            .map(toWidgetTask)
+
+        let widgetData = WidgetData(
+            todayTasks: Array(today),
+            upcomingTasks: Array(upcoming),
+            overdueTasks: Array(overdue),
+            lastUpdated: now
+        )
+
+        WidgetDataProvider.shared.cacheWidgetData(widgetData)
     }
 }

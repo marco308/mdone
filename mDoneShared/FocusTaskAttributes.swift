@@ -1,3 +1,4 @@
+#if os(iOS)
 import ActivityKit
 import Foundation
 
@@ -18,3 +19,4 @@ struct FocusTaskAttributes: ActivityAttributes {
         let elapsedBeforePause: TimeInterval
     }
 }
+#endif
