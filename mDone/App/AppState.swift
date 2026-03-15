@@ -20,6 +20,9 @@ final class AppState {
     var onTaskCompleted: ((Int64) -> Void)?
     var onTaskDeleted: ((Int64) -> Void)?
 
+    /// Per-project ordered task lists fetched from the view endpoint (preserves positions).
+    private var projectTaskCache: [Int64: [VTask]] = [:]
+
     var unreadNotificationCount: Int {
         notifications.filter { $0.read != true }.count
     }
@@ -134,6 +137,32 @@ final class AppState {
         authService.saveServerURL(serverURL)
         authService.saveToken(token)
         print("[mDone] Credentials saved, setting isAuthenticated = true")
+        isAuthenticated = true
+    }
+
+    @MainActor
+    func loginWithCredentials(serverURL: String, username: String, password: String) async throws {
+        print("[mDone] loginWithCredentials() called")
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        let url = serverURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        await APIClient.shared.configure(serverURL: url, token: "")
+
+        // Get JWT token via login endpoint
+        let loginRequest = LoginRequest(username: username, password: password)
+        let loginResponse: LoginResponse = try await APIClient.shared.send(Endpoint.login, body: loginRequest)
+
+        // Configure with the JWT token
+        await APIClient.shared.configure(serverURL: url, token: loginResponse.token)
+
+        // Validate
+        let projects: [Project] = try await APIClient.shared.fetch(Endpoint.projects())
+        print("[mDone] Validation OK - got \(projects.count) projects")
+
+        authService.saveServerURL(url)
+        authService.saveToken(loginResponse.token)
         isAuthenticated = true
     }
 
@@ -291,7 +320,34 @@ final class AppState {
     }
 
     func tasksForProject(_ projectId: Int64) -> [VTask] {
-        tasks.filter { $0.projectId == projectId && !$0.done }
+        // Use cached view-specific tasks if available (has correct positions)
+        if let cached = projectTaskCache[projectId] {
+            return cached.filter { !$0.done }
+        }
+        return tasks.filter { $0.projectId == projectId && !$0.done }
+    }
+
+    /// Fetches tasks for a specific project via the view endpoint, which returns correct positions.
+    @MainActor
+    func fetchProjectTasks(project: Project) async {
+        guard let viewId = project.listViewId else { return }
+        do {
+            let viewTasks: [VTask] = try await taskService.fetchProjectTasks(
+                projectId: project.id, viewId: viewId
+            )
+            // Store in cache — these have correct per-view positions
+            projectTaskCache[project.id] = viewTasks
+            // Also update the global task list with any new tasks
+            for viewTask in viewTasks {
+                if let index = tasks.firstIndex(where: { $0.id == viewTask.id }) {
+                    tasks[index] = viewTask
+                } else {
+                    tasks.append(viewTask)
+                }
+            }
+        } catch {
+            print("[mDone] fetchProjectTasks error: \(error)")
+        }
     }
 
     func tasksForDate(_ date: Date) -> [VTask] {
@@ -358,6 +414,13 @@ final class AppState {
             try await taskService.updatePosition(taskId: task.id, position: position, viewId: resolvedViewId)
             if let index = tasks.firstIndex(where: { $0.id == task.id }) {
                 tasks[index].position = position
+            }
+            // Update cached project task order
+            if var cached = projectTaskCache[task.projectId] {
+                if let cacheIndex = cached.firstIndex(where: { $0.id == task.id }) {
+                    cached[cacheIndex].position = position
+                }
+                projectTaskCache[task.projectId] = cached.sorted { ($0.position ?? 0) < ($1.position ?? 0) }
             }
         } catch {
             errorMessage = error.localizedDescription

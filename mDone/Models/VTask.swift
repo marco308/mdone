@@ -58,6 +58,13 @@ struct VTask: Codable, Identifiable, Hashable {
         return "Repeating"
     }
 
+    /// Whether the due date has a specific time (not midnight)
+    var hasSpecificTime: Bool {
+        guard let dueDate = effectiveDueDate else { return false }
+        let components = Calendar.current.dateComponents([.hour, .minute], from: dueDate)
+        return (components.hour ?? 0) != 0 || (components.minute ?? 0) != 0
+    }
+
     /// Returns nil for Vikunja's zero-date sentinel (year 1)
     var effectiveDueDate: Date? {
         guard let dueDate else { return nil }

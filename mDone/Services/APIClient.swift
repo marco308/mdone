@@ -96,6 +96,44 @@ actor APIClient {
         }
     }
 
+    /// Fetches all pages of a paginated endpoint and returns the combined results.
+    func fetchAllPages<T: Decodable>(_ endpointBuilder: (Int, Int) -> Endpoint, perPage: Int = 100) async throws -> [T] {
+        var allItems: [T] = []
+        var page = 1
+
+        while true {
+            let endpoint = endpointBuilder(page, perPage)
+            let request = try buildRequest(for: endpoint)
+            let (data, response) = try await session.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw NetworkError.unknown(URLError(.badServerResponse))
+            }
+
+            switch httpResponse.statusCode {
+            case 200 ... 299:
+                let items: [T]
+                do {
+                    items = try decoder.decode([T].self, from: data)
+                } catch {
+                    throw NetworkError.decodingError(error)
+                }
+                allItems.append(contentsOf: items)
+
+                let totalPages = Int(httpResponse.value(forHTTPHeaderField: "x-pagination-total-pages") ?? "1") ?? 1
+                if page >= totalPages || items.isEmpty {
+                    return allItems
+                }
+                page += 1
+            case 401:
+                throw NetworkError.unauthorized
+            default:
+                let apiError = try? decoder.decode(APIError.self, from: data)
+                throw NetworkError.serverError(statusCode: httpResponse.statusCode, message: apiError?.message)
+            }
+        }
+    }
+
     func send<R: Decodable>(_ endpoint: Endpoint, body: some Encodable) async throws -> R {
         var request = try buildRequest(for: endpoint)
         request.httpBody = try encoder.encode(body)

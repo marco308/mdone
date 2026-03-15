@@ -46,7 +46,11 @@ struct TaskRow: View {
                         if let dueDate = task.effectiveDueDate {
                             HStack(spacing: 4) {
                                 Image(systemName: "calendar")
-                                Text(dueDate, style: .date)
+                                if task.hasSpecificTime {
+                                    Text(dueDate, format: .dateTime.month().day().year().hour().minute())
+                                } else {
+                                    Text(dueDate, style: .date)
+                                }
                             }
                             .font(.caption)
                             .foregroundStyle(task.isOverdue ? .red : .secondary)

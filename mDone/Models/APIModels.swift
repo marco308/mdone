@@ -1,5 +1,10 @@
 import Foundation
 
+struct LoginRequest: Encodable {
+    var username: String
+    var password: String
+}
+
 struct LoginResponse: Codable {
     var token: String
 }

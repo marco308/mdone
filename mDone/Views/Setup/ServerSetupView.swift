@@ -3,9 +3,17 @@ import SwiftUI
 struct ServerSetupView: View {
     @Environment(AppState.self) private var appState
     @State private var serverURL = ""
+    @State private var username = ""
+    @State private var password = ""
     @State private var apiToken = ""
     @State private var isConnecting = false
     @State private var errorMessage: String?
+    @State private var authMode: AuthMode = .credentials
+
+    enum AuthMode: String, CaseIterable {
+        case credentials = "Login"
+        case apiToken = "API Token"
+    }
 
     var body: some View {
         NavigationStack {
@@ -47,21 +55,58 @@ struct ServerSetupView: View {
                             #endif
                         }
 
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("API Token")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .textCase(.uppercase)
+                        Picker("Auth Method", selection: $authMode) {
+                            ForEach(AuthMode.allCases, id: \.self) { mode in
+                                Text(mode.rawValue).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
 
-                            SecureField("Paste your API token", text: $apiToken)
-                                .textFieldStyle(.roundedBorder)
-                            #if os(iOS)
-                                .textContentType(.password)
-                            #endif
-                                .autocorrectionDisabled()
-                            #if os(iOS)
-                                .textInputAutocapitalization(.never)
-                            #endif
+                        if authMode == .credentials {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Username")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .textCase(.uppercase)
+
+                                TextField("Username", text: $username)
+                                    .textFieldStyle(.roundedBorder)
+                                #if os(iOS)
+                                    .textContentType(.username)
+                                    .textInputAutocapitalization(.never)
+                                #endif
+                                    .autocorrectionDisabled()
+                            }
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Password")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .textCase(.uppercase)
+
+                                SecureField("Password", text: $password)
+                                    .textFieldStyle(.roundedBorder)
+                                #if os(iOS)
+                                    .textContentType(.password)
+                                #endif
+                            }
+                        } else {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("API Token")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .textCase(.uppercase)
+
+                                SecureField("Paste your API token", text: $apiToken)
+                                    .textFieldStyle(.roundedBorder)
+                                #if os(iOS)
+                                    .textContentType(.password)
+                                #endif
+                                    .autocorrectionDisabled()
+                                #if os(iOS)
+                                    .textInputAutocapitalization(.never)
+                                #endif
+                            }
                         }
                     }
                     .padding(.horizontal)
@@ -90,14 +135,22 @@ struct ServerSetupView: View {
                         .frame(height: 44)
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(serverURL.isEmpty || apiToken.isEmpty || isConnecting)
+                    .disabled(isFormIncomplete || isConnecting)
                     .padding(.horizontal)
 
-                    Text("You can create an API token in your Vikunja instance under Settings > API Tokens")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
+                    if authMode == .credentials {
+                        Text("Login with your Vikunja username and password for full functionality")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                    } else {
+                        Text("API tokens have limited permissions. Use Login for full functionality including task reordering.")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                    }
 
                     Spacer()
                 }
@@ -105,6 +158,15 @@ struct ServerSetupView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+        }
+    }
+
+    private var isFormIncomplete: Bool {
+        if serverURL.isEmpty { return true }
+        if authMode == .credentials {
+            return username.isEmpty || password.isEmpty
+        } else {
+            return apiToken.isEmpty
         }
     }
 
@@ -116,11 +178,19 @@ struct ServerSetupView: View {
         if !url.hasPrefix("http://") && !url.hasPrefix("https://") {
             url = "https://" + url
         }
-        let token = apiToken.trimmingCharacters(in: .whitespacesAndNewlines)
 
         Task {
             do {
-                try await appState.login(serverURL: url, token: token)
+                if authMode == .credentials {
+                    try await appState.loginWithCredentials(
+                        serverURL: url,
+                        username: username.trimmingCharacters(in: .whitespacesAndNewlines),
+                        password: password
+                    )
+                } else {
+                    let token = apiToken.trimmingCharacters(in: .whitespacesAndNewlines)
+                    try await appState.login(serverURL: url, token: token)
+                }
             } catch {
                 print("[mDone] Login error: \(error)")
                 errorMessage = error.localizedDescription

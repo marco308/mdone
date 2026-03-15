@@ -35,7 +35,7 @@ struct ProjectView: Codable, Identifiable {
     var projectId: Int64
     var viewKind: String?
     var position: Double?
-    var bucketConfigurationMode: Int64?
+    var bucketConfigurationMode: String?
     var defaultBucketId: Int64?
     var doneBucketId: Int64?
 }

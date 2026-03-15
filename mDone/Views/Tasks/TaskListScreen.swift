@@ -60,10 +60,18 @@ struct TaskListScreen: View {
                 .contentMargins(.bottom, 72, for: .scrollContent)
                 .refreshable {
                     await appState.refreshAll()
+                    if let projectFilter {
+                        await appState.fetchProjectTasks(project: projectFilter)
+                    }
                 }
             }
 
             QuickAddBar(projectId: projectFilter?.id ?? defaultProjectId)
+        }
+        .task(id: projectFilter?.id) {
+            if let projectFilter {
+                await appState.fetchProjectTasks(project: projectFilter)
+            }
         }
         .searchable(text: $bindableAppState.searchQuery, prompt: "Search tasks")
         .onSubmit(of: .search) {

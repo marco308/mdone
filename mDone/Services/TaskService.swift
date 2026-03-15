@@ -7,8 +7,10 @@ actor TaskService {
         self.apiClient = apiClient
     }
 
-    func fetchAllTasks(page: Int = 1, perPage: Int = 50) async throws -> [VTask] {
-        try await apiClient.fetch(Endpoint.allTasks(page: page, perPage: perPage))
+    func fetchAllTasks(perPage: Int = 100) async throws -> [VTask] {
+        try await apiClient.fetchAllPages({ page, pp in
+            Endpoint.allTasks(page: page, perPage: pp)
+        }, perPage: perPage)
     }
 
     func fetchTask(id: Int64) async throws -> VTask {

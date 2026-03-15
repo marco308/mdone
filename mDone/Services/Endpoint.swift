@@ -15,6 +15,10 @@ struct Endpoint {
         self.queryItems = queryItems
     }
 
+    // MARK: - Auth
+
+    static let login = Endpoint(path: "/api/v1/login", method: .POST)
+
     // MARK: - User
 
     static let currentUser = Endpoint(path: "/api/v1/user")
