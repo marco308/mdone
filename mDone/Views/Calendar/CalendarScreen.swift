@@ -24,7 +24,7 @@ struct CalendarScreen: View {
         }
         .navigationTitle("Calendar")
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .automatic) {
                 Button {
                     withAnimation {
                         selectedDate = Date()

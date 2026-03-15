@@ -3,7 +3,7 @@ import SwiftUI
 struct LoadingOverlay: View {
     var body: some View {
         ZStack {
-            Color(.systemBackground)
+            Color.primary.colorInvert()
                 .opacity(0.8)
 
             VStack(spacing: 16) {

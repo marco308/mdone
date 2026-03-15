@@ -35,7 +35,9 @@ struct ProjectListScreen: View {
                 }
             }
         }
+        #if os(iOS)
         .listStyle(.insetGrouped)
+        #endif
         .navigationTitle("Projects")
         .navigationDestination(for: Project.self) { project in
             TaskListScreen(projectFilter: project)

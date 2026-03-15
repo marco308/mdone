@@ -130,7 +130,9 @@ final class AppState {
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
+            #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -142,7 +144,9 @@ final class AppState {
         do {
             let newTask = try await taskService.createTask(projectId: projectId, request: request)
             tasks.append(newTask)
+            #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -165,7 +169,9 @@ final class AppState {
         do {
             try await taskService.deleteTask(id: task.id)
             tasks.removeAll { $0.id == task.id }
+            #if os(iOS)
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            #endif
         } catch {
             errorMessage = error.localizedDescription
         }

@@ -23,7 +23,7 @@ struct TaskRow: View {
                 } label: {
                     Image(systemName: task.done ? "checkmark.circle.fill" : "circle")
                         .font(.title3)
-                        .foregroundStyle(task.done ? .green : priorityColor)
+                        .foregroundStyle(task.done ? .green : checkboxColor)
                         .contentTransition(.symbolEffect(.replace))
                 }
                 .buttonStyle(.plain)
@@ -94,5 +94,9 @@ struct TaskRow: View {
         case .low: .blue
         case .none: .clear
         }
+    }
+
+    private var checkboxColor: Color {
+        task.priorityLevel == .none ? .gray : priorityColor
     }
 }

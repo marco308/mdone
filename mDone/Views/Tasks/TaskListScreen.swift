@@ -33,7 +33,9 @@ struct TaskListScreen: View {
                     smartListSections
                 }
             }
-            .listStyle(.insetGrouped)
+            #if os(iOS)
+        .listStyle(.insetGrouped)
+        #endif
             .refreshable {
                 await appState.refreshAll()
             }

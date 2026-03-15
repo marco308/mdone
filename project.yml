@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: com.mdone
   deploymentTarget:
     iOS: "18.0"
+    macOS: "15.0"
   xcodeVersion: "16.0"
   generateEmptyDirectories: true
 
@@ -32,6 +33,22 @@ targets:
       testTargets:
         - mDoneTests
         - mDoneUITests
+
+  mDone-macOS:
+    type: application
+    platform: macOS
+    sources:
+      - mDone
+    settings:
+      base:
+        INFOPLIST_FILE: mDone/Info.plist
+        CODE_SIGN_ENTITLEMENTS: mDone/mDone-macOS.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SWIFT_EMIT_LOC_STRINGS: "YES"
+        SUPPORTS_MACCATALYST: "NO"
+    scheme:
+      testTargets: []
 
   mDoneTests:
     type: bundle.unit-test

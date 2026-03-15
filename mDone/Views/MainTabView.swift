@@ -9,6 +9,7 @@ struct MainTabView: View {
     }
 
     var body: some View {
+        #if os(iOS)
         TabView(selection: $selectedTab) {
             SwiftUI.Tab("Inbox", systemImage: "tray.fill", value: Tab.inbox) {
                 NavigationStack {
@@ -38,5 +39,8 @@ struct MainTabView: View {
         .task {
             await appState.refreshAll()
         }
+        #else
+        Text("macOS")
+        #endif
     }
 }

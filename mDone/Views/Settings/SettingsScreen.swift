@@ -77,7 +77,9 @@ struct SettingsScreen: View {
             }
             .listRowBackground(Color.clear)
         }
+        #if os(iOS)
         .listStyle(.insetGrouped)
+        #endif
         .navigationTitle("Settings")
         .alert("Disconnect?", isPresented: $showLogoutConfirm) {
             Button("Disconnect", role: .destructive) {

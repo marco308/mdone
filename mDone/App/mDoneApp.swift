@@ -10,7 +10,11 @@ struct mDoneApp: App {
         WindowGroup {
             Group {
                 if appState.isAuthenticated {
+                    #if os(iOS)
                     MainTabView()
+                    #else
+                    MacContentView()
+                    #endif
                 } else {
                     ServerSetupView()
                 }

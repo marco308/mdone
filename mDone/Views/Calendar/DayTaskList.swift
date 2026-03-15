@@ -30,7 +30,9 @@ struct DayTaskList: View {
                             .textCase(.uppercase)
                     }
                 }
-                .listStyle(.insetGrouped)
+                #if os(iOS)
+        .listStyle(.insetGrouped)
+        #endif
             }
         }
     }

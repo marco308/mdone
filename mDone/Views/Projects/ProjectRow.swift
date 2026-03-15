@@ -21,7 +21,7 @@ struct ProjectRow: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
-                    .background(Color(.systemGray5))
+                    .background(Color.gray.opacity(0.2))
                     .clipShape(Capsule())
             }
         }

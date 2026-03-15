@@ -91,7 +91,9 @@ struct TaskDetailSheet: View {
                 }
             }
             .navigationTitle("Edit Task")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -114,7 +116,9 @@ struct TaskDetailSheet: View {
                 Text("This action cannot be undone.")
             }
         }
+        #if os(iOS)
         .presentationDetents([.medium, .large])
+        #endif
     }
 
     private func saveTask() {
