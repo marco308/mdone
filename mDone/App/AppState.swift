@@ -351,6 +351,13 @@ final class AppState {
     }
 
     @MainActor
+    func postponeTask(_ task: VTask, byHours hours: Int) async {
+        let baseDate = task.effectiveDueDate ?? Date()
+        let newDate = Calendar.current.date(byAdding: .hour, value: hours, to: baseDate) ?? baseDate
+        await updateTask(id: task.id, request: TaskUpdateRequest(dueDate: newDate))
+    }
+
+    @MainActor
     func updateTask(id: Int64, request: TaskUpdateRequest) async {
         do {
             let updated = try await taskService.updateTask(id: id, request: request)

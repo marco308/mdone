@@ -23,6 +23,15 @@ struct TaskRow: View {
         #endif
             .swipeActions(edge: .leading) {
                 #if os(iOS)
+                if !task.done {
+                    Button {
+                        Task { await appState.postponeTask(task, byHours: 24) }
+                    } label: {
+                        Label("+24h", systemImage: "clock.arrow.circlepath")
+                    }
+                    .tint(.blue)
+                }
+
                 Button {
                     if isFocused {
                         focusManager.endFocus()
