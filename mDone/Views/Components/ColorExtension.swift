@@ -33,7 +33,7 @@ extension Color {
         self.init(red: r, green: g, blue: b, opacity: a)
     }
 
-    // TickTick-inspired color palette
+    // Priority color palette
     static let priorityRed = Color(hex: "FF4444")
     static let priorityOrange = Color(hex: "FF8C00")
     static let priorityYellow = Color(hex: "FFD700")

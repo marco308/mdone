@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-mDone is a native iOS/macOS task management app (TickTick-inspired) that connects to a self-hosted **Vikunja** server via its REST API (v2.1.0). Pure Swift with SwiftUI — no external dependencies.
+mDone is a native iOS/macOS task management app that connects to a self-hosted **Vikunja** server via its REST API (v2.1.0). Pure Swift with SwiftUI — no external dependencies.
 
 ## Build & Development
 

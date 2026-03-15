@@ -12,7 +12,7 @@ Task manager for Vikunja
 
 Take control of your tasks with mDone — a beautifully designed task manager built for your self-hosted Vikunja server.
 
-If you run your own Vikunja instance and want a polished, native iOS experience to manage your tasks, mDone is made for you. Inspired by the clean design of TickTick, mDone brings a thoughtful, focused interface to your self-hosted productivity setup.
+If you run your own Vikunja instance and want a polished, native iOS experience to manage your tasks, mDone is made for you. A thoughtful, focused interface for your self-hosted productivity setup.
 
 KEY FEATURES
 
