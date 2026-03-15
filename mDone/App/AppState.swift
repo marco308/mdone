@@ -111,6 +111,13 @@ final class AppState {
         let authenticated = authService.isAuthenticated()
         if authenticated {
             await configureAPIClient()
+            // Sync credentials to shared App Group UserDefaults so widgets can access them
+            if let serverURL = authService.getServerURL(),
+               let token = authService.getToken()
+            {
+                SharedKeys.sharedDefaults.set(serverURL, forKey: SharedKeys.serverURLKey)
+                SharedKeys.sharedDefaults.set(token, forKey: SharedKeys.apiTokenKey)
+            }
         }
         isAuthenticated = authenticated
     }
