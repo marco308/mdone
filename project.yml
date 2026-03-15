@@ -1,0 +1,61 @@
+name: mDone
+options:
+  bundleIdPrefix: com.mdone
+  deploymentTarget:
+    iOS: "18.0"
+  xcodeVersion: "16.0"
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: "YOURTEAMID"
+    CODE_SIGN_IDENTITY: "Apple Development"
+    CODE_SIGN_STYLE: Automatic
+
+targets:
+  mDone:
+    type: application
+    platform: iOS
+    sources:
+      - mDone
+    settings:
+      base:
+        INFOPLIST_FILE: mDone/Info.plist
+        CODE_SIGN_ENTITLEMENTS: mDone/mDone.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SWIFT_EMIT_LOC_STRINGS: "YES"
+    scheme:
+      testTargets:
+        - mDoneTests
+        - mDoneUITests
+
+  mDoneTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - mDoneTests
+    dependencies:
+      - target: mDone
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.tests
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/mDone.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/mDone"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+  mDoneUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - mDoneUITests
+    dependencies:
+      - target: mDone
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.uitests
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_TARGET_NAME: mDone
