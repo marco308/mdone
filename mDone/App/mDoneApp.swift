@@ -45,6 +45,7 @@ struct mDoneApp: App {
                 }
                 #endif
 
+                #if DEBUG
                 // Support auto-login via UserDefaults for testing (set via simctl)
                 let defaults = UserDefaults.standard
                 if !appState.isAuthenticated,
@@ -62,6 +63,11 @@ struct mDoneApp: App {
                         await appState.checkAuth()
                     }
                 }
+                #else
+                Task {
+                    await appState.checkAuth()
+                }
+                #endif
             }
             .onChange(of: dependencies.networkMonitor.isConnected) { _, isConnected in
                 appState.handleConnectivityChange(isConnected: isConnected)

@@ -78,9 +78,13 @@ final class FocusManager {
                 )
                 activity = newActivity
                 session.activityId = newActivity.id
+                #if DEBUG
                 print("[FocusManager] Live Activity started: \(newActivity.id)")
+                #endif
             } catch {
+                #if DEBUG
                 print("[FocusManager] Failed to start Live Activity: \(error)")
+                #endif
             }
         }
 
@@ -88,7 +92,9 @@ final class FocusManager {
         persistSession()
 
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        #if DEBUG
         print("[FocusManager] Focus started on task: \(task.title)")
+        #endif
     }
 
     func pauseFocus() {
@@ -107,7 +113,9 @@ final class FocusManager {
         }
 
         persistSession()
+        #if DEBUG
         print("[FocusManager] Focus paused. Elapsed: \(session.elapsedBeforePause)s")
+        #endif
     }
 
     func resumeFocus() {
@@ -124,7 +132,9 @@ final class FocusManager {
         }
 
         persistSession()
+        #if DEBUG
         print("[FocusManager] Focus resumed")
+        #endif
     }
 
     func endFocus() {
@@ -147,7 +157,9 @@ final class FocusManager {
         clearPersistedSession()
 
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        #if DEBUG
         print("[FocusManager] Focus ended")
+        #endif
     }
 
     func switchFocus(task: VTask, projectName: String) {
@@ -158,13 +170,17 @@ final class FocusManager {
     func handleTaskCompleted(taskId: Int64) {
         guard focusedTaskId == taskId else { return }
         endFocus()
+        #if DEBUG
         print("[FocusManager] Focused task completed, ending focus")
+        #endif
     }
 
     func handleTaskDeleted(taskId: Int64) {
         guard focusedTaskId == taskId else { return }
         endFocus()
+        #if DEBUG
         print("[FocusManager] Focused task deleted, ending focus")
+        #endif
     }
 
     // MARK: - Private Methods
@@ -180,7 +196,9 @@ final class FocusManager {
             // Clean up stale sessions (> 24 hours)
             let staleThreshold: TimeInterval = 24 * 60 * 60
             if Date().timeIntervalSince(session.sessionStartDate) > staleThreshold {
+                #if DEBUG
                 print("[FocusManager] Stale session found (> 24h), cleaning up")
+                #endif
                 clearPersistedSession()
                 // Also end any lingering Live Activity
                 for existingActivity in Activity<FocusTaskAttributes>.activities {
@@ -201,17 +219,25 @@ final class FocusManager {
 
                 if let matchingActivity {
                     activity = matchingActivity
+                    #if DEBUG
                     print("[FocusManager] Reconnected to Live Activity: \(activityId)")
+                    #endif
                 } else {
                     // Activity was dismissed but session persists — try to restart
+                    #if DEBUG
                     print("[FocusManager] Live Activity not found, attempting restart")
+                    #endif
                     restartLiveActivity(for: session)
                 }
             }
 
+            #if DEBUG
             print("[FocusManager] Session restored for task: \(session.taskTitle)")
+            #endif
         } catch {
+            #if DEBUG
             print("[FocusManager] Failed to decode persisted session: \(error)")
+            #endif
             clearPersistedSession()
         }
     }
@@ -241,9 +267,13 @@ final class FocusManager {
             currentSession = updatedSession
             persistSession()
 
+            #if DEBUG
             print("[FocusManager] Live Activity restarted: \(newActivity.id)")
+            #endif
         } catch {
+            #if DEBUG
             print("[FocusManager] Failed to restart Live Activity: \(error)")
+            #endif
         }
     }
 
@@ -253,7 +283,9 @@ final class FocusManager {
             let data = try JSONEncoder().encode(session)
             sharedDefaults.set(data, forKey: FocusConstants.focusSessionKey)
         } catch {
+            #if DEBUG
             print("[FocusManager] Failed to persist session: \(error)")
+            #endif
         }
     }
 

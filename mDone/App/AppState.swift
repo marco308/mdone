@@ -123,7 +123,9 @@ final class AppState {
 
     @MainActor
     func login(serverURL: String, token: String) async throws {
+        #if DEBUG
         print("[mDone] login() called with serverURL: \(serverURL)")
+        #endif
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -131,19 +133,27 @@ final class AppState {
         await APIClient.shared.configure(serverURL: serverURL, token: token)
 
         // Validate by fetching projects — works with both JWT and API tokens
+        #if DEBUG
         print("[mDone] Fetching projects to validate...")
+        #endif
         let projects: [Project] = try await APIClient.shared.fetch(Endpoint.projects())
+        #if DEBUG
         print("[mDone] Validation OK - got \(projects.count) projects")
+        #endif
 
         authService.saveServerURL(serverURL)
         authService.saveToken(token)
+        #if DEBUG
         print("[mDone] Credentials saved, setting isAuthenticated = true")
+        #endif
         isAuthenticated = true
     }
 
     @MainActor
     func loginWithCredentials(serverURL: String, username: String, password: String) async throws {
+        #if DEBUG
         print("[mDone] loginWithCredentials() called")
+        #endif
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -160,7 +170,9 @@ final class AppState {
 
         // Validate
         let projects: [Project] = try await APIClient.shared.fetch(Endpoint.projects())
+        #if DEBUG
         print("[mDone] Validation OK - got \(projects.count) projects")
+        #endif
 
         authService.saveServerURL(url)
         authService.saveToken(loginResponse.token)
@@ -169,7 +181,9 @@ final class AppState {
 
     @MainActor
     func logout() async {
+        #if DEBUG
         print("[mDone] logout() called")
+        #endif
         authService.clearAll()
         await APIClient.shared.clearCredentials()
         tasks = []
@@ -185,7 +199,9 @@ final class AppState {
 
     @MainActor
     func refreshAll() async {
+        #if DEBUG
         print("[mDone] refreshAll() called")
+        #endif
         isLoading = true
         defer { isLoading = false }
 
@@ -194,13 +210,19 @@ final class AppState {
             async let fetchedProjects = projectService.fetchProjects()
 
             tasks = try await fetchedTasks
+            #if DEBUG
             print("[mDone] refreshAll: got \(tasks.count) tasks")
+            #endif
             projects = try await fetchedProjects
+            #if DEBUG
             print("[mDone] refreshAll: got \(projects.count) projects")
+            #endif
 
             let labelsResult: [VLabel] = try await APIClient.shared.fetch(Endpoint.labels())
             labels = labelsResult
+            #if DEBUG
             print("[mDone] refreshAll: got \(labels.count) labels")
+            #endif
 
             let notificationsEnabled = UserDefaults.standard.bool(forKey: "notificationsEnabled")
             if notificationsEnabled {
@@ -208,19 +230,27 @@ final class AppState {
             }
 
             errorMessage = nil
+            #if DEBUG
             print("[mDone] refreshAll: SUCCESS")
+            #endif
 
             pushWidgetData()
             WidgetCenter.shared.reloadAllTimelines()
         } catch let error as NetworkError {
+            #if DEBUG
             print("[mDone] refreshAll: NetworkError: \(error)")
+            #endif
             if case .unauthorized = error {
+                #if DEBUG
                 print("[mDone] refreshAll: got .unauthorized, calling logout()")
+                #endif
                 await logout()
             }
             errorMessage = error.errorDescription
         } catch {
+            #if DEBUG
             print("[mDone] refreshAll: other error: \(error)")
+            #endif
             errorMessage = error.localizedDescription
         }
     }
@@ -358,7 +388,9 @@ final class AppState {
                 }
             }
         } catch {
+            #if DEBUG
             print("[mDone] fetchProjectTasks error: \(error)")
+            #endif
         }
     }
 
@@ -378,7 +410,9 @@ final class AppState {
             let result: [VNotification] = try await APIClient.shared.fetch(Endpoint.notifications())
             notifications = result
         } catch {
+            #if DEBUG
             print("[mDone] fetchNotifications error: \(error)")
+            #endif
         }
     }
 
@@ -393,7 +427,9 @@ final class AppState {
                 notifications[index].readAt = Date()
             }
         } catch {
+            #if DEBUG
             print("[mDone] markNotificationRead error: \(error)")
+            #endif
         }
     }
 
@@ -407,7 +443,9 @@ final class AppState {
                 notifications[index].readAt = Date()
             }
         } catch {
+            #if DEBUG
             print("[mDone] markAllNotificationsRead error: \(error)")
+            #endif
         }
     }
 

@@ -192,7 +192,9 @@ struct ServerSetupView: View {
                     try await appState.login(serverURL: url, token: token)
                 }
             } catch {
+                #if DEBUG
                 print("[mDone] Login error: \(error)")
+                #endif
                 errorMessage = error.localizedDescription
             }
             isConnecting = false

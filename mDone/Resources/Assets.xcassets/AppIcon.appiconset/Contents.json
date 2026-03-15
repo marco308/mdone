@@ -5,6 +5,12 @@
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
+    },
+    {
+      "filename" : "AppIcon-1024.png",
+      "idiom" : "mac",
+      "platform" : "macos",
+      "size" : "1024x1024"
     }
   ],
   "info" : {
