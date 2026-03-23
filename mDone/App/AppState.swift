@@ -8,6 +8,7 @@ final class AppState {
     var isAuthenticated: Bool = false
     var isLoading: Bool = false
     var errorMessage: String?
+    var activeError: NetworkError?
 
     var tasks: [VTask] = []
     var projects: [Project] = []
@@ -271,6 +272,7 @@ final class AppState {
             }
 
             errorMessage = nil
+            activeError = nil
             #if DEBUG
             print("[mDone] refreshAll: SUCCESS")
             #endif
@@ -289,12 +291,12 @@ final class AppState {
                 #endif
                 await logout()
             }
-            errorMessage = error.errorDescription
+            handleError(error)
         } catch {
             #if DEBUG
             print("[mDone] refreshAll: other error: \(error)")
             #endif
-            errorMessage = error.localizedDescription
+            handleError(error)
         }
     }
 
@@ -311,13 +313,14 @@ final class AppState {
             )
             tasks = results
             errorMessage = nil
+            activeError = nil
         } catch let error as NetworkError {
             if case .unauthorized = error {
                 await logout()
             }
-            errorMessage = error.errorDescription
+            handleError(error)
         } catch {
-            errorMessage = error.localizedDescription
+            handleError(error)
         }
     }
 
@@ -331,13 +334,14 @@ final class AppState {
             )
             tasks = results
             errorMessage = nil
+            activeError = nil
         } catch let error as NetworkError {
             if case .unauthorized = error {
                 await logout()
             }
-            errorMessage = error.errorDescription
+            handleError(error)
         } catch {
-            errorMessage = error.localizedDescription
+            handleError(error)
         }
     }
 
@@ -356,7 +360,7 @@ final class AppState {
             #endif
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
-            errorMessage = error.localizedDescription
+            handleError(error)
         }
     }
 
@@ -371,7 +375,7 @@ final class AppState {
             #endif
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
-            errorMessage = error.localizedDescription
+            handleError(error)
         }
     }
 
@@ -391,7 +395,7 @@ final class AppState {
             }
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
-            errorMessage = error.localizedDescription
+            handleError(error)
         }
     }
 
@@ -407,7 +411,7 @@ final class AppState {
             #endif
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
-            errorMessage = error.localizedDescription
+            handleError(error)
         }
     }
 
@@ -567,7 +571,7 @@ final class AppState {
                 projectTaskCache[task.projectId] = cached.sorted { ($0.position ?? 0) < ($1.position ?? 0) }
             }
         } catch {
-            errorMessage = error.localizedDescription
+            handleError(error)
         }
     }
 
@@ -587,6 +591,15 @@ final class AppState {
             }
         }
         return result
+    }
+
+    // MARK: - Error Handling
+
+    @MainActor
+    private func handleError(_ error: Error) {
+        let friendlyError = NetworkError.friendly(from: error)
+        errorMessage = friendlyError.errorDescription
+        activeError = friendlyError
     }
 
     // MARK: - Widget Data

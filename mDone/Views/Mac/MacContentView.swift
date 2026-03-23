@@ -57,5 +57,8 @@ struct MacContentView: View {
             await appState.refreshAll()
             await appState.fetchNotifications()
         }
+        .errorBanner(Bindable(appState).activeError) {
+            Task { await appState.refreshAll() }
+        }
     }
 }
