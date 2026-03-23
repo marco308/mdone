@@ -105,7 +105,7 @@ actor NotificationService {
         let singleId = "task-\(taskId)"
         var identifiers = [singleId]
         // Remove up to 20 indexed reminders (reasonable upper bound)
-        for i in 0..<20 {
+        for i in 0 ..< 20 {
             identifiers.append("task-\(taskId)-\(i)")
         }
         center.removePendingNotificationRequests(withIdentifiers: identifiers)

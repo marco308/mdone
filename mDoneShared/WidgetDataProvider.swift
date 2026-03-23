@@ -3,7 +3,6 @@ import Foundation
 /// Lightweight API client for widget use. Reads credentials from shared App Group UserDefaults
 /// and fetches tasks directly from the Vikunja REST API without depending on the main app module.
 final class WidgetDataProvider: @unchecked Sendable {
-
     static let shared = WidgetDataProvider()
 
     private let session: URLSession
@@ -147,12 +146,13 @@ final class WidgetDataProvider: @unchecked Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiToken)", forHTTPHeaderField: "Authorization")
 
-        let body: [String: Bool] = ["done": true]
+        let body = ["done": true]
         request.httpBody = try encoder.encode(body)
 
         let (_, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse,
-              (200 ... 299).contains(httpResponse.statusCode) else {
+              (200 ... 299).contains(httpResponse.statusCode)
+        else {
             throw WidgetDataError.requestFailed
         }
     }
@@ -203,7 +203,8 @@ final class WidgetDataProvider: @unchecked Sendable {
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse,
-              (200 ... 299).contains(httpResponse.statusCode) else {
+              (200 ... 299).contains(httpResponse.statusCode)
+        else {
             throw WidgetDataError.requestFailed
         }
 

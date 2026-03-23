@@ -25,61 +25,61 @@ struct mDoneApp: App {
             .environment(appState)
             .environment(dependencies.networkMonitor)
             #if os(iOS)
-            .environment(focusManager)
+                .environment(focusManager)
             #endif
-            .modelContainer(dependencies.modelContainer)
-            .onAppear {
-                let syncService = SyncService(
-                    taskService: TaskService(),
-                    projectService: ProjectService(),
-                    modelContainer: dependencies.modelContainer
-                )
-                appState.configureSyncService(syncService, networkMonitor: dependencies.networkMonitor)
+                .modelContainer(dependencies.modelContainer)
+                .onAppear {
+                    let syncService = SyncService(
+                        taskService: TaskService(),
+                        projectService: ProjectService(),
+                        modelContainer: dependencies.modelContainer
+                    )
+                    appState.configureSyncService(syncService, networkMonitor: dependencies.networkMonitor)
 
-                #if os(iOS)
-                appState.onTaskCompleted = { taskId in
-                    focusManager.handleTaskCompleted(taskId: taskId)
-                }
-                appState.onTaskDeleted = { taskId in
-                    focusManager.handleTaskDeleted(taskId: taskId)
-                }
-                #endif
-
-                #if DEBUG
-                // Support auto-login via UserDefaults for testing (set via simctl)
-                let defaults = UserDefaults.standard
-                if !appState.isAuthenticated,
-                   let serverURL = defaults.string(forKey: "MDONE_SERVER_URL"),
-                   let token = defaults.string(forKey: "MDONE_TOKEN"),
-                   !serverURL.isEmpty, !token.isEmpty
-                {
-                    defaults.removeObject(forKey: "MDONE_SERVER_URL")
-                    defaults.removeObject(forKey: "MDONE_TOKEN")
-                    Task {
-                        try? await appState.login(serverURL: serverURL, token: token)
+                    #if os(iOS)
+                    appState.onTaskCompleted = { taskId in
+                        focusManager.handleTaskCompleted(taskId: taskId)
                     }
-                } else {
+                    appState.onTaskDeleted = { taskId in
+                        focusManager.handleTaskDeleted(taskId: taskId)
+                    }
+                    #endif
+
+                    #if DEBUG
+                    // Support auto-login via UserDefaults for testing (set via simctl)
+                    let defaults = UserDefaults.standard
+                    if !appState.isAuthenticated,
+                       let serverURL = defaults.string(forKey: "MDONE_SERVER_URL"),
+                       let token = defaults.string(forKey: "MDONE_TOKEN"),
+                       !serverURL.isEmpty, !token.isEmpty
+                    {
+                        defaults.removeObject(forKey: "MDONE_SERVER_URL")
+                        defaults.removeObject(forKey: "MDONE_TOKEN")
+                        Task {
+                            try? await appState.login(serverURL: serverURL, token: token)
+                        }
+                    } else {
+                        Task {
+                            await appState.checkAuth()
+                        }
+                    }
+                    #else
                     Task {
                         await appState.checkAuth()
                     }
+                    #endif
                 }
-                #else
-                Task {
-                    await appState.checkAuth()
+                .onChange(of: dependencies.networkMonitor.isConnected) { _, isConnected in
+                    appState.handleConnectivityChange(isConnected: isConnected)
                 }
-                #endif
-            }
-            .onChange(of: dependencies.networkMonitor.isConnected) { _, isConnected in
-                appState.handleConnectivityChange(isConnected: isConnected)
-            }
             #if os(iOS)
-            .onOpenURL { url in
-                if url.scheme == "mdone", url.host == "focus",
-                   focusManager.currentSession != nil
-                {
-                    focusManager.showFocusView = true
+                .onOpenURL { url in
+                    if url.scheme == "mdone", url.host == "focus",
+                       focusManager.currentSession != nil
+                    {
+                        focusManager.showFocusView = true
+                    }
                 }
-            }
             #endif
         }
     }

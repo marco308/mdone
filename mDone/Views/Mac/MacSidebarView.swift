@@ -136,6 +136,7 @@ struct MacSidebarView: View {
                         Circle()
                             .fill(projectColor(project))
                             .frame(width: 10, height: 10)
+                            .accessibilityHidden(true)
                     }
                     .tag(MacContentView.SidebarSection.project(project))
                 }

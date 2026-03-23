@@ -76,23 +76,23 @@ struct TaskFilterSheet: View {
             }
             .navigationTitle("Advanced Filter")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(.inline)
             #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Reset") {
-                        resetFilters()
-                        onApply(nil)
-                        dismiss()
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Reset") {
+                            resetFilters()
+                            onApply(nil)
+                            dismiss()
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Apply") {
+                            onApply(buildFilterString())
+                            dismiss()
+                        }
                     }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Apply") {
-                        onApply(buildFilterString())
-                        dismiss()
-                    }
-                }
-            }
         }
         #if os(iOS)
         .presentationDetents([.medium, .large])

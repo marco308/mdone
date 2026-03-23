@@ -333,14 +333,14 @@ final class FocusManager {
 
     private func makeContentState(from session: FocusSession) -> FocusTaskAttributes.ContentState {
         if session.isPaused {
-            return FocusTaskAttributes.ContentState(
+            FocusTaskAttributes.ContentState(
                 focusStartDate: session.focusIntervalStartDate,
                 isPaused: true,
                 elapsedBeforePause: session.elapsedBeforePause
             )
         } else {
             // Use syntheticStartDate so the Live Activity timer shows total elapsed time
-            return FocusTaskAttributes.ContentState(
+            FocusTaskAttributes.ContentState(
                 focusStartDate: session.syntheticStartDate,
                 isPaused: false,
                 elapsedBeforePause: session.elapsedBeforePause

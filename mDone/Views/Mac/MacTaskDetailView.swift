@@ -50,6 +50,7 @@ struct MacTaskDetailView: View {
                         }
                         .buttonStyle(.borderless)
                         .help(isPreviewingMarkdown ? "Edit" : "Preview Markdown")
+                        .accessibilityLabel(isPreviewingMarkdown ? "Edit description" : "Preview description")
                     }
 
                     if isPreviewingMarkdown {
@@ -93,10 +94,10 @@ struct MacTaskDetailView: View {
                 Picker("Repeat", selection: $repeatInterval) {
                     Text("Never").tag(Int64(0))
                     Text("Daily").tag(Int64(86400))
-                    Text("Weekly").tag(Int64(604800))
-                    Text("Every 2 Weeks").tag(Int64(1209600))
-                    Text("Monthly").tag(Int64(2592000))
-                    Text("Yearly").tag(Int64(31536000))
+                    Text("Weekly").tag(Int64(604_800))
+                    Text("Every 2 Weeks").tag(Int64(1_209_600))
+                    Text("Monthly").tag(Int64(2_592_000))
+                    Text("Yearly").tag(Int64(31_536_000))
                 }
             }
 
@@ -190,7 +191,12 @@ struct MacTaskDetailView: View {
     }
 
     private func markdownAttributedString(from markdown: String) -> AttributedString {
-        (try? AttributedString(markdown: markdown, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(markdown)
+        (
+            try? AttributedString(markdown: markdown, options: .init(
+                interpretedSyntax: .inlineOnlyPreservingWhitespace
+            ))
+        ) ??
+            AttributedString(markdown)
     }
 
     private func saveTask() {

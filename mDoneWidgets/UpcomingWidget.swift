@@ -228,7 +228,8 @@ struct UpcomingWidgetView: View {
 
         // Within the next 7 days: show day name
         if let weekFromNow = calendar.date(byAdding: .day, value: 7, to: now),
-           date < weekFromNow {
+           date < weekFromNow
+        {
             let dayFormatter = DateFormatter()
             dayFormatter.dateFormat = "EEE"
             return formatWithTime(dayFormatter.string(from: date), date: date)
@@ -246,7 +247,7 @@ struct UpcomingWidgetView: View {
         let minute = calendar.component(.minute, from: date)
 
         // If the time is midnight (00:00), it likely means no specific time was set
-        if hour == 0 && minute == 0 {
+        if hour == 0, minute == 0 {
             return prefix
         }
 

@@ -32,6 +32,9 @@ struct SmartListSection: View {
                     .background(accentColor.opacity(0.15))
                     .clipShape(Capsule())
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(title), \(tasks.count) \(tasks.count == 1 ? "task" : "tasks")")
+            .accessibilityAddTraits(.isHeader)
         }
     }
 

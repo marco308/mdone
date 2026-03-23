@@ -1,9 +1,8 @@
-import XCTest
 import SwiftUI
+import XCTest
 @testable import mDone
 
 final class WidgetDataTests: XCTestCase {
-
     // MARK: - Test Helpers
 
     private func makeSampleTask(
@@ -133,13 +132,13 @@ final class WidgetDataTests: XCTestCase {
         let lastUpdated = Date(timeIntervalSince1970: 1_710_600_000)
         let todayTasks = [
             makeSampleTask(id: 10, title: "Code review", priority: 3),
-            makeSampleTask(id: 11, title: "Team sync", priority: 2)
+            makeSampleTask(id: 11, title: "Team sync", priority: 2),
         ]
         let upcomingTasks = [
-            makeSampleTask(id: 20, title: "Sprint planning", priority: 2)
+            makeSampleTask(id: 20, title: "Sprint planning", priority: 2),
         ]
         let overdueTasks = [
-            makeSampleTask(id: 30, title: "File taxes", priority: 5, isOverdue: true)
+            makeSampleTask(id: 30, title: "File taxes", priority: 5, isOverdue: true),
         ]
 
         let original = WidgetData(
@@ -235,7 +234,10 @@ final class WidgetDataTests: XCTestCase {
         }
 
         let freshProvider = WidgetDataProvider()
-        XCTAssertFalse(freshProvider.isAuthenticated, "A provider with no stored credentials should not be authenticated")
+        XCTAssertFalse(
+            freshProvider.isAuthenticated,
+            "A provider with no stored credentials should not be authenticated"
+        )
     }
 
     // MARK: - WidgetDataProvider Cache and Retrieve
@@ -256,10 +258,10 @@ final class WidgetDataTests: XCTestCase {
         let lastUpdated = Date(timeIntervalSince1970: 1_710_800_000)
         let widgetData = WidgetData(
             todayTasks: [
-                makeSampleTask(id: 100, title: "Deploy to staging", priority: 4, projectId: 5, projectTitle: "DevOps")
+                makeSampleTask(id: 100, title: "Deploy to staging", priority: 4, projectId: 5, projectTitle: "DevOps"),
             ],
             upcomingTasks: [
-                makeSampleTask(id: 101, title: "Quarterly review", priority: 2, projectId: 3, projectTitle: "HR")
+                makeSampleTask(id: 101, title: "Quarterly review", priority: 2, projectId: 3, projectTitle: "HR"),
             ],
             overdueTasks: [],
             lastUpdated: lastUpdated
@@ -311,7 +313,7 @@ final class WidgetDataTests: XCTestCase {
             SharedKeys.appGroupID,
             SharedKeys.apiTokenKey,
             SharedKeys.serverURLKey,
-            SharedKeys.widgetDataKey
+            SharedKeys.widgetDataKey,
         ]
 
         // All keys should be non-empty

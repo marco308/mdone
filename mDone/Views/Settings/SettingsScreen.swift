@@ -19,6 +19,7 @@ struct SettingsScreen: View {
                         Circle()
                             .fill(appState.isAuthenticated ? .green : .red)
                             .frame(width: 8, height: 8)
+                            .accessibilityHidden(true)
                         Text(appState.isAuthenticated ? "Connected" : "Disconnected")
                             .font(.subheadline)
                     }

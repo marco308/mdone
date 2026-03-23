@@ -22,6 +22,7 @@ struct FocusBanner: View {
                 Image(systemName: "scope")
                     .foregroundStyle(.orange)
                     .symbolEffect(.pulse)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading) {
                     Text("Focusing")
@@ -43,6 +44,7 @@ struct FocusBanner: View {
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -50,6 +52,7 @@ struct FocusBanner: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Focusing on \(session.taskTitle). Tap to open focus session.")
         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)

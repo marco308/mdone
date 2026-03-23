@@ -12,6 +12,7 @@ struct QuickAddBar: View {
             Image(systemName: "plus.circle.fill")
                 .font(.title2)
                 .foregroundStyle(Color.accentColor)
+                .accessibilityHidden(true)
 
             TextField("Add a task...", text: $title)
                 .focused($isFocused)
@@ -29,6 +30,7 @@ struct QuickAddBar: View {
                         .font(.title2)
                         .foregroundStyle(Color.accentColor)
                 }
+                .accessibilityLabel("Add task")
             }
         }
         .padding(.horizontal, 16)

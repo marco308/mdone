@@ -16,5 +16,7 @@ struct LoadingOverlay: View {
             }
         }
         .ignoresSafeArea()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Loading")
     }
 }

@@ -6,6 +6,10 @@ struct FocusSessionView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
 
+    @ScaledMetric(relativeTo: .largeTitle) private var timerFontSize: CGFloat = 56
+    @ScaledMetric(relativeTo: .title) private var largeControlSize: CGFloat = 52
+    @ScaledMetric(relativeTo: .title3) private var smallControlSize: CGFloat = 28
+
     var body: some View {
         if let session = focusManager.currentSession {
             VStack(spacing: 0) {
@@ -25,8 +29,11 @@ struct FocusSessionView: View {
 
                     TimelineView(.periodic(from: .now, by: 1.0)) { timeline in
                         Text(formatElapsed(session.totalElapsed(at: timeline.date)))
-                            .font(.system(size: 56, weight: .light, design: .monospaced))
+                            .font(.system(size: timerFontSize, weight: .light, design: .monospaced))
                             .monospacedDigit()
+                            .accessibilityLabel(
+                                "Elapsed time: \(formatElapsed(session.totalElapsed(at: timeline.date)))"
+                            )
                     }
                     .padding(.top, 24)
 
@@ -63,6 +70,7 @@ struct FocusSessionView: View {
             Spacer()
             Text("Focus Mode")
                 .font(.headline)
+                .accessibilityAddTraits(.isHeader)
             Spacer()
         }
         .overlay(alignment: .trailing) {
@@ -73,6 +81,7 @@ struct FocusSessionView: View {
                     .font(.title2)
                     .foregroundStyle(.secondary)
             }
+            .accessibilityLabel("Close")
         }
         .padding()
     }
@@ -89,12 +98,13 @@ struct FocusSessionView: View {
             } label: {
                 VStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 28))
+                        .font(.system(size: smallControlSize))
                     Text("Done")
                         .font(.caption)
                 }
                 .foregroundStyle(.green)
             }
+            .accessibilityLabel("Mark task done")
 
             Button {
                 if session.isPaused {
@@ -105,12 +115,13 @@ struct FocusSessionView: View {
             } label: {
                 VStack(spacing: 8) {
                     Image(systemName: session.isPaused ? "play.circle.fill" : "pause.circle.fill")
-                        .font(.system(size: 52))
+                        .font(.system(size: largeControlSize))
                     Text(session.isPaused ? "Resume" : "Pause")
                         .font(.caption)
                 }
                 .foregroundStyle(.orange)
             }
+            .accessibilityLabel(session.isPaused ? "Resume focus timer" : "Pause focus timer")
 
             Button {
                 focusManager.endFocus()
@@ -118,12 +129,13 @@ struct FocusSessionView: View {
             } label: {
                 VStack(spacing: 8) {
                     Image(systemName: "stop.circle.fill")
-                        .font(.system(size: 28))
+                        .font(.system(size: smallControlSize))
                     Text("End")
                         .font(.caption)
                 }
                 .foregroundStyle(.red)
             }
+            .accessibilityLabel("End focus session")
         }
     }
 }

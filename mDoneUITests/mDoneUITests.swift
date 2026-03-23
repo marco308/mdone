@@ -1,12 +1,11 @@
 import XCTest
 
 final class mDoneUITests: XCTestCase {
-
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
 
-    func testAppLaunchesToSetupScreen() throws {
+    func testAppLaunchesToSetupScreen() {
         let app = XCUIApplication()
         app.launch()
 

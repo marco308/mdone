@@ -85,27 +85,31 @@ struct TaskListScreen: View {
         }
         .navigationTitle(projectFilter?.title ?? "Inbox")
         #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.inline)
         #endif
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showAdvancedFilter = true
-                } label: {
-                    Image(systemName: appState.advancedFilterString != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showAdvancedFilter = true
+                    } label: {
+                        Image(systemName: appState
+                            .advancedFilterString != nil ? "line.3.horizontal.decrease.circle.fill" :
+                            "line.3.horizontal.decrease.circle")
+                    }
+                    .accessibilityLabel(appState
+                        .advancedFilterString != nil ? "Advanced filter active" : "Advanced filter")
                 }
             }
-        }
-        .sheet(isPresented: $showAdvancedFilter) {
-            TaskFilterSheet { filterString in
-                Task { await appState.applyAdvancedFilter(filterString) }
+            .sheet(isPresented: $showAdvancedFilter) {
+                TaskFilterSheet { filterString in
+                    Task { await appState.applyAdvancedFilter(filterString) }
+                }
             }
-        }
-        .overlay {
-            if appState.isLoading, appState.tasks.isEmpty {
-                LoadingOverlay()
+            .overlay {
+                if appState.isLoading, appState.tasks.isEmpty {
+                    LoadingOverlay()
+                }
             }
-        }
     }
 
     private var isFiltering: Bool {
@@ -258,10 +262,12 @@ struct TaskListScreen: View {
     private var offlineBanner: some View {
         HStack {
             Image(systemName: "wifi.slash")
+                .accessibilityHidden(true)
             Text("You're offline. Changes will sync when connected.")
                 .font(.caption)
         }
         .foregroundStyle(.orange)
         .listRowBackground(Color.orange.opacity(0.1))
+        .accessibilityElement(children: .combine)
     }
 }
