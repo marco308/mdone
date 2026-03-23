@@ -76,6 +76,9 @@ struct TaskListScreen: View {
                 await appState.fetchProjectTasks(project: projectFilter)
             }
         }
+        .task {
+            await appState.requestCalendarAccess()
+        }
         .searchable(text: $bindableAppState.searchQuery, prompt: "Search tasks")
         .onSubmit(of: .search) {
             Task { await appState.searchTasks(query: appState.searchQuery) }
@@ -154,6 +157,29 @@ struct TaskListScreen: View {
                 tasks: appState.todayTasks,
                 accentColor: Color.accentColor
             )
+        }
+
+        if appState.calendarAccessGranted, !appState.todayCalendarEvents.isEmpty {
+            Section {
+                ForEach(appState.todayCalendarEvents) { event in
+                    CalendarEventRow(event: event)
+                }
+            } header: {
+                HStack {
+                    Image(systemName: "calendar")
+                    Text("Today's Events")
+                    Spacer()
+                    Text("\(appState.todayCalendarEvents.count)")
+                        .font(.caption2)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.green, in: Capsule())
+                }
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(.green)
+            }
         }
 
         if !appState.tomorrowTasks.isEmpty {
