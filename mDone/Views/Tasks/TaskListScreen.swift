@@ -66,7 +66,10 @@ struct TaskListScreen: View {
                 }
             }
 
-            QuickAddBar(projectId: projectFilter?.id ?? defaultProjectId)
+            QuickAddBar(
+                projectId: projectFilter?.id ?? defaultProjectId,
+                defaultDueDate: projectFilter == nil ? Calendar.current.startOfDay(for: Date()) : nil
+            )
         }
         .task(id: projectFilter?.id) {
             if let projectFilter {
@@ -78,6 +81,9 @@ struct TaskListScreen: View {
             Task { await appState.searchTasks(query: appState.searchQuery) }
         }
         .navigationTitle(projectFilter?.title ?? "Inbox")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -150,11 +156,27 @@ struct TaskListScreen: View {
             )
         }
 
+        if !appState.tomorrowTasks.isEmpty {
+            SmartListSection(
+                title: "Tomorrow",
+                tasks: appState.tomorrowTasks,
+                accentColor: .orange
+            )
+        }
+
+        if !appState.thisWeekTasks.isEmpty {
+            SmartListSection(
+                title: "This Week",
+                tasks: appState.thisWeekTasks,
+                accentColor: .blue
+            )
+        }
+
         if !appState.upcomingTasks.isEmpty {
             SmartListSection(
                 title: "Upcoming",
                 tasks: appState.upcomingTasks,
-                accentColor: .blue
+                accentColor: .purple
             )
         }
 

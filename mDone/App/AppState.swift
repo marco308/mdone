@@ -79,9 +79,24 @@ final class AppState {
         tasks.filter(\.isDueToday).sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
     }
 
-    var upcomingTasks: [VTask] {
-        tasks.filter { $0.isDueThisWeek && !$0.isDueToday }
+    var tomorrowTasks: [VTask] {
+        tasks.filter(\.isDueTomorrow).sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
+    }
+
+    var thisWeekTasks: [VTask] {
+        tasks.filter { $0.isDueThisWeek && !$0.isDueToday && !$0.isDueTomorrow }
             .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
+    }
+
+    var upcomingTasks: [VTask] {
+        tasks.filter {
+            guard let dueDate = $0.effectiveDueDate, !$0.done else { return false }
+            let calendar = Calendar.current
+            guard let weekEnd = calendar.date(byAdding: .day, value: 7, to: calendar.startOfDay(for: Date()))
+            else { return false }
+            return dueDate > weekEnd
+        }
+        .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
     }
 
     var noDateTasks: [VTask] {
@@ -312,13 +327,6 @@ final class AppState {
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
-            // Update project task cache so the project view reflects the change immediately
-            if var cached = projectTaskCache[updated.projectId] {
-                if let cacheIndex = cached.firstIndex(where: { $0.id == updated.id }) {
-                    cached[cacheIndex] = updated
-                }
-                projectTaskCache[updated.projectId] = cached
-            }
             if updated.done {
                 onTaskCompleted?(updated.id)
             }
@@ -337,10 +345,6 @@ final class AppState {
         do {
             let newTask = try await taskService.createTask(projectId: projectId, request: request)
             tasks.append(newTask)
-            // Update project task cache so the new task appears immediately
-            if projectTaskCache[projectId] != nil {
-                projectTaskCache[projectId]?.append(newTask)
-            }
             #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             #endif
@@ -364,13 +368,6 @@ final class AppState {
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
-            // Update project task cache
-            if var cached = projectTaskCache[updated.projectId] {
-                if let cacheIndex = cached.firstIndex(where: { $0.id == updated.id }) {
-                    cached[cacheIndex] = updated
-                }
-                projectTaskCache[updated.projectId] = cached
-            }
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
             errorMessage = error.localizedDescription
@@ -381,11 +378,8 @@ final class AppState {
     func deleteTask(_ task: VTask) async {
         do {
             let taskId = task.id
-            let projectId = task.projectId
             try await taskService.deleteTask(id: taskId)
             tasks.removeAll { $0.id == taskId }
-            // Update project task cache
-            projectTaskCache[projectId]?.removeAll { $0.id == taskId }
             onTaskDeleted?(taskId)
             #if os(iOS)
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
@@ -397,11 +391,16 @@ final class AppState {
     }
 
     func tasksForProject(_ projectId: Int64) -> [VTask] {
-        // Use cached view-specific tasks if available (has correct positions)
+        // Always read latest task data from the tasks array (source of truth).
+        // Use the cache only for position ordering.
+        let projectTasks = tasks.filter { $0.projectId == projectId && !$0.done }
         if let cached = projectTaskCache[projectId] {
-            return cached.filter { !$0.done }
+            let orderMap = Dictionary(uniqueKeysWithValues: cached.enumerated().map { ($1.id, $0) })
+            return projectTasks.sorted { a, b in
+                (orderMap[a.id] ?? Int.max) < (orderMap[b.id] ?? Int.max)
+            }
         }
-        return tasks.filter { $0.projectId == projectId && !$0.done }
+        return projectTasks
     }
 
     /// Fetches tasks for a specific project via the view endpoint, which returns correct positions.

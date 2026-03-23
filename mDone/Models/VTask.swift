@@ -82,6 +82,11 @@ struct VTask: Codable, Identifiable, Hashable {
         return Calendar.current.isDateInToday(dueDate)
     }
 
+    var isDueTomorrow: Bool {
+        guard let dueDate = effectiveDueDate, !done else { return false }
+        return Calendar.current.isDateInTomorrow(dueDate)
+    }
+
     var isDueThisWeek: Bool {
         guard let dueDate = effectiveDueDate, !done else { return false }
         let now = Date()

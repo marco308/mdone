@@ -3,6 +3,7 @@ import SwiftUI
 struct QuickAddBar: View {
     @Environment(AppState.self) private var appState
     let projectId: Int64
+    var defaultDueDate: Date?
     @State private var title = ""
     @FocusState private var isFocused: Bool
 
@@ -43,7 +44,7 @@ struct QuickAddBar: View {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         Task {
-            await appState.createTask(title: trimmed, projectId: projectId)
+            await appState.createTask(title: trimmed, projectId: projectId, dueDate: defaultDueDate)
             title = ""
         }
     }

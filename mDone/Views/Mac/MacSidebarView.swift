@@ -46,6 +46,44 @@ struct MacSidebarView: View {
                 .tag(MacContentView.SidebarSection.today)
 
                 Label {
+                    HStack {
+                        Text("Tomorrow")
+                        Spacer()
+                        if !appState.tomorrowTasks.isEmpty {
+                            Text("\(appState.tomorrowTasks.count)")
+                                .font(.caption2)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.orange, in: Capsule())
+                        }
+                    }
+                } icon: {
+                    Image(systemName: "sunrise")
+                        .foregroundStyle(.orange)
+                }
+                .tag(MacContentView.SidebarSection.tomorrow)
+
+                Label {
+                    HStack {
+                        Text("This Week")
+                        Spacer()
+                        if !appState.thisWeekTasks.isEmpty {
+                            Text("\(appState.thisWeekTasks.count)")
+                                .font(.caption2)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.blue, in: Capsule())
+                        }
+                    }
+                } icon: {
+                    Image(systemName: "calendar.badge.clock")
+                        .foregroundStyle(.blue)
+                }
+                .tag(MacContentView.SidebarSection.thisWeek)
+
+                Label {
                     Text("Upcoming")
                 } icon: {
                     Image(systemName: "calendar")

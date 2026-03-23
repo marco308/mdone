@@ -6,7 +6,7 @@ struct MacContentView: View {
     @State private var selectedTask: VTask?
 
     enum SidebarSection: Hashable {
-        case inbox, today, upcoming, overdue, noDate
+        case inbox, today, tomorrow, thisWeek, upcoming, overdue, noDate
         case project(Project)
         case notifications, calendar, settings
     }
@@ -15,7 +15,7 @@ struct MacContentView: View {
     private var sectionShowsTaskList: Bool {
         guard let selectedSection else { return false }
         switch selectedSection {
-        case .inbox, .today, .upcoming, .overdue, .noDate, .project:
+        case .inbox, .today, .tomorrow, .thisWeek, .upcoming, .overdue, .noDate, .project:
             return true
         case .notifications, .calendar, .settings:
             return false

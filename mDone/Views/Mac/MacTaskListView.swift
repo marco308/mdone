@@ -128,6 +128,8 @@ struct MacTaskListView: View {
         switch section {
         case .inbox: return "Inbox"
         case .today: return "Today"
+        case .tomorrow: return "Tomorrow"
+        case .thisWeek: return "This Week"
         case .upcoming: return "Upcoming"
         case .overdue: return "Overdue"
         case .noDate: return "No Date"
@@ -143,6 +145,8 @@ struct MacTaskListView: View {
         switch section {
         case .inbox: return appState.activeTasks
         case .today: return appState.todayTasks
+        case .tomorrow: return appState.tomorrowTasks
+        case .thisWeek: return appState.thisWeekTasks
         case .upcoming: return appState.upcomingTasks
         case .overdue: return appState.overdueTasks
         case .noDate: return appState.noDateTasks
@@ -208,6 +212,8 @@ struct MacTaskListView: View {
         guard let section else { return "tray" }
         switch section {
         case .today: return "sun.max"
+        case .tomorrow: return "sunrise"
+        case .thisWeek: return "calendar.badge.clock"
         case .upcoming: return "calendar"
         case .overdue: return "checkmark.circle"
         case .noDate: return "tray"
@@ -222,6 +228,8 @@ struct MacTaskListView: View {
         guard let section else { return "No Tasks" }
         switch section {
         case .today: return "All Clear Today"
+        case .tomorrow: return "Nothing Tomorrow"
+        case .thisWeek: return "Nothing This Week"
         case .upcoming: return "Nothing Upcoming"
         case .overdue: return "No Overdue Tasks"
         case .noDate: return "No Undated Tasks"
@@ -236,7 +244,9 @@ struct MacTaskListView: View {
         guard let section else { return "" }
         switch section {
         case .today: return "You have no tasks due today."
-        case .upcoming: return "No tasks due this week."
+        case .tomorrow: return "No tasks due tomorrow."
+        case .thisWeek: return "No tasks due this week."
+        case .upcoming: return "No tasks coming up."
         case .overdue: return "Great job staying on top of things!"
         case .noDate: return "All your tasks have due dates."
         case .inbox: return "Create a task to get started."
