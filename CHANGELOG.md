@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Expanded unit test coverage for APIClient, TaskService, ProjectService, and SyncService
+- MockURLProtocol test helper for network request testing without real API calls
+- Tests for network error handling, token expiry, pagination, date decoding edge cases
+- Tests for all VTask computed properties (isOverdue, isDueToday, isDueTomorrow, isDueThisWeek, repeatDescription)
+- Tests for cached model round-trips, updates, and label preservation
+
 ## [1.1.0] - 2026-03-23
 
 ### Added
