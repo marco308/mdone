@@ -7,7 +7,7 @@ struct TaskFilterSheet: View {
     @State private var selectedPriority: PriorityLevel? = nil
     @State private var selectedDateRange: DateRangeOption = .any
     @State private var customStartDate: Date = Date()
-    @State private var customEndDate: Date = Date().addingTimeInterval(7 * 24 * 3600)
+    @State private var customEndDate: Date = Date().addingTimeInterval(7.0 * 24.0 * 3600.0)
     @State private var doneFilter: DoneFilter = .undone
     @State private var selectedProjectId: Int64? = nil
 
