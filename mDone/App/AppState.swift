@@ -1,3 +1,4 @@
+import EventKit
 import Foundation
 import SwiftUI
 import WidgetKit
@@ -15,9 +16,16 @@ final class AppState {
     var selectedProject: Project?
 
     var searchQuery: String = ""
-    var activeFilter: TaskFilter? = nil
-    var advancedFilterString: String? = nil
+    var activeFilter: TaskFilter?
+    var advancedFilterString: String?
     var pendingOperationsCount: Int = 0
+    var isRetrying: Bool = false
+
+    // Calendar integration
+    var calendarEvents: [CalendarEvent] = []
+    var calendarAccessGranted: Bool = false
+    private let calendarService = CalendarService()
+
     var onTaskCompleted: ((Int64) -> Void)?
     var onTaskDeleted: ((Int64) -> Void)?
 
@@ -40,6 +48,12 @@ final class AppState {
 
     var isOffline: Bool {
         !(networkMonitor?.isConnected ?? true)
+    }
+
+    /// Polls the APIClient's retry state and updates the published `isRetrying` property.
+    @MainActor
+    func updateRetryState() async {
+        isRetrying = await APIClient.shared.isRetrying
     }
 
     func configureSyncService(_ syncService: SyncService, networkMonitor: NetworkMonitor) {
@@ -225,17 +239,22 @@ final class AppState {
         print("[mDone] refreshAll() called")
         #endif
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            isRetrying = false
+        }
 
         do {
             async let fetchedTasks = taskService.fetchAllTasks(perPage: 200)
             async let fetchedProjects = projectService.fetchProjects()
 
             tasks = try await fetchedTasks
+            await updateRetryState()
             #if DEBUG
             print("[mDone] refreshAll: got \(tasks.count) tasks")
             #endif
             projects = try await fetchedProjects
+            await updateRetryState()
             #if DEBUG
             print("[mDone] refreshAll: got \(projects.count) projects")
             #endif
@@ -258,6 +277,8 @@ final class AppState {
 
             pushWidgetData()
             WidgetCenter.shared.reloadAllTimelines()
+
+            await refreshCalendarEvents()
         } catch let error as NetworkError {
             #if DEBUG
             print("[mDone] refreshAll: NetworkError: \(error)")
@@ -428,6 +449,42 @@ final class AppState {
         }
     }
 
+    // MARK: - Calendar Events
+
+    @MainActor
+    func requestCalendarAccess() async {
+        calendarAccessGranted = await calendarService.requestAccess()
+        if calendarAccessGranted {
+            await refreshCalendarEvents()
+        }
+    }
+
+    @MainActor
+    func refreshCalendarEvents() async {
+        guard calendarAccessGranted else { return }
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: Date())
+        guard let end = calendar.date(byAdding: .day, value: 7, to: start) else { return }
+        calendarEvents = await calendarService.fetchEvents(from: start, to: end)
+    }
+
+    func calendarEventsForDate(_ date: Date) async -> [CalendarEvent] {
+        guard calendarAccessGranted else { return [] }
+        return await calendarService.eventsForDate(date)
+    }
+
+    func calendarEventsForMonth(_ date: Date) async -> [Date: [CalendarEvent]] {
+        guard calendarAccessGranted else { return [:] }
+        return await calendarService.eventsForMonth(date)
+    }
+
+    var todayCalendarEvents: [CalendarEvent] {
+        let calendar = Calendar.current
+        let todayStart = calendar.startOfDay(for: Date())
+        guard let todayEnd = calendar.date(byAdding: .day, value: 1, to: todayStart) else { return [] }
+        return calendarEvents.filter { $0.startDate >= todayStart && $0.startDate < todayEnd }
+    }
+
     func tasksForDate(_ date: Date) -> [VTask] {
         let calendar = Calendar.current
         return tasks.filter { task in
@@ -455,7 +512,10 @@ final class AppState {
         do {
             // Send empty body to mark as read
             struct EmptyBody: Encodable {}
-            let _: VNotification = try await APIClient.shared.send(Endpoint.markNotificationRead(id: id), body: EmptyBody())
+            let _: VNotification = try await APIClient.shared.send(
+                Endpoint.markNotificationRead(id: id),
+                body: EmptyBody()
+            )
             if let index = notifications.firstIndex(where: { $0.id == id }) {
                 notifications[index].read = true
                 notifications[index].readAt = Date()

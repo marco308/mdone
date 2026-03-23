@@ -161,8 +161,23 @@ struct MacSidebarView: View {
                 }
                 .tag(MacContentView.SidebarSection.notifications)
 
-                Label("Calendar", systemImage: "calendar")
-                    .tag(MacContentView.SidebarSection.calendar)
+                Label {
+                    HStack {
+                        Text("Calendar")
+                        Spacer()
+                        if appState.calendarAccessGranted, !appState.todayCalendarEvents.isEmpty {
+                            Text("\(appState.todayCalendarEvents.count)")
+                                .font(.caption2)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.green, in: Capsule())
+                        }
+                    }
+                } icon: {
+                    Image(systemName: "calendar")
+                }
+                .tag(MacContentView.SidebarSection.calendar)
 
                 Label("Settings", systemImage: "gear")
                     .tag(MacContentView.SidebarSection.settings)

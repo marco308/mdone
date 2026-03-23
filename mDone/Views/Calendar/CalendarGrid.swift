@@ -4,6 +4,7 @@ struct CalendarGrid: View {
     @Binding var displayedMonth: Date
     @Binding var selectedDate: Date
     let tasksForMonth: [Date: [VTask]]
+    var eventsForMonth: [Date: [CalendarEvent]] = [:]
 
     private let calendar = Calendar.current
     private let weekdays = Calendar.current.shortWeekdaySymbols
@@ -50,11 +51,13 @@ struct CalendarGrid: View {
             LazyVGrid(columns: columns, spacing: 8) {
                 ForEach(daysInMonth(), id: \.self) { date in
                     if let date {
+                        let dayKey = calendar.startOfDay(for: date)
                         DayCell(
                             date: date,
                             isToday: calendar.isDateInToday(date),
                             isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
-                            tasks: tasksForMonth[calendar.startOfDay(for: date)] ?? []
+                            tasks: tasksForMonth[dayKey] ?? [],
+                            events: eventsForMonth[dayKey] ?? []
                         )
                         .onTapGesture {
                             withAnimation(.easeInOut(duration: 0.2)) {
@@ -115,6 +118,15 @@ struct DayCell: View {
     let isToday: Bool
     let isSelected: Bool
     let tasks: [VTask]
+    var events: [CalendarEvent] = []
+
+    private var hasEvents: Bool {
+        !events.isEmpty
+    }
+
+    private var totalDots: Int {
+        min(tasks.count, 3) + (hasEvents ? 1 : 0)
+    }
 
     var body: some View {
         VStack(spacing: 4) {
@@ -131,11 +143,17 @@ struct DayCell: View {
                     }
                 }
 
-            // Task dots
+            // Task and event dots
             HStack(spacing: 2) {
                 ForEach(0 ..< min(tasks.count, 3), id: \.self) { index in
                     Circle()
                         .fill(dotColor(for: tasks[index]))
+                        .frame(width: 5, height: 5)
+                }
+
+                if hasEvents {
+                    Circle()
+                        .fill(Color.green)
                         .frame(width: 5, height: 5)
                 }
             }

@@ -20,6 +20,7 @@ enum NetworkError: LocalizedError {
     case serverError(statusCode: Int, message: String?)
     case decodingError(Error)
     case networkUnavailable
+    case rateLimited
     case unknown(Error)
 
     var errorDescription: String? {
@@ -34,6 +35,8 @@ enum NetworkError: LocalizedError {
             "Failed to parse server response"
         case .networkUnavailable:
             "No internet connection"
+        case .rateLimited:
+            "Server is busy. Please try again later."
         case let .unknown(error):
             error.localizedDescription
         }
