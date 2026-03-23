@@ -44,5 +44,8 @@ mDone.xcodeproj/
 # Screenshot debug output
 screenshots/ipad-debug/
 
+# Environment files
+.env*
+
 # Claude Code
 .claude/

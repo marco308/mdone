@@ -6,9 +6,39 @@ final class ScreenshotTests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        app.launchArguments += ["-MDONE_SERVER_URL", "https://vikunja-test.marcuslab.uk"]
-        app.launchArguments += ["-MDONE_TOKEN", "tk_911c079025eb3bf9e7f3008668ad0c7bbc091fc9"]
+
+        let env = Self.loadEnvFile()
+        guard let serverURL = ProcessInfo.processInfo.environment["MDONE_SERVER_URL"] ?? env["MDONE_SERVER_URL"],
+              let token = ProcessInfo.processInfo.environment["MDONE_TOKEN"] ?? env["MDONE_TOKEN"]
+        else {
+            XCTFail("Set MDONE_SERVER_URL and MDONE_TOKEN in environment or .env.screenshot")
+            return
+        }
+
+        app.launchArguments += ["-MDONE_SERVER_URL", serverURL]
+        app.launchArguments += ["-MDONE_TOKEN", token]
         app.launch()
+    }
+
+    private static func loadEnvFile() -> [String: String] {
+        // Walk up from the test bundle to find the repo root .env.screenshot
+        var dir = URL(fileURLWithPath: #file).deletingLastPathComponent()
+        for _ in 0 ..< 5 {
+            let envURL = dir.appendingPathComponent(".env.screenshot")
+            if let contents = try? String(contentsOf: envURL, encoding: .utf8) {
+                var result: [String: String] = [:]
+                for line in contents.components(separatedBy: .newlines) {
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    guard !trimmed.isEmpty, !trimmed.hasPrefix("#") else { continue }
+                    let parts = trimmed.split(separator: "=", maxSplits: 1)
+                    guard parts.count == 2 else { continue }
+                    result[String(parts[0])] = String(parts[1])
+                }
+                return result
+            }
+            dir = dir.deletingLastPathComponent()
+        }
+        return [:]
     }
 
     func testCaptureScreenshots() throws {
