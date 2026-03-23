@@ -1,6 +1,6 @@
 import Foundation
-import SwiftData
 import OSLog
+import SwiftData
 
 actor SyncService {
     private let taskService: TaskService
@@ -11,7 +11,12 @@ actor SyncService {
 
     private static let maxRetries = 3
 
-    init(taskService: TaskService, projectService: ProjectService, modelContainer: ModelContainer, apiClient: APIClient = .shared) {
+    init(
+        taskService: TaskService,
+        projectService: ProjectService,
+        modelContainer: ModelContainer,
+        apiClient: APIClient = .shared
+    ) {
         self.taskService = taskService
         self.projectService = projectService
         self.modelContainer = modelContainer
@@ -82,11 +87,17 @@ actor SyncService {
                 logger.info("Successfully processed: \(operation.method) \(operation.endpointPath)")
             } catch {
                 operation.retryCount += 1
-                logger.error("Failed operation \(operation.method) \(operation.endpointPath) (attempt \(operation.retryCount)): \(error.localizedDescription)")
+                logger
+                    .error(
+                        "Failed operation \(operation.method) \(operation.endpointPath) (attempt \(operation.retryCount)): \(error.localizedDescription)"
+                    )
 
                 if operation.retryCount >= SyncService.maxRetries {
                     operation.failed = true
-                    logger.error("Operation marked as failed after \(SyncService.maxRetries) retries: \(operation.method) \(operation.endpointPath)")
+                    logger
+                        .error(
+                            "Operation marked as failed after \(SyncService.maxRetries) retries: \(operation.method) \(operation.endpointPath)"
+                        )
                 }
 
                 try? context.save()

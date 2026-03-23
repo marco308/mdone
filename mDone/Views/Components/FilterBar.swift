@@ -7,25 +7,27 @@ enum TaskFilter: String, CaseIterable, Identifiable {
     case completed
     case hasLabels
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var label: String {
         switch self {
-        case .all: return "All"
-        case .highPriority: return "High Priority"
-        case .dueThisWeek: return "Due This Week"
-        case .completed: return "Completed"
-        case .hasLabels: return "Has Labels"
+        case .all: "All"
+        case .highPriority: "High Priority"
+        case .dueThisWeek: "Due This Week"
+        case .completed: "Completed"
+        case .hasLabels: "Has Labels"
         }
     }
 
     var icon: String {
         switch self {
-        case .all: return "tray.full"
-        case .highPriority: return "flag.fill"
-        case .dueThisWeek: return "calendar"
-        case .completed: return "checkmark.circle"
-        case .hasLabels: return "tag"
+        case .all: "tray.full"
+        case .highPriority: "flag.fill"
+        case .dueThisWeek: "calendar"
+        case .completed: "checkmark.circle"
+        case .hasLabels: "tag"
         }
     }
 
@@ -33,17 +35,17 @@ enum TaskFilter: String, CaseIterable, Identifiable {
     var filterString: String? {
         switch self {
         case .all:
-            return nil
+            nil
         case .highPriority:
-            return "priority >= 3"
+            "priority >= 3"
         case .dueThisWeek:
-            return "due_date > now && due_date < now+7d"
+            "due_date > now && due_date < now+7d"
         case .completed:
-            return "done = true"
+            "done = true"
         case .hasLabels:
             // Vikunja does not have a direct "has labels" filter;
             // this is applied locally instead.
-            return nil
+            nil
         }
     }
 
@@ -51,15 +53,15 @@ enum TaskFilter: String, CaseIterable, Identifiable {
     func apply(to tasks: [VTask]) -> [VTask] {
         switch self {
         case .all:
-            return tasks
+            tasks
         case .highPriority:
-            return tasks.filter { $0.priority >= 3 }
+            tasks.filter { $0.priority >= 3 }
         case .dueThisWeek:
-            return tasks.filter { $0.isDueThisWeek || $0.isDueToday }
+            tasks.filter { $0.isDueThisWeek || $0.isDueToday }
         case .completed:
-            return tasks.filter { $0.done }
+            tasks.filter(\.done)
         case .hasLabels:
-            return tasks.filter { !($0.labels ?? []).isEmpty }
+            tasks.filter { !($0.labels ?? []).isEmpty }
         }
     }
 }
@@ -123,5 +125,7 @@ struct FilterChip: View {
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Filter: \(title)")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }

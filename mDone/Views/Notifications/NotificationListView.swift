@@ -38,30 +38,30 @@ struct NotificationListView: View {
             }
             .navigationTitle("Notifications")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(.inline)
             #endif
-            .toolbar {
-                #if os(iOS)
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
-                }
-                #endif
+                .toolbar {
+                    #if os(iOS)
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") { dismiss() }
+                    }
+                    #endif
 
-                ToolbarItem(placement: .primaryAction) {
-                    if appState.unreadNotificationCount > 0 {
-                        Button {
-                            Task {
-                                await appState.markAllNotificationsRead()
+                    ToolbarItem(placement: .primaryAction) {
+                        if appState.unreadNotificationCount > 0 {
+                            Button {
+                                Task {
+                                    await appState.markAllNotificationsRead()
+                                }
+                            } label: {
+                                Label("Mark All Read", systemImage: "envelope.open.fill")
                             }
-                        } label: {
-                            Label("Mark All Read", systemImage: "envelope.open.fill")
                         }
                     }
                 }
-            }
-            .task {
-                await appState.fetchNotifications()
-            }
+                .task {
+                    await appState.fetchNotifications()
+                }
         }
     }
 }
@@ -75,12 +75,14 @@ struct NotificationRow: View {
             Circle()
                 .fill(notification.isUnread ? Color.blue : Color.clear)
                 .frame(width: 8, height: 8)
+                .accessibilityHidden(true)
 
             // Icon
             Image(systemName: notification.iconName)
                 .font(.title3)
                 .foregroundStyle(notification.iconColor)
                 .frame(width: 28)
+                .accessibilityHidden(true)
 
             // Content
             VStack(alignment: .leading, spacing: 4) {
@@ -99,5 +101,9 @@ struct NotificationRow: View {
         }
         .padding(.vertical, 4)
         .opacity(notification.isUnread ? 1.0 : 0.7)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(notification.isUnread ? "Unread: " : "")\(notification.descriptionText), \(notification.relativeTimeString)"
+        )
     }
 }

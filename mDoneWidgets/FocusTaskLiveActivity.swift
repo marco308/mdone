@@ -92,7 +92,7 @@ private func timerView(
             .foregroundStyle(.secondary)
     } else {
         Text(
-            timerInterval: context.state.focusStartDate...(.distantFuture),
+            timerInterval: context.state.focusStartDate ... .distantFuture,
             countsDown: false
         )
         .font(font.monospacedDigit())
@@ -117,11 +117,11 @@ private func statusIcon(isPaused: Bool) -> some View {
 
 private func priorityColor(_ level: Int) -> Color {
     switch level {
-    case 5, 4: return .red
-    case 3: return .orange
-    case 2: return .yellow
-    case 1: return .blue
-    default: return .gray
+    case 5, 4: .red
+    case 3: .orange
+    case 2: .yellow
+    case 1: .blue
+    default: .gray
     }
 }
 

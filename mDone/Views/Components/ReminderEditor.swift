@@ -16,12 +16,12 @@ struct ReminderEditor: View {
 
         var relativePeriod: Int64 {
             switch self {
-            case .atDue: return 0
-            case .fiveMin: return -300
-            case .fifteenMin: return -900
-            case .thirtyMin: return -1800
-            case .oneHour: return -3600
-            case .oneDay: return -86400
+            case .atDue: 0
+            case .fiveMin: -300
+            case .fifteenMin: -900
+            case .thirtyMin: -1800
+            case .oneHour: -3600
+            case .oneDay: -86400
             }
         }
 
@@ -39,6 +39,7 @@ struct ReminderEditor: View {
             HStack {
                 Image(systemName: "bell")
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
                 Text(displayText(for: reminder))
                 Spacer()
             }
@@ -74,23 +75,23 @@ struct ReminderEditor: View {
                 }
                 .navigationTitle("Custom Reminder")
                 #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
+                    .navigationBarTitleDisplayMode(.inline)
                 #endif
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { showCustomPicker = false }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Add") {
-                            reminders.append(TaskReminder(
-                                reminder: customDate,
-                                relativePeriod: nil,
-                                relativeTo: nil
-                            ))
-                            showCustomPicker = false
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") { showCustomPicker = false }
+                        }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Add") {
+                                reminders.append(TaskReminder(
+                                    reminder: customDate,
+                                    relativePeriod: nil,
+                                    relativeTo: nil
+                                ))
+                                showCustomPicker = false
+                            }
                         }
                     }
-                }
             }
             #if os(iOS)
             .presentationDetents([.medium])

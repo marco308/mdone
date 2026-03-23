@@ -102,9 +102,12 @@ struct MacTaskListView: View {
                 Button {
                     showAdvancedFilter.toggle()
                 } label: {
-                    Image(systemName: appState.advancedFilterString != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                    Image(systemName: appState
+                        .advancedFilterString != nil ? "line.3.horizontal.decrease.circle.fill" :
+                        "line.3.horizontal.decrease.circle")
                 }
                 .help("Advanced Filter")
+                .accessibilityLabel(appState.advancedFilterString != nil ? "Advanced filter active" : "Advanced filter")
                 .popover(isPresented: $showAdvancedFilter) {
                     TaskFilterSheet { filterString in
                         Task { await appState.applyAdvancedFilter(filterString) }
@@ -131,6 +134,7 @@ struct MacTaskListView: View {
                     Image(systemName: "arrow.up.arrow.down")
                 }
                 .help("Sort tasks")
+                .accessibilityLabel("Sort by \(sortOrder.rawValue)")
             }
 
             ToolbarItem(placement: .primaryAction) {

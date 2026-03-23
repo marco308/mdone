@@ -10,6 +10,8 @@ struct ServerSetupView: View {
     @State private var errorMessage: String?
     @State private var authMode: AuthMode = .credentials
 
+    @ScaledMetric(relativeTo: .largeTitle) private var logoSize: CGFloat = 64
+
     enum AuthMode: String, CaseIterable {
         case credentials = "Login"
         case apiToken = "API Token"
@@ -24,8 +26,9 @@ struct ServerSetupView: View {
                     // Logo area
                     VStack(spacing: 12) {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 64))
+                            .font(.system(size: logoSize))
                             .foregroundStyle(Color.accentColor)
+                            .accessibilityHidden(true)
 
                         Text("mDone")
                             .font(.largeTitle.bold())
@@ -145,11 +148,13 @@ struct ServerSetupView: View {
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
                     } else {
-                        Text("API tokens have limited permissions. Use Login for full functionality including task reordering.")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
+                        Text(
+                            "API tokens have limited permissions. Use Login for full functionality including task reordering."
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
                     }
 
                     Spacer()
@@ -175,7 +180,7 @@ struct ServerSetupView: View {
         errorMessage = nil
 
         var url = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !url.hasPrefix("http://") && !url.hasPrefix("https://") {
+        if !url.hasPrefix("http://"), !url.hasPrefix("https://") {
             url = "https://" + url
         }
 

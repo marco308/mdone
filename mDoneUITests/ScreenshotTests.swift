@@ -2,7 +2,9 @@ import XCTest
 
 final class ScreenshotTests: XCTestCase {
     let app = XCUIApplication()
-    var isIPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
+    var isIPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -41,7 +43,7 @@ final class ScreenshotTests: XCTestCase {
         return [:]
     }
 
-    func testCaptureScreenshots() throws {
+    func testCaptureScreenshots() {
         // Wait for login — look for "Inbox" anywhere (title or tab)
         let inboxText = app.staticTexts["Inbox"]
         guard inboxText.waitForExistence(timeout: 20) else {

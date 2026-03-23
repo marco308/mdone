@@ -9,6 +9,7 @@ struct ProjectRow: View {
             Circle()
                 .fill(projectColor)
                 .frame(width: 12, height: 12)
+                .accessibilityHidden(true)
 
             Text(project.title)
                 .font(.body)
@@ -26,6 +27,8 @@ struct ProjectRow: View {
             }
         }
         .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(project.title), \(taskCount) \(taskCount == 1 ? "task" : "tasks")")
     }
 
     private var projectColor: Color {

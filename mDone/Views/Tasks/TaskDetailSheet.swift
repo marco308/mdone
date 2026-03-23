@@ -51,6 +51,7 @@ struct TaskDetailSheet: View {
                                     .font(.caption)
                             }
                             .buttonStyle(.borderless)
+                            .accessibilityLabel(isPreviewingMarkdown ? "Edit description" : "Preview description")
                         }
 
                         if isPreviewingMarkdown {
@@ -112,10 +113,10 @@ struct TaskDetailSheet: View {
                     Picker("Repeat", selection: $repeatInterval) {
                         Text("Never").tag(Int64(0))
                         Text("Daily").tag(Int64(86400))
-                        Text("Weekly").tag(Int64(604800))
-                        Text("Every 2 Weeks").tag(Int64(1209600))
-                        Text("Monthly").tag(Int64(2592000))
-                        Text("Yearly").tag(Int64(31536000))
+                        Text("Weekly").tag(Int64(604_800))
+                        Text("Every 2 Weeks").tag(Int64(1_209_600))
+                        Text("Monthly").tag(Int64(2_592_000))
+                        Text("Yearly").tag(Int64(31_536_000))
                     }
                 }
 
@@ -195,7 +196,12 @@ struct TaskDetailSheet: View {
     }
 
     private func markdownAttributedString(from markdown: String) -> AttributedString {
-        (try? AttributedString(markdown: markdown, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(markdown)
+        (
+            try? AttributedString(markdown: markdown, options: .init(
+                interpretedSyntax: .inlineOnlyPreservingWhitespace
+            ))
+        ) ??
+            AttributedString(markdown)
     }
 
     private func saveTask() {

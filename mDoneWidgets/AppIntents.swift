@@ -41,7 +41,7 @@ struct OpenTaskIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult {
-        return .result()
+        .result()
     }
 }
 
@@ -55,6 +55,6 @@ struct QuickAddIntent: AppIntent {
     init() {}
 
     func perform() async throws -> some IntentResult {
-        return .result()
+        .result()
     }
 }

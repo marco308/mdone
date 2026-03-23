@@ -106,7 +106,7 @@ struct TodayTasksWidgetView: View {
         Group {
             if !entry.isAuthenticated {
                 unauthenticatedView
-            } else if entry.tasks.isEmpty && entry.overdueTasks.isEmpty {
+            } else if entry.tasks.isEmpty, entry.overdueTasks.isEmpty {
                 emptyStateView
             } else {
                 taskListView

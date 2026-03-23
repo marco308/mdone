@@ -9,14 +9,17 @@ struct DayTaskList: View {
         tasks.isEmpty && calendarEvents.isEmpty
     }
 
+    @ScaledMetric(relativeTo: .title) private var emptyIconSize: CGFloat = 36
+
     var body: some View {
         Group {
             if isEmpty {
                 VStack(spacing: 12) {
                     Spacer()
                     Image(systemName: "calendar.badge.checkmark")
-                        .font(.system(size: 36))
+                        .font(.system(size: emptyIconSize))
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                     Text("No tasks or events for this day")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)

@@ -39,7 +39,7 @@ final class MacScreenshotTests: XCTestCase {
         return [:]
     }
 
-    func testCaptureScreenshots() throws {
+    func testCaptureScreenshots() {
         // Wait for login
         let inboxText = app.staticTexts["Inbox"]
         guard inboxText.waitForExistence(timeout: 20) else {

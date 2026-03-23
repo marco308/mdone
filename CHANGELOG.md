@@ -14,6 +14,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Tests for cached model round-trips, updates, and label preservation
 - Automatic retry with exponential backoff for transient API failures (timeouts, rate limits, server errors)
 
+### Fixed
+- VoiceOver accessibility across all screens: added descriptive labels to interactive controls, task rows, calendar cells, focus timer, and notification bell
+- Added accessibility grouping to task rows, project rows, notification rows, and empty states so VoiceOver reads them as coherent elements
+- Added header traits to section headers and calendar month title
+- Marked decorative elements (priority color bars, status dots, icons) as hidden from accessibility
+- Replaced hardcoded font sizes with @ScaledMetric for Dynamic Type support in focus timer, empty states, and setup screen
+- Replaced hardcoded notification badge font size with semantic .caption2 for Dynamic Type scaling
+- Added toggle trait to task completion checkbox buttons
+- Added selected trait to active filter chips and calendar day cells
+
 ## [1.1.0] - 2026-03-23
 
 ### Added

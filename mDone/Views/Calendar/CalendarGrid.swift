@@ -20,11 +20,13 @@ struct CalendarGrid: View {
                     Image(systemName: "chevron.left")
                         .font(.body.weight(.medium))
                 }
+                .accessibilityLabel("Previous month")
 
                 Spacer()
 
                 Text(displayedMonth, format: .dateTime.month(.wide).year())
                     .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
 
                 Spacer()
 
@@ -34,6 +36,7 @@ struct CalendarGrid: View {
                     Image(systemName: "chevron.right")
                         .font(.body.weight(.medium))
                 }
+                .accessibilityLabel("Next month")
             }
             .padding(.horizontal, 4)
 
@@ -158,8 +161,23 @@ struct DayCell: View {
                 }
             }
             .frame(height: 5)
+            .accessibilityHidden(true)
         }
         .frame(height: 44)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(dayCellAccessibilityLabel)
+        .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
+    }
+
+    private var dayCellAccessibilityLabel: String {
+        var label = date.formatted(date: .complete, time: .omitted)
+        if isToday {
+            label += ", today"
+        }
+        if !tasks.isEmpty {
+            label += ", \(tasks.count) \(tasks.count == 1 ? "task" : "tasks")"
+        }
+        return label
     }
 
     private func dotColor(for task: VTask) -> Color {

@@ -70,14 +70,18 @@ struct MainTabView: View {
 
                 if appState.unreadNotificationCount > 0 {
                     Text("\(appState.unreadNotificationCount)")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.caption2.bold())
                         .foregroundStyle(.white)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1)
                         .background(Color.red, in: Capsule())
                         .offset(x: 8, y: -8)
+                        .accessibilityHidden(true)
                 }
             }
         }
+        .accessibilityLabel(appState
+            .unreadNotificationCount > 0 ? "Notifications, \(appState.unreadNotificationCount) unread" :
+            "Notifications")
     }
 }

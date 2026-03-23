@@ -43,6 +43,7 @@ struct CalendarScreen: View {
                     Text("Today")
                         .font(.subheadline)
                 }
+                .accessibilityLabel("Go to today")
             }
         }
         .task {

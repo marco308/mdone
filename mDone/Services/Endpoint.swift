@@ -42,7 +42,14 @@ struct Endpoint {
 
     // MARK: - Tasks
 
-    static func allTasks(page: Int = 1, perPage: Int = 50, filter: String? = nil, search: String? = nil, sortBy: String? = nil, orderBy: String? = nil) -> Endpoint {
+    static func allTasks(
+        page: Int = 1,
+        perPage: Int = 50,
+        filter: String? = nil,
+        search: String? = nil,
+        sortBy: String? = nil,
+        orderBy: String? = nil
+    ) -> Endpoint {
         var items = [
             URLQueryItem(name: "page", value: "\(page)"),
             URLQueryItem(name: "per_page", value: "\(perPage)"),

@@ -8,6 +8,7 @@ struct PriorityBadge: View {
             Image(systemName: "flag.fill")
                 .font(.caption2)
                 .foregroundStyle(color)
+                .accessibilityLabel("Priority: \(priority.label)")
         }
     }
 

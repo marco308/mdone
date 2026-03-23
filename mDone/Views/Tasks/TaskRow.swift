@@ -17,68 +17,68 @@ struct TaskRow: View {
     var body: some View {
         rowContent
         #if os(iOS)
-            .contentShape(Rectangle())
-            .onTapGesture { showDetail = true }
-            .listRowBackground(isFocused ? Color.orange.opacity(0.08) : nil)
+        .contentShape(Rectangle())
+        .onTapGesture { showDetail = true }
+        .listRowBackground(isFocused ? Color.orange.opacity(0.08) : nil)
         #endif
-            .swipeActions(edge: .leading) {
-                #if os(iOS)
-                if !task.done {
-                    Button {
-                        Task { await appState.postponeTask(task, byHours: 24) }
-                    } label: {
-                        Label("+24h", systemImage: "clock.arrow.circlepath")
-                    }
-                    .tint(.blue)
-                }
-
+        .swipeActions(edge: .leading) {
+            #if os(iOS)
+            if !task.done {
                 Button {
-                    if isFocused {
-                        focusManager.endFocus()
-                    } else {
-                        let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
-                        focusManager.switchFocus(task: task, projectName: projectName)
-                    }
+                    Task { await appState.postponeTask(task, byHours: 24) }
                 } label: {
-                    Label(isFocused ? "End Focus" : "Focus", systemImage: "scope")
+                    Label("+24h", systemImage: "clock.arrow.circlepath")
                 }
-                .tint(.orange)
-                #endif
+                .tint(.blue)
+            }
 
-                Button {
-                    Task { await appState.toggleTaskDone(task) }
-                } label: {
-                    Label(task.done ? "Undo" : "Done", systemImage: task.done ? "arrow.uturn.backward" : "checkmark")
-                }
-                .tint(.green)
-            }
-            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                Button(role: .destructive) {
-                    Task { await appState.deleteTask(task) }
-                } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-            }
-        #if os(iOS)
-            .contextMenu {
+            Button {
                 if isFocused {
-                    Button {
-                        focusManager.endFocus()
-                    } label: {
-                        Label("End Focus", systemImage: "scope")
-                    }
+                    focusManager.endFocus()
                 } else {
-                    Button {
-                        let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
-                        focusManager.switchFocus(task: task, projectName: projectName)
-                    } label: {
-                        Label("Start Focus", systemImage: "scope")
-                    }
+                    let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
+                    focusManager.switchFocus(task: task, projectName: projectName)
+                }
+            } label: {
+                Label(isFocused ? "End Focus" : "Focus", systemImage: "scope")
+            }
+            .tint(.orange)
+            #endif
+
+            Button {
+                Task { await appState.toggleTaskDone(task) }
+            } label: {
+                Label(task.done ? "Undo" : "Done", systemImage: task.done ? "arrow.uturn.backward" : "checkmark")
+            }
+            .tint(.green)
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                Task { await appState.deleteTask(task) }
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        #if os(iOS)
+        .contextMenu {
+            if isFocused {
+                Button {
+                    focusManager.endFocus()
+                } label: {
+                    Label("End Focus", systemImage: "scope")
+                }
+            } else {
+                Button {
+                    let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
+                    focusManager.switchFocus(task: task, projectName: projectName)
+                } label: {
+                    Label("Start Focus", systemImage: "scope")
                 }
             }
-            .sheet(isPresented: $showDetail) {
-                TaskDetailSheet(task: task)
-            }
+        }
+        .sheet(isPresented: $showDetail) {
+            TaskDetailSheet(task: task)
+        }
         #endif
     }
 
@@ -87,6 +87,7 @@ struct TaskRow: View {
             RoundedRectangle(cornerRadius: 2)
                 .fill(priorityColor)
                 .frame(width: 4, height: 36)
+                .accessibilityHidden(true)
 
             Button {
                 Task {
@@ -99,6 +100,8 @@ struct TaskRow: View {
                     .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(task.done ? "Mark \(task.title) as incomplete" : "Mark \(task.title) as complete")
+            .accessibilityAddTraits(.isToggle)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(task.title)
@@ -154,11 +157,39 @@ struct TaskRow: View {
                     .font(.caption)
                     .foregroundStyle(.orange)
                     .symbolEffect(.pulse)
+                    .accessibilityLabel("Focused")
             }
             #endif
         }
         .padding(.vertical, 4)
         .opacity(task.done ? 0.6 : 1)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(taskAccessibilityLabel)
+    }
+
+    private var taskAccessibilityLabel: String {
+        var parts: [String] = []
+        parts.append(task.title)
+        if task.done {
+            parts.append("completed")
+        }
+        if task.priority > 0 {
+            parts.append("priority \(task.priorityLevel.label)")
+        }
+        if let dueDate = task.effectiveDueDate {
+            if task.isOverdue {
+                parts.append("overdue")
+            }
+            parts.append("due \(dueDate.formatted(date: .abbreviated, time: .omitted))")
+        }
+        if task.isRepeating, let desc = task.repeatDescription {
+            parts.append("repeats \(desc)")
+        }
+        if let labels = task.labels, !labels.isEmpty {
+            let labelNames = labels.prefix(3).map(\.title).joined(separator: ", ")
+            parts.append("labels: \(labelNames)")
+        }
+        return parts.joined(separator: ", ")
     }
 
     private var priorityColor: Color {
