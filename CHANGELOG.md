@@ -14,6 +14,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Tests for cached model round-trips, updates, and label preservation
 - Automatic retry with exponential backoff for transient API failures (timeouts, rate limits, server errors)
 
+### Changed
+- Error messages are now user-friendly with clear guidance instead of technical details
+- Added error banner component that displays contextual icons, recovery suggestions, and retry actions
+- Network, auth, and server errors are mapped to actionable messages (e.g., "You're offline. Your changes will sync when you're back online.")
+
 ### Fixed
 - VoiceOver accessibility across all screens: added descriptive labels to interactive controls, task rows, calendar cells, focus timer, and notification bell
 - Added accessibility grouping to task rows, project rows, notification rows, and empty states so VoiceOver reads them as coherent elements

@@ -55,6 +55,9 @@ struct MainTabView: View {
         .fullScreenCover(isPresented: Bindable(focusManager).showFocusView) {
             FocusSessionView()
         }
+        .errorBanner(Bindable(appState).activeError) {
+            Task { await appState.refreshAll() }
+        }
         #else
         Text("macOS")
         #endif
