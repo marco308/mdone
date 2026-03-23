@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Tests for network error handling, token expiry, pagination, date decoding edge cases
 - Tests for all VTask computed properties (isOverdue, isDueToday, isDueTomorrow, isDueThisWeek, repeatDescription)
 - Tests for cached model round-trips, updates, and label preservation
+- Automatic retry with exponential backoff for transient API failures (timeouts, rate limits, server errors)
 
 ## [1.1.0] - 2026-03-23
 

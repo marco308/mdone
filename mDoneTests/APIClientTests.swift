@@ -159,7 +159,13 @@ final class APIClientTests: XCTestCase {
         XCTAssertNotNil(NetworkError.invalidURL.errorDescription)
         XCTAssertNotNil(NetworkError.unauthorized.errorDescription)
         XCTAssertNotNil(NetworkError.networkUnavailable.errorDescription)
+        XCTAssertNotNil(NetworkError.rateLimited.errorDescription)
         XCTAssertNotNil(NetworkError.serverError(statusCode: 500, message: "Internal error").errorDescription)
+    }
+
+    func testRateLimitedErrorDescription() {
+        let error = NetworkError.rateLimited
+        XCTAssertEqual(error.errorDescription, "Server is busy. Please try again later.")
     }
 
     func testEndpointPaths() {

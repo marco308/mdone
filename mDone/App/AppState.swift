@@ -16,9 +16,10 @@ final class AppState {
     var selectedProject: Project?
 
     var searchQuery: String = ""
-    var activeFilter: TaskFilter? = nil
-    var advancedFilterString: String? = nil
+    var activeFilter: TaskFilter?
+    var advancedFilterString: String?
     var pendingOperationsCount: Int = 0
+    var isRetrying: Bool = false
 
     // Calendar integration
     var calendarEvents: [CalendarEvent] = []
@@ -47,6 +48,12 @@ final class AppState {
 
     var isOffline: Bool {
         !(networkMonitor?.isConnected ?? true)
+    }
+
+    /// Polls the APIClient's retry state and updates the published `isRetrying` property.
+    @MainActor
+    func updateRetryState() async {
+        isRetrying = await APIClient.shared.isRetrying
     }
 
     func configureSyncService(_ syncService: SyncService, networkMonitor: NetworkMonitor) {
@@ -232,17 +239,22 @@ final class AppState {
         print("[mDone] refreshAll() called")
         #endif
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            isRetrying = false
+        }
 
         do {
             async let fetchedTasks = taskService.fetchAllTasks(perPage: 200)
             async let fetchedProjects = projectService.fetchProjects()
 
             tasks = try await fetchedTasks
+            await updateRetryState()
             #if DEBUG
             print("[mDone] refreshAll: got \(tasks.count) tasks")
             #endif
             projects = try await fetchedProjects
+            await updateRetryState()
             #if DEBUG
             print("[mDone] refreshAll: got \(projects.count) projects")
             #endif
@@ -500,7 +512,10 @@ final class AppState {
         do {
             // Send empty body to mark as read
             struct EmptyBody: Encodable {}
-            let _: VNotification = try await APIClient.shared.send(Endpoint.markNotificationRead(id: id), body: EmptyBody())
+            let _: VNotification = try await APIClient.shared.send(
+                Endpoint.markNotificationRead(id: id),
+                body: EmptyBody()
+            )
             if let index = notifications.firstIndex(where: { $0.id == id }) {
                 notifications[index].read = true
                 notifications[index].readAt = Date()
