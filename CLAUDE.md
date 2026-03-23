@@ -58,6 +58,10 @@ View → AppState (method call) → Service (TaskService/ProjectService)
 - Filtering uses Vikunja DSL syntax, e.g. `"priority = 3 && due_date > now && done = false"`
 - All IDs are `Int64`
 
+## Changelog
+
+Update `CHANGELOG.md` whenever making user-facing changes (features, fixes, UI changes). Add entries under the `[Unreleased]` section using Keep a Changelog categories: Added, Changed, Fixed, Removed. Keep entries concise and written from the user's perspective.
+
 ## Linting & Formatting
 
 SwiftLint runs as a post-build script (configured in `project.yml`). Config in `.swiftlint.yml` — notably disables `line_length`, `trailing_whitespace`, `type_body_length`, `file_length`, `function_body_length`, and `cyclomatic_complexity`.
