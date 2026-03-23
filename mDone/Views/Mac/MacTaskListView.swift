@@ -52,6 +52,28 @@ struct MacTaskListView: View {
             } else if tasks.isEmpty {
                 ContentUnavailableView.search(text: appState.searchQuery)
                     .frame(maxHeight: .infinity)
+            } else if section == .inbox {
+                List(selection: $selectedTask) {
+                    if !appState.overdueTasks.isEmpty {
+                        SmartListSection(title: "Overdue", tasks: appState.overdueTasks, accentColor: .red)
+                    }
+                    if !appState.todayTasks.isEmpty {
+                        SmartListSection(title: "Today", tasks: appState.todayTasks, accentColor: Color.accentColor)
+                    }
+                    if !appState.tomorrowTasks.isEmpty {
+                        SmartListSection(title: "Tomorrow", tasks: appState.tomorrowTasks, accentColor: .orange)
+                    }
+                    if !appState.thisWeekTasks.isEmpty {
+                        SmartListSection(title: "This Week", tasks: appState.thisWeekTasks, accentColor: .blue)
+                    }
+                    if !appState.upcomingTasks.isEmpty {
+                        SmartListSection(title: "Upcoming", tasks: appState.upcomingTasks, accentColor: .purple)
+                    }
+                    if !appState.noDateTasks.isEmpty {
+                        SmartListSection(title: "No Date", tasks: appState.noDateTasks, accentColor: .secondary)
+                    }
+                }
+                .listStyle(.inset)
             } else {
                 List(tasks, selection: $selectedTask) { task in
                     TaskRow(task: task)

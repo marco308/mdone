@@ -71,7 +71,21 @@ targets:
         name: SwiftLint
         basedOnDependencyAnalysis: false
     scheme:
-      testTargets: []
+      testTargets:
+        - mDoneMacUITests
+
+  mDoneMacUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - mDoneMacUITests
+    dependencies:
+      - target: mDone-macOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.macuitests
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_TARGET_NAME: mDone-macOS
 
   mDoneWidgets:
     type: app-extension
