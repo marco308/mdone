@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Network, auth, and server errors are mapped to actionable messages (e.g., "You're offline. Your changes will sync when you're back online.")
 
 ### Fixed
+- macOS: Added missing calendars entitlement required for App Store sandbox compliance
 - VoiceOver accessibility across all screens: added descriptive labels to interactive controls, task rows, calendar cells, focus timer, and notification bell
 - Added accessibility grouping to task rows, project rows, notification rows, and empty states so VoiceOver reads them as coherent elements
 - Added header traits to section headers and calendar month title
