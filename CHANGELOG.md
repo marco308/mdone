@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Network, auth, and server errors are mapped to actionable messages (e.g., "You're offline. Your changes will sync when you're back online.")
 
 ### Fixed
+- macOS: Calendar permission prompt now appears immediately after login instead of only when navigating to the Calendar tab
+- Improved calendar privacy purpose string with a specific usage example per App Store guidelines
 - macOS: Added missing calendars entitlement required for App Store sandbox compliance
 - VoiceOver accessibility across all screens: added descriptive labels to interactive controls, task rows, calendar cells, focus timer, and notification bell
 - Added accessibility grouping to task rows, project rows, notification rows, and empty states so VoiceOver reads them as coherent elements

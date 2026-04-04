@@ -69,6 +69,13 @@ struct mDoneApp: App {
                     }
                     #endif
                 }
+                .onChange(of: appState.isAuthenticated) { _, isAuthenticated in
+                    if isAuthenticated {
+                        Task {
+                            await appState.requestCalendarAccess()
+                        }
+                    }
+                }
                 .onChange(of: dependencies.networkMonitor.isConnected) { _, isConnected in
                     appState.handleConnectivityChange(isConnected: isConnected)
                 }

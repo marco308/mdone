@@ -59,7 +59,7 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>mDone shows your calendar events alongside tasks so you can plan your day in one place.</string>
+	<string>mDone displays your calendar events alongside your tasks so you can plan your day in one place. For example, your upcoming meetings will appear in the Calendar tab and Today view next to your to-do items.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>CFBundleURLTypes</key>
