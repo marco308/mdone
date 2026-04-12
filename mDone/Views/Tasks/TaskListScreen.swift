@@ -8,6 +8,14 @@ struct TaskListScreen: View {
     #endif
     var projectFilter: Project?
     @State private var showAdvancedFilter = false
+    @State private var sortOrder: SortOrder = .dueDate
+    @State private var sortAscending: Bool = true
+
+    enum SortOrder: String, CaseIterable {
+        case dueDate = "Due Date"
+        case priority = "Priority"
+        case title = "Title"
+    }
 
     var body: some View {
         @Bindable var bindableAppState = appState
@@ -31,7 +39,7 @@ struct TaskListScreen: View {
                     if isFiltering {
                         filteredTaskSection
                     } else if let projectFilter {
-                        let projectTasks = appState.tasksForProject(projectFilter.id)
+                        let projectTasks = sorted(appState.tasksForProject(projectFilter.id))
                         if projectTasks.isEmpty {
                             Section {
                                 EmptyStateView(
@@ -99,6 +107,31 @@ struct TaskListScreen: View {
                     .accessibilityLabel(appState
                         .advancedFilterString != nil ? "Advanced filter active" : "Advanced filter")
                 }
+
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        ForEach(SortOrder.allCases, id: \.self) { order in
+                            Button {
+                                if sortOrder == order {
+                                    sortAscending.toggle()
+                                } else {
+                                    sortOrder = order
+                                    sortAscending = true
+                                }
+                            } label: {
+                                HStack {
+                                    Text(order.rawValue)
+                                    if sortOrder == order {
+                                        Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                    }
+                    .accessibilityLabel("Sort by \(sortOrder.rawValue), \(sortAscending ? "ascending" : "descending")")
+                }
             }
             .sheet(isPresented: $showAdvancedFilter) {
                 TaskFilterSheet { filterString in
@@ -119,11 +152,12 @@ struct TaskListScreen: View {
     @ViewBuilder
     private var filteredTaskSection: some View {
         let allFiltered = appState.filteredTasks
-        let tasks = if let projectFilter {
+        let filtered = if let projectFilter {
             allFiltered.filter { $0.projectId == projectFilter.id }
         } else {
             allFiltered
         }
+        let tasks = sorted(filtered)
         if tasks.isEmpty {
             Section {
                 EmptyStateView(
@@ -150,7 +184,7 @@ struct TaskListScreen: View {
         if !appState.overdueTasks.isEmpty {
             SmartListSection(
                 title: "Overdue",
-                tasks: appState.overdueTasks,
+                tasks: sorted(appState.overdueTasks),
                 accentColor: .red
             )
         }
@@ -158,7 +192,7 @@ struct TaskListScreen: View {
         if !appState.todayTasks.isEmpty {
             SmartListSection(
                 title: "Today",
-                tasks: appState.todayTasks,
+                tasks: sorted(appState.todayTasks),
                 accentColor: Color.accentColor
             )
         }
@@ -189,7 +223,7 @@ struct TaskListScreen: View {
         if !appState.tomorrowTasks.isEmpty {
             SmartListSection(
                 title: "Tomorrow",
-                tasks: appState.tomorrowTasks,
+                tasks: sorted(appState.tomorrowTasks),
                 accentColor: .orange
             )
         }
@@ -197,7 +231,7 @@ struct TaskListScreen: View {
         if !appState.thisWeekTasks.isEmpty {
             SmartListSection(
                 title: "This Week",
-                tasks: appState.thisWeekTasks,
+                tasks: sorted(appState.thisWeekTasks),
                 accentColor: .blue
             )
         }
@@ -205,7 +239,7 @@ struct TaskListScreen: View {
         if !appState.upcomingTasks.isEmpty {
             SmartListSection(
                 title: "Upcoming",
-                tasks: appState.upcomingTasks,
+                tasks: sorted(appState.upcomingTasks),
                 accentColor: .purple
             )
         }
@@ -213,7 +247,7 @@ struct TaskListScreen: View {
         if !appState.noDateTasks.isEmpty {
             SmartListSection(
                 title: "No Date",
-                tasks: appState.noDateTasks,
+                tasks: sorted(appState.noDateTasks),
                 accentColor: .secondary
             )
         }
@@ -226,6 +260,21 @@ struct TaskListScreen: View {
                     subtitle: "No pending tasks"
                 )
             }
+        }
+    }
+
+    private func sorted(_ tasks: [VTask]) -> [VTask] {
+        tasks.sorted { a, b in
+            let result: Bool
+            switch sortOrder {
+            case .dueDate:
+                result = (a.dueDate ?? .distantFuture) < (b.dueDate ?? .distantFuture)
+            case .priority:
+                result = a.priority > b.priority
+            case .title:
+                result = a.title.localizedCompare(b.title) == .orderedAscending
+            }
+            return sortAscending ? result : !result
         }
     }
 
