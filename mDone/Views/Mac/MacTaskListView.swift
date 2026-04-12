@@ -232,7 +232,7 @@ struct MacTaskListView: View {
             let result: Bool
             switch sortOrder {
             case .dueDate:
-                result = (a.dueDate ?? .distantFuture) < (b.dueDate ?? .distantFuture)
+                result = (a.effectiveDueDate ?? .distantFuture) < (b.effectiveDueDate ?? .distantFuture)
             case .priority:
                 result = a.priority > b.priority
             case .title:
