@@ -10,6 +10,7 @@ struct SmartListSection: View {
         Section {
             ForEach(tasks) { task in
                 TaskRow(task: task)
+                    .tag(task)
             }
             .onMove { source, destination in
                 handleMove(from: source, to: destination)
