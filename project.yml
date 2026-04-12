@@ -10,8 +10,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "1.1.0"
-    CURRENT_PROJECT_VERSION: "16"
+    MARKETING_VERSION: "1.1.1"
+    CURRENT_PROJECT_VERSION: "17"
     DEVELOPMENT_TEAM: "Z62E7MGREE"
     CODE_SIGN_IDENTITY: "Apple Development"
     CODE_SIGN_STYLE: Automatic
@@ -97,6 +97,8 @@ targets:
       path: mDoneWidgets/Info.plist
       properties:
         CFBundleDisplayName: mDone Focus
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
