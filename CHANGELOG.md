@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Sort tasks by due date, priority, or title with ascending/descending toggle on iOS and macOS (#48)
 - Expanded unit test coverage for APIClient, TaskService, ProjectService, and SyncService
 - MockURLProtocol test helper for network request testing without real API calls
 - Tests for network error handling, token expiry, pagination, date decoding edge cases

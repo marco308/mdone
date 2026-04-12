@@ -5,6 +5,7 @@ struct MacTaskListView: View {
     let section: MacContentView.SidebarSection?
     @Binding var selectedTask: VTask?
     @State private var sortOrder: SortOrder = .dueDate
+    @State private var sortAscending: Bool = true
     @State private var showAdvancedFilter = false
 
     enum SortOrder: String, CaseIterable {
@@ -120,12 +121,17 @@ struct MacTaskListView: View {
                 Menu {
                     ForEach(SortOrder.allCases, id: \.self) { order in
                         Button {
-                            sortOrder = order
+                            if sortOrder == order {
+                                sortAscending.toggle()
+                            } else {
+                                sortOrder = order
+                                sortAscending = true
+                            }
                         } label: {
                             HStack {
                                 Text(order.rawValue)
                                 if sortOrder == order {
-                                    Image(systemName: "checkmark")
+                                    Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
                                 }
                             }
                         }
@@ -134,7 +140,7 @@ struct MacTaskListView: View {
                     Image(systemName: "arrow.up.arrow.down")
                 }
                 .help("Sort tasks")
-                .accessibilityLabel("Sort by \(sortOrder.rawValue)")
+                .accessibilityLabel("Sort by \(sortOrder.rawValue), \(sortAscending ? "ascending" : "descending")")
             }
 
             ToolbarItem(placement: .primaryAction) {
@@ -222,13 +228,17 @@ struct MacTaskListView: View {
             tasks = tasks.filter { $0.title.lowercased().contains(query) }
         }
 
-        switch sortOrder {
-        case .dueDate:
-            tasks.sort { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
-        case .priority:
-            tasks.sort { $0.priority > $1.priority }
-        case .title:
-            tasks.sort { $0.title.localizedCompare($1.title) == .orderedAscending }
+        tasks.sort { a, b in
+            let result: Bool
+            switch sortOrder {
+            case .dueDate:
+                result = (a.effectiveDueDate ?? .distantFuture) < (b.effectiveDueDate ?? .distantFuture)
+            case .priority:
+                result = a.priority > b.priority
+            case .title:
+                result = a.title.localizedCompare(b.title) == .orderedAscending
+            }
+            return sortAscending ? result : !result
         }
 
         return tasks
