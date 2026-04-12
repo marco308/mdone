@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Network, auth, and server errors are mapped to actionable messages (e.g., "You're offline. Your changes will sync when you're back online.")
 
 ### Fixed
+- iOS: App no longer drops server connections when briefly switching to another app; in-flight requests now finish in the background (#49)
+- App automatically refreshes data when returning to the foreground
 - macOS: Calendar permission prompt now appears immediately after login instead of only when navigating to the Calendar tab
 - Improved calendar privacy purpose string with a specific usage example per App Store guidelines
 - macOS: Added missing calendars entitlement required for App Store sandbox compliance

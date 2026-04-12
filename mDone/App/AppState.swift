@@ -1,6 +1,9 @@
 import EventKit
 import Foundation
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 import WidgetKit
 
 @Observable
@@ -240,9 +243,24 @@ final class AppState {
         print("[mDone] refreshAll() called")
         #endif
         isLoading = true
+
+        #if os(iOS)
+        // Request background execution time so in-flight network requests
+        // can finish if the user switches away mid-refresh (issue #49).
+        let bgTaskId = UIApplication.shared.beginBackgroundTask {
+            // Expiration handler — nothing to clean up, the requests will
+            // be cancelled by the system after this returns.
+        }
+        #endif
+
         defer {
             isLoading = false
             isRetrying = false
+            #if os(iOS)
+            if bgTaskId != .invalid {
+                UIApplication.shared.endBackgroundTask(bgTaskId)
+            }
+            #endif
         }
 
         do {

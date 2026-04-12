@@ -5,6 +5,7 @@ import SwiftUI
 struct mDoneApp: App {
     private let dependencies = AppDependencies()
     @State private var appState = AppState()
+    @Environment(\.scenePhase) private var scenePhase
     #if os(iOS)
     @State private var focusManager = FocusManager()
     #endif
@@ -78,6 +79,11 @@ struct mDoneApp: App {
                 }
                 .onChange(of: dependencies.networkMonitor.isConnected) { _, isConnected in
                     appState.handleConnectivityChange(isConnected: isConnected)
+                }
+                .onChange(of: scenePhase) { _, newPhase in
+                    if newPhase == .active, appState.isAuthenticated {
+                        Task { await appState.refreshAll() }
+                    }
                 }
             #if os(iOS)
                 .onOpenURL { url in
