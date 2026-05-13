@@ -13,18 +13,20 @@ struct MacTaskDetailView: View {
     @State private var repeatInterval: Int64
     @State private var reminders: [TaskReminder]
     @State private var showDeleteConfirm = false
-    @State private var isPreviewingMarkdown = false
+    @State private var isShowingDescriptionPreview: Bool
 
     init(task: VTask) {
         self.task = task
+        let initialDescription = task.description ?? ""
         _title = State(initialValue: task.title)
-        _descriptionText = State(initialValue: task.description ?? "")
+        _descriptionText = State(initialValue: initialDescription)
         _dueDate = State(initialValue: task.dueDate)
         _hasDueDate = State(initialValue: task.dueDate != nil)
         _priority = State(initialValue: task.priority)
         _selectedProjectId = State(initialValue: task.projectId)
         _repeatInterval = State(initialValue: task.repeatAfter ?? 0)
         _reminders = State(initialValue: task.reminders ?? [])
+        _isShowingDescriptionPreview = State(initialValue: !initialDescription.isEmpty)
     }
 
     var body: some View {
@@ -43,17 +45,17 @@ struct MacTaskDetailView: View {
                             .foregroundStyle(.secondary)
                         Spacer()
                         Button {
-                            isPreviewingMarkdown.toggle()
+                            isShowingDescriptionPreview.toggle()
                         } label: {
-                            Image(systemName: isPreviewingMarkdown ? "pencil" : "eye")
+                            Image(systemName: isShowingDescriptionPreview ? "pencil" : "eye")
                                 .font(.caption)
                         }
                         .buttonStyle(.borderless)
-                        .help(isPreviewingMarkdown ? "Edit" : "Preview Markdown")
-                        .accessibilityLabel(isPreviewingMarkdown ? "Edit description" : "Preview description")
+                        .help(isShowingDescriptionPreview ? "Edit" : "Preview description")
+                        .accessibilityLabel(isShowingDescriptionPreview ? "Edit description" : "Preview description")
                     }
 
-                    if isPreviewingMarkdown {
+                    if isShowingDescriptionPreview {
                         if descriptionText.isEmpty {
                             Text("No description")
                                 .font(.body)
@@ -61,10 +63,13 @@ struct MacTaskDetailView: View {
                                 .italic()
                                 .frame(minHeight: 100, alignment: .topLeading)
                         } else {
-                            Text(markdownAttributedString(from: descriptionText))
-                                .font(.body)
-                                .textSelection(.enabled)
-                                .frame(minHeight: 100, maxHeight: 200, alignment: .topLeading)
+                            ScrollView {
+                                Text(RichTextRenderer.render(descriptionText))
+                                    .font(.body)
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                            }
+                            .frame(minHeight: 100, maxHeight: 200)
                         }
                     } else {
                         TextEditor(text: $descriptionText)
@@ -180,23 +185,16 @@ struct MacTaskDetailView: View {
         }
         .onChange(of: task) { _, newTask in
             title = newTask.title
-            descriptionText = newTask.description ?? ""
+            let newDescription = newTask.description ?? ""
+            descriptionText = newDescription
             dueDate = newTask.dueDate
             hasDueDate = newTask.dueDate != nil
             priority = newTask.priority
             selectedProjectId = newTask.projectId
             repeatInterval = newTask.repeatAfter ?? 0
             reminders = newTask.reminders ?? []
+            isShowingDescriptionPreview = !newDescription.isEmpty
         }
-    }
-
-    private func markdownAttributedString(from markdown: String) -> AttributedString {
-        (
-            try? AttributedString(markdown: markdown, options: .init(
-                interpretedSyntax: .inlineOnlyPreservingWhitespace
-            ))
-        ) ??
-            AttributedString(markdown)
     }
 
     private func saveTask() {
