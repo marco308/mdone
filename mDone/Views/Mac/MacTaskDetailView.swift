@@ -13,7 +13,7 @@ struct MacTaskDetailView: View {
     @State private var repeatInterval: Int64
     @State private var reminders: [TaskReminder]
     @State private var showDeleteConfirm = false
-    @State private var isPreviewingMarkdown: Bool
+    @State private var isShowingDescriptionPreview: Bool
 
     init(task: VTask) {
         self.task = task
@@ -26,7 +26,7 @@ struct MacTaskDetailView: View {
         _selectedProjectId = State(initialValue: task.projectId)
         _repeatInterval = State(initialValue: task.repeatAfter ?? 0)
         _reminders = State(initialValue: task.reminders ?? [])
-        _isPreviewingMarkdown = State(initialValue: !initialDescription.isEmpty)
+        _isShowingDescriptionPreview = State(initialValue: !initialDescription.isEmpty)
     }
 
     var body: some View {
@@ -45,17 +45,17 @@ struct MacTaskDetailView: View {
                             .foregroundStyle(.secondary)
                         Spacer()
                         Button {
-                            isPreviewingMarkdown.toggle()
+                            isShowingDescriptionPreview.toggle()
                         } label: {
-                            Image(systemName: isPreviewingMarkdown ? "pencil" : "eye")
+                            Image(systemName: isShowingDescriptionPreview ? "pencil" : "eye")
                                 .font(.caption)
                         }
                         .buttonStyle(.borderless)
-                        .help(isPreviewingMarkdown ? "Edit" : "Preview Markdown")
-                        .accessibilityLabel(isPreviewingMarkdown ? "Edit description" : "Preview description")
+                        .help(isShowingDescriptionPreview ? "Edit" : "Preview description")
+                        .accessibilityLabel(isShowingDescriptionPreview ? "Edit description" : "Preview description")
                     }
 
-                    if isPreviewingMarkdown {
+                    if isShowingDescriptionPreview {
                         if descriptionText.isEmpty {
                             Text("No description")
                                 .font(.body)
@@ -193,7 +193,7 @@ struct MacTaskDetailView: View {
             selectedProjectId = newTask.projectId
             repeatInterval = newTask.repeatAfter ?? 0
             reminders = newTask.reminders ?? []
-            isPreviewingMarkdown = !newDescription.isEmpty
+            isShowingDescriptionPreview = !newDescription.isEmpty
         }
     }
 
