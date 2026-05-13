@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-05-13
+
 ### Added
 - Sort tasks by due date, priority, or title with ascending/descending toggle on iOS and macOS (#48)
 - Expanded unit test coverage for APIClient, TaskService, ProjectService, and SyncService
