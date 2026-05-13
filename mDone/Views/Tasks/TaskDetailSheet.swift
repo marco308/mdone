@@ -17,18 +17,20 @@ struct TaskDetailSheet: View {
     @State private var repeatInterval: Int64
     @State private var reminders: [TaskReminder]
     @State private var showDeleteConfirm = false
-    @State private var isPreviewingMarkdown = false
+    @State private var isPreviewingMarkdown: Bool
 
     init(task: VTask) {
         self.task = task
+        let initialDescription = task.description ?? ""
         _title = State(initialValue: task.title)
-        _description = State(initialValue: task.description ?? "")
+        _description = State(initialValue: initialDescription)
         _dueDate = State(initialValue: task.effectiveDueDate)
         _hasDueDate = State(initialValue: task.effectiveDueDate != nil)
         _priority = State(initialValue: task.priority)
         _selectedProjectId = State(initialValue: task.projectId)
         _repeatInterval = State(initialValue: task.repeatAfter ?? 0)
         _reminders = State(initialValue: task.reminders ?? [])
+        _isPreviewingMarkdown = State(initialValue: !initialDescription.isEmpty)
     }
 
     var body: some View {
@@ -61,7 +63,7 @@ struct TaskDetailSheet: View {
                                     .foregroundStyle(.secondary)
                                     .italic()
                             } else {
-                                Text(markdownAttributedString(from: description))
+                                Text(RichTextRenderer.render(description))
                                     .font(.body)
                                     .textSelection(.enabled)
                             }
@@ -193,15 +195,6 @@ struct TaskDetailSheet: View {
         #if os(iOS)
         .presentationDetents([.medium, .large])
         #endif
-    }
-
-    private func markdownAttributedString(from markdown: String) -> AttributedString {
-        (
-            try? AttributedString(markdown: markdown, options: .init(
-                interpretedSyntax: .inlineOnlyPreservingWhitespace
-            ))
-        ) ??
-            AttributedString(markdown)
     }
 
     private func saveTask() {
