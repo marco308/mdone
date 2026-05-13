@@ -34,7 +34,7 @@ final class AppState {
     var onTaskDeleted: ((Int64) -> Void)?
 
     /// Per-project ordered task lists fetched from the view endpoint (preserves positions).
-    private var projectTaskCache: [Int64: [VTask]] = [:]
+    var projectTaskCache: [Int64: [VTask]] = [:]
 
     var unreadNotificationCount: Int {
         notifications.filter { $0.read != true }.count
@@ -438,7 +438,13 @@ final class AppState {
         // Use the cache only for position ordering.
         let projectTasks = tasks.filter { $0.projectId == projectId && !$0.done }
         if let cached = projectTaskCache[projectId] {
-            let orderMap = Dictionary(uniqueKeysWithValues: cached.enumerated().map { ($1.id, $0) })
+            // Keep the earliest index when an id appears twice; Vikunja can return
+            // duplicate task rows from the view endpoint if task_positions has
+            // duplicate (task_id, project_view_id) rows.
+            let orderMap = Dictionary(
+                cached.enumerated().map { ($1.id, $0) },
+                uniquingKeysWith: { first, _ in first }
+            )
             return projectTasks.sorted { a, b in
                 (orderMap[a.id] ?? Int.max) < (orderMap[b.id] ?? Int.max)
             }
@@ -454,8 +460,10 @@ final class AppState {
             let viewTasks: [VTask] = try await taskService.fetchProjectTasks(
                 projectId: project.id, viewId: viewId
             )
-            // Store in cache — these have correct per-view positions
-            projectTaskCache[project.id] = viewTasks
+            // Store in cache — these have correct per-view positions.
+            // Dedupe by id: Vikunja's view-tasks endpoint can return the same task
+            // more than once when task_positions has duplicate rows for the view.
+            projectTaskCache[project.id] = Self.uniquedById(viewTasks)
             // Also update the global task list with any new tasks
             for viewTask in viewTasks {
                 if let index = tasks.firstIndex(where: { $0.id == viewTask.id }) {
@@ -469,6 +477,12 @@ final class AppState {
             print("[mDone] fetchProjectTasks error: \(error)")
             #endif
         }
+    }
+
+    /// Returns the input with duplicate `id`s removed, preserving the first occurrence.
+    static func uniquedById(_ tasks: [VTask]) -> [VTask] {
+        var seen = Set<Int64>()
+        return tasks.filter { seen.insert($0.id).inserted }
     }
 
     // MARK: - Calendar Events
