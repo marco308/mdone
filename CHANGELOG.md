@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Network, auth, and server errors are mapped to actionable messages (e.g., "You're offline. Your changes will sync when you're back online.")
 
 ### Fixed
+- Crash when opening a project whose tasks have duplicate `task_positions` rows on the Vikunja server; the duplicates are now ignored on the client (#54)
 - macOS: Clicking a task in the Inbox now opens the detail view
 - iOS: App no longer drops server connections when briefly switching to another app; in-flight requests now finish in the background (#49)
 - App automatically refreshes data when returning to the foreground
