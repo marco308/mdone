@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Task detail screen shows total focus time and session count for tasks you've used the Focus Timer on (#61).
+
 ## [1.1.2] - 2026-05-13
 
 ### Added
