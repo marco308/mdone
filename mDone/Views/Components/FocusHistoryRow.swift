@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Inline row showing accumulated focus time for a task. Renders nothing if
 /// there are no recorded sessions — callers should also hide their wrapping
-/// section using `hasFocusHistory(for:)` so an empty header doesn't appear.
+/// section using `FocusHistoryGate` so an empty header doesn't appear.
 struct FocusHistoryRow: View {
     let taskId: Int64
 

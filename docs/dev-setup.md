@@ -109,6 +109,6 @@ If you're chasing a bug that may be Vikunja-side, pin your dev compose file to t
 Almost never. Only when:
 
 - The data shape Apple Review depends on changes (e.g. a new demo flow needs a specific seeded task).
-- The token expires — credentials are in the memory note `reference_vikunja_review.md`.
+- The token expires — store the credentials in a password manager (1Password, Keychain, or equivalent) outside this repo, and rotate the test-server token before the previous one expires.
 
 For everything else, dev is the right environment.

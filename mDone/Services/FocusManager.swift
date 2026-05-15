@@ -1,5 +1,6 @@
 #if os(iOS)
 import ActivityKit
+import CryptoKit
 import Foundation
 import SwiftData
 import SwiftUI
@@ -384,8 +385,18 @@ final class FocusManager {
         }
     }
 
+    /// Stable per-device identifier for the FocusRecord — derived from
+    /// `identifierForVendor` but SHA-256 hashed so the persisted value isn't
+    /// the raw vendor UUID. Stable across launches as long as the user keeps
+    /// at least one app from this vendor installed; resets if they uninstall
+    /// every mDone-vendor app and reinstall. Good enough to distinguish
+    /// "iPhone vs Mac" in #62's analysis without doubling as a tracking handle.
     private static func deviceIdentifier() -> String {
-        UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
+        guard let uuid = UIDevice.current.identifierForVendor?.uuidString else {
+            return "unknown"
+        }
+        let digest = SHA256.hash(data: Data(uuid.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 
     private func makeContentState(from session: FocusSession) -> FocusTaskAttributes.ContentState {

@@ -39,6 +39,9 @@ final class FocusHistoryTests: XCTestCase {
         XCTAssertEqual(record.endedAt, start.addingTimeInterval(600))
         XCTAssertEqual(record.focusedSeconds, 600)
         XCTAssertFalse(record.device.isEmpty)
+        // Device must be a hashed digest, never the raw vendor UUID (which
+        // would be a trackable identifier if these records are exported).
+        XCTAssertFalse(record.device.contains("-"), "Raw UUID format leaked: \(record.device)")
     }
 
     func testPersistDropsZeroDurationSession() throws {
