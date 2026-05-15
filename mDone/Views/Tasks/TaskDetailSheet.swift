@@ -93,6 +93,7 @@ struct TaskDetailSheet: View {
                             Label("Focus on This Task", systemImage: "scope")
                         }
                     }
+                    FocusHistoryRow(taskId: task.id)
                 }
                 #endif
 

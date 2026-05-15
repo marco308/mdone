@@ -1,7 +1,10 @@
 #if os(iOS)
 import ActivityKit
+import CryptoKit
 import Foundation
+import SwiftData
 import SwiftUI
+import UIKit
 
 @MainActor
 @Observable
@@ -28,6 +31,7 @@ final class FocusManager {
     // MARK: - Private
 
     private var activity: Activity<FocusTaskAttributes>?
+    private let modelContainer: ModelContainer?
 
     private var sharedDefaults: UserDefaults {
         FocusConstants.sharedDefaults
@@ -35,7 +39,8 @@ final class FocusManager {
 
     // MARK: - Init
 
-    init() {
+    init(modelContainer: ModelContainer? = nil) {
+        self.modelContainer = modelContainer
         restoreSession()
     }
 
@@ -143,7 +148,12 @@ final class FocusManager {
 
     func endFocus() {
         let activityToEnd = activity
-        let elapsed = currentSession?.totalElapsed() ?? 0
+        let endedAt = Date()
+        var elapsed: TimeInterval = 0
+        if let session = currentSession {
+            elapsed = session.totalElapsed(at: endedAt)
+            persistCompletedSession(session, endedAt: endedAt, focusedSeconds: elapsed)
+        }
 
         activity = nil
         currentSession = nil
@@ -176,7 +186,12 @@ final class FocusManager {
 
     func switchFocus(task: VTask, projectName: String) {
         let activityToEnd = activity
-        let elapsed = currentSession?.totalElapsed() ?? 0
+        let endedAt = Date()
+        var elapsed: TimeInterval = 0
+        if let session = currentSession {
+            elapsed = session.totalElapsed(at: endedAt)
+            persistCompletedSession(session, endedAt: endedAt, focusedSeconds: elapsed)
+        }
 
         // Clear state immediately
         activity = nil
@@ -237,6 +252,13 @@ final class FocusManager {
                 #if DEBUG
                 print("[FocusManager] Stale session found (> 24h), cleaning up")
                 #endif
+                // Persist whatever time was accumulated before the session went stale.
+                // Only count elapsedBeforePause (bounded, observed) — never the in-flight
+                // current interval, which could span the entire 24h+ stale window if the
+                // app was killed mid-session.
+                let elapsed = session.elapsedBeforePause
+                let endedAt = session.sessionStartDate.addingTimeInterval(elapsed)
+                persistCompletedSession(session, endedAt: endedAt, focusedSeconds: elapsed)
                 clearPersistedSession()
                 // Also end any lingering Live Activity
                 for existingActivity in Activity<FocusTaskAttributes>.activities {
@@ -329,6 +351,52 @@ final class FocusManager {
 
     private func clearPersistedSession() {
         sharedDefaults.removeObject(forKey: FocusConstants.focusSessionKey)
+    }
+
+    // Internal (not private) so unit tests can drive it without going through ActivityKit.
+    func persistCompletedSession(
+        _ session: FocusSession,
+        endedAt: Date,
+        focusedSeconds: TimeInterval
+    ) {
+        // Drop zero-duration sessions — start-and-immediately-end is noise.
+        guard focusedSeconds >= 1.0 else { return }
+        guard let modelContainer else { return }
+
+        let record = FocusRecord(
+            taskId: session.taskId,
+            taskTitle: session.taskTitle,
+            projectName: session.projectName,
+            priorityLevel: session.priorityLevel,
+            startedAt: session.sessionStartDate,
+            endedAt: endedAt,
+            focusedSeconds: focusedSeconds,
+            device: Self.deviceIdentifier()
+        )
+
+        let context = modelContainer.mainContext
+        context.insert(record)
+        do {
+            try context.save()
+        } catch {
+            #if DEBUG
+            print("[FocusManager] Failed to persist FocusRecord: \(error)")
+            #endif
+        }
+    }
+
+    /// Stable per-device identifier for the FocusRecord — derived from
+    /// `identifierForVendor` but SHA-256 hashed so the persisted value isn't
+    /// the raw vendor UUID. Stable across launches as long as the user keeps
+    /// at least one app from this vendor installed; resets if they uninstall
+    /// every mDone-vendor app and reinstall. Good enough to distinguish
+    /// "iPhone vs Mac" in #62's analysis without doubling as a tracking handle.
+    private static func deviceIdentifier() -> String {
+        guard let uuid = UIDevice.current.identifierForVendor?.uuidString else {
+            return "unknown"
+        }
+        let digest = SHA256.hash(data: Data(uuid.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 
     private func makeContentState(from session: FocusSession) -> FocusTaskAttributes.ContentState {

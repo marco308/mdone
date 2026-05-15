@@ -13,39 +13,58 @@ final class NetworkErrorTests: XCTestCase {
 
     func testUnauthorizedDescription() throws {
         let error = NetworkError.unauthorized
-        XCTAssertNotNil(error.errorDescription)
-        XCTAssertFalse(try XCTUnwrap(error.errorDescription?.isEmpty))
-        XCTAssertTrue(try XCTUnwrap(error.errorDescription?.lowercased().contains("auth")))
+        let description = try XCTUnwrap(error.errorDescription).lowercased()
+        XCTAssertFalse(description.isEmpty)
+        // Should tell the user their session is gone, in plain language.
+        XCTAssertTrue(
+            description.contains("session") || description.contains("log in") || description.contains("sign in"),
+            "Expected an auth-related concept, got: \(description)"
+        )
     }
 
-    func testServerErrorDescriptionWithMessage() {
-        let error = NetworkError.serverError(statusCode: 500, message: "Internal Server Error")
-        XCTAssertNotNil(error.errorDescription)
-        XCTAssertEqual(error.errorDescription, "Internal Server Error")
+    func testServerErrorDescriptionHidesRawServerMessage() throws {
+        // Contract: we surface a user-friendly message, NOT the raw server response.
+        // (Raw 500-class messages often leak internal detail.)
+        let error = NetworkError.serverError(statusCode: 500, message: "Internal Server Error: panic in goroutine 42")
+        let description = try XCTUnwrap(error.errorDescription)
+        XCTAssertFalse(description.isEmpty)
+        XCTAssertFalse(description.contains("goroutine"), "Raw server detail leaked: \(description)")
+        XCTAssertFalse(description.contains("Internal Server Error"), "Raw server message leaked: \(description)")
     }
 
     func testServerErrorDescriptionWithoutMessage() throws {
         let error = NetworkError.serverError(statusCode: 503, message: nil)
-        XCTAssertNotNil(error.errorDescription)
-        XCTAssertTrue(try XCTUnwrap(error.errorDescription?.contains("503")))
+        let description = try XCTUnwrap(error.errorDescription)
+        XCTAssertFalse(description.isEmpty)
+        // 5xx errors should suggest the issue is server-side and retryable.
+        let lower = description.lowercased()
+        XCTAssertTrue(
+            lower.contains("server") || lower.contains("try again"),
+            "Expected server / retry concept, got: \(description)"
+        )
     }
 
     func testDecodingErrorDescription() throws {
         let underlyingError = NSError(domain: "Test", code: 0)
         let error = NetworkError.decodingError(underlyingError)
-        XCTAssertNotNil(error.errorDescription)
-        XCTAssertFalse(try XCTUnwrap(error.errorDescription?.isEmpty))
-        XCTAssertTrue(try XCTUnwrap(error.errorDescription?.lowercased().contains("parse")) || error.errorDescription!
-            .lowercased().contains("decod"))
+        let description = try XCTUnwrap(error.errorDescription).lowercased()
+        XCTAssertFalse(description.isEmpty)
+        XCTAssertTrue(
+            description.contains("response") || description.contains("unexpected") || description.contains("parse")
+                || description.contains("decod"),
+            "Expected response / parse concept, got: \(description)"
+        )
     }
 
     func testNetworkUnavailableDescription() throws {
         let error = NetworkError.networkUnavailable
-        XCTAssertNotNil(error.errorDescription)
-        XCTAssertFalse(try XCTUnwrap(error.errorDescription?.isEmpty))
-        XCTAssertTrue(try XCTUnwrap(error.errorDescription?.lowercased().contains("internet")) || error
-            .errorDescription!.lowercased().contains("connection") || error.errorDescription!.lowercased()
-            .contains("network"))
+        let description = try XCTUnwrap(error.errorDescription).lowercased()
+        XCTAssertFalse(description.isEmpty)
+        XCTAssertTrue(
+            description.contains("offline") || description.contains("online") || description.contains("internet")
+                || description.contains("connection") || description.contains("network"),
+            "Expected connectivity concept, got: \(description)"
+        )
     }
 
     func testUnknownErrorDescription() throws {

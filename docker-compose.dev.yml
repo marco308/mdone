@@ -1,0 +1,21 @@
+services:
+  vikunja:
+    image: vikunja/vikunja:latest
+    container_name: mdone-vikunja-dev
+    restart: unless-stopped
+    ports:
+      - "3456:3456"
+    environment:
+      VIKUNJA_SERVICE_PUBLICURL: "http://localhost:3456"
+      VIKUNJA_SERVICE_JWTSECRET: "dev-only-not-a-real-secret-rotate-if-ever-exposed"
+      VIKUNJA_DATABASE_TYPE: "sqlite"
+      VIKUNJA_DATABASE_PATH: "/app/vikunja/files/vikunja.db"
+      VIKUNJA_LOG_LEVEL: "INFO"
+      VIKUNJA_SERVICE_ENABLEREGISTRATION: "true"
+    volumes:
+      - ./vikunja-dev-data/files:/app/vikunja/files
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3456/api/v1/info"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

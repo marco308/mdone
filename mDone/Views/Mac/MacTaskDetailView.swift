@@ -144,6 +144,12 @@ struct MacTaskDetailView: View {
                 }
             }
 
+            FocusHistoryGate(taskId: task.id) {
+                Section("Focus") {
+                    FocusHistoryRow(taskId: task.id)
+                }
+            }
+
             Section {
                 HStack(spacing: 16) {
                     Button {
