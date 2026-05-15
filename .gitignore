@@ -47,5 +47,8 @@ screenshots/ipad-debug/
 # Environment files
 .env*
 
+# Local dev Vikunja data (docker-compose.dev.yml)
+vikunja-dev-data/
+
 # Claude Code
 .claude/

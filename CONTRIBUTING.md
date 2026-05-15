@@ -12,8 +12,19 @@ Please open an issue on [GitHub Issues](https://github.com/marco308/mdone/issues
 
 - Xcode (Swift 5.9)
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`)
+- Docker Desktop + `jq` (for the local dev Vikunja — `brew install jq`)
 - Deployment targets: iOS 18.0+ / macOS 15.0+
-- No external dependencies
+- No external Swift dependencies
+
+**Set up a local Vikunja to develop against** so you never point the app at your real instance:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d
+./scripts/seed-dev-vikunja.sh
+# Login in the app: http://localhost:3456 / devuser / devpassword
+```
+
+Full walkthrough — environments, reset/reseed, manual + unit testing, version pinning — in [docs/dev-setup.md](docs/dev-setup.md).
 
 **Build steps:**
 
