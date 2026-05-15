@@ -148,9 +148,9 @@ final class FocusManager {
     func endFocus() {
         let activityToEnd = activity
         let endedAt = Date()
-        let elapsed = currentSession?.totalElapsed(at: endedAt) ?? 0
-
+        var elapsed: TimeInterval = 0
         if let session = currentSession {
+            elapsed = session.totalElapsed(at: endedAt)
             persistCompletedSession(session, endedAt: endedAt, focusedSeconds: elapsed)
         }
 
@@ -186,9 +186,9 @@ final class FocusManager {
     func switchFocus(task: VTask, projectName: String) {
         let activityToEnd = activity
         let endedAt = Date()
-        let elapsed = currentSession?.totalElapsed(at: endedAt) ?? 0
-
+        var elapsed: TimeInterval = 0
         if let session = currentSession {
+            elapsed = session.totalElapsed(at: endedAt)
             persistCompletedSession(session, endedAt: endedAt, focusedSeconds: elapsed)
         }
 

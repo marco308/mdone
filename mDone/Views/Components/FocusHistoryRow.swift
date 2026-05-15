@@ -34,7 +34,7 @@ struct FocusHistoryRow: View {
 
     private var summary: String {
         let session = records.count == 1 ? "session" : "sessions"
-        return "\(formatDuration(total)) · \(records.count) \(session)"
+        return "\(FocusDurationFormatter.string(from: total)) · \(records.count) \(session)"
     }
 
     private var accessibleDuration: String {
@@ -43,20 +43,6 @@ struct FocusHistoryRow: View {
         formatter.unitsStyle = .full
         formatter.maximumUnitCount = 2
         return formatter.string(from: total) ?? "0 seconds"
-    }
-
-    private func formatDuration(_ seconds: TimeInterval) -> String {
-        let formatter = DateComponentsFormatter()
-        formatter.unitsStyle = .abbreviated
-        formatter.maximumUnitCount = 2
-        formatter.allowedUnits = if seconds < 60 {
-            [.second]
-        } else if seconds >= 3600 {
-            [.hour, .minute]
-        } else {
-            [.minute]
-        }
-        return formatter.string(from: seconds) ?? "\(Int(seconds))s"
     }
 }
 
