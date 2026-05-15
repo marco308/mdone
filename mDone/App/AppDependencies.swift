@@ -11,6 +11,7 @@ struct AppDependencies {
             CachedProject.self,
             CachedLabel.self,
             PendingOperation.self,
+            FocusRecord.self,
         ])
 
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)

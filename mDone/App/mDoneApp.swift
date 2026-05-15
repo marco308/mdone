@@ -3,12 +3,20 @@ import SwiftUI
 
 @main
 struct mDoneApp: App {
-    private let dependencies = AppDependencies()
+    private let dependencies: AppDependencies
     @State private var appState = AppState()
     @Environment(\.scenePhase) private var scenePhase
     #if os(iOS)
-    @State private var focusManager = FocusManager()
+    @State private var focusManager: FocusManager
     #endif
+
+    init() {
+        let deps = AppDependencies()
+        dependencies = deps
+        #if os(iOS)
+        _focusManager = State(initialValue: FocusManager(modelContainer: deps.modelContainer))
+        #endif
+    }
 
     var body: some Scene {
         WindowGroup {

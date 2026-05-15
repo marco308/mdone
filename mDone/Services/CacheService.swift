@@ -158,6 +158,38 @@ final class CachedLabel {
 }
 
 @Model
+final class FocusRecord {
+    var taskId: Int64
+    var taskTitle: String
+    var projectName: String
+    var priorityLevel: Int
+    var startedAt: Date
+    var endedAt: Date
+    var focusedSeconds: Double
+    var device: String
+
+    init(
+        taskId: Int64,
+        taskTitle: String,
+        projectName: String,
+        priorityLevel: Int,
+        startedAt: Date,
+        endedAt: Date,
+        focusedSeconds: Double,
+        device: String
+    ) {
+        self.taskId = taskId
+        self.taskTitle = taskTitle
+        self.projectName = projectName
+        self.priorityLevel = priorityLevel
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+        self.focusedSeconds = focusedSeconds
+        self.device = device
+    }
+}
+
+@Model
 final class PendingOperation {
     var id: UUID
     var endpointPath: String
