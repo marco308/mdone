@@ -1,8 +1,10 @@
+import SwiftData
 import SwiftUI
 
 struct TaskDetailSheet: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     #if os(iOS)
     @Environment(FocusManager.self) private var focusManager
     #endif
@@ -18,6 +20,8 @@ struct TaskDetailSheet: View {
     @State private var reminders: [TaskReminder]
     @State private var showDeleteConfirm = false
     @State private var isShowingDescriptionPreview: Bool
+    /// Loaded from `EstimateStore` on appear; `nil` == no estimate.
+    @State private var estimateSeconds: TimeInterval?
 
     init(task: VTask) {
         self.task = task
@@ -112,6 +116,10 @@ struct TaskDetailSheet: View {
                     }
                 }
 
+                Section {
+                    EstimatePicker(estimateSeconds: $estimateSeconds)
+                }
+
                 Section("Repeat") {
                     Picker("Repeat", selection: $repeatInterval) {
                         Text("Never").tag(Int64(0))
@@ -168,6 +176,9 @@ struct TaskDetailSheet: View {
                 }
             }
             .navigationTitle("Edit Task")
+            .onAppear {
+                estimateSeconds = EstimateStore.estimate(for: task.id, in: modelContext)
+            }
             #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -209,6 +220,13 @@ struct TaskDetailSheet: View {
             reminders: reminders,
             clearDueDate: !hasDueDate
         )
+        // Persist the mDone-local estimate (not sent to Vikunja). `set` with a
+        // non-positive value clears, so a removed estimate is honoured too.
+        if let seconds = estimateSeconds {
+            EstimateStore.set(seconds, for: task.id, in: modelContext)
+        } else {
+            EstimateStore.clear(for: task.id, in: modelContext)
+        }
         Task {
             await appState.updateTask(id: task.id, request: request)
             dismiss()
