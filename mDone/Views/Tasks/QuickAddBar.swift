@@ -40,6 +40,11 @@ struct QuickAddBar: View {
         .shadow(color: .black.opacity(0.1), radius: 8, y: -2)
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
+        .task(id: appState.quickAddTrigger) {
+            if appState.quickAddTrigger != nil {
+                isFocused = true
+            }
+        }
     }
 
     private func addTask() {

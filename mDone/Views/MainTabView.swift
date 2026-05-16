@@ -49,6 +49,11 @@ struct MainTabView: View {
             await appState.refreshAll()
             await appState.fetchNotifications()
         }
+        .onChange(of: appState.quickAddTrigger) { _, newValue in
+            if newValue != nil {
+                selectedTab = .inbox
+            }
+        }
         .sheet(isPresented: $showNotifications) {
             NotificationListView()
         }
