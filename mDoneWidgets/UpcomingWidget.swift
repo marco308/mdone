@@ -108,10 +108,16 @@ struct UpcomingWidgetView: View {
         Group {
             if !entry.isAuthenticated {
                 unauthenticatedView
-            } else if entry.tasks.isEmpty {
-                emptyStateView
             } else {
-                taskListView
+                VStack(alignment: .leading, spacing: 0) {
+                    headerView
+                        .padding(.bottom, 4)
+                    if entry.tasks.isEmpty {
+                        emptyStateView
+                    } else {
+                        taskListView
+                    }
+                }
             }
         }
         .dynamicTypeSize(...DynamicTypeSize.xLarge)
@@ -152,9 +158,6 @@ struct UpcomingWidgetView: View {
 
     private var taskListView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            headerView
-                .padding(.bottom, 4)
-
             let visibleTasks = Array(entry.tasks.prefix(maxRows))
             ForEach(visibleTasks) { task in
                 taskRow(task: task)
@@ -199,7 +202,7 @@ struct UpcomingWidgetView: View {
 
             Spacer(minLength: 0)
 
-            if entry.configuration.showAddTaskButton, family != .systemSmall || entry.tasks.isEmpty {
+            if entry.configuration.showAddTaskButton {
                 Link(destination: URL(string: "mdone://create")!) {
                     Image(systemName: "plus.circle.fill")
                         .font(family == .systemSmall ? .subheadline : .body)

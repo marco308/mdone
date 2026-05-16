@@ -132,10 +132,16 @@ struct TodayTasksWidgetView: View {
         Group {
             if !entry.isAuthenticated {
                 unauthenticatedView
-            } else if visibleTodayTasks.isEmpty, visibleOverdueTasks.isEmpty {
-                emptyStateView
             } else {
-                taskListView
+                VStack(alignment: .leading, spacing: 0) {
+                    headerView
+                        .padding(.bottom, 4)
+                    if visibleTodayTasks.isEmpty, visibleOverdueTasks.isEmpty {
+                        emptyStateView
+                    } else {
+                        taskListView
+                    }
+                }
             }
         }
         .dynamicTypeSize(...DynamicTypeSize.xLarge)
@@ -187,10 +193,10 @@ struct TodayTasksWidgetView: View {
 
     private var taskListView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            headerView
-                .padding(.bottom, 4)
-
-            let overdueLimit = min(visibleOverdueTasks.count, maxOverdueRows)
+            // When only one bucket is shown (overdue-only or today-only), let it
+            // claim all available rows instead of capping at maxOverdueRows.
+            let overdueCap = visibleTodayTasks.isEmpty ? maxRows : maxOverdueRows
+            let overdueLimit = min(visibleOverdueTasks.count, overdueCap)
             let todayLimit = max(maxRows - overdueLimit, 0)
             let visibleOverdue = Array(visibleOverdueTasks.prefix(overdueLimit))
             let visibleToday = Array(visibleTodayTasks.prefix(todayLimit))
@@ -242,7 +248,7 @@ struct TodayTasksWidgetView: View {
 
             Spacer(minLength: 0)
 
-            if entry.configuration.showAddTaskButton, family != .systemSmall || totalCount == 0 {
+            if entry.configuration.showAddTaskButton {
                 Link(destination: URL(string: "mdone://create")!) {
                     Image(systemName: "plus.circle.fill")
                         .font(family == .systemSmall ? .subheadline : .body)
