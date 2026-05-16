@@ -90,12 +90,14 @@ final class WidgetDataProvider: @unchecked Sendable {
 
     private func fetchTodayTasks() async throws -> [WidgetTask] {
         let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: Date())
-        guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else {
+        let now = Date()
+        guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) else {
             return []
         }
 
-        let startStr = formatDate(startOfDay)
+        // Only tasks still upcoming today — anything already past its due time is returned by
+        // fetchOverdueTasks instead, otherwise the same task would appear in both lists.
+        let startStr = formatDate(now)
         let endStr = formatDate(endOfDay)
         let filter = "due_date > \"\(startStr)\" && due_date < \"\(endStr)\" && done = false"
 
@@ -121,7 +123,9 @@ final class WidgetDataProvider: @unchecked Sendable {
 
     private func fetchOverdueTasks() async throws -> [WidgetTask] {
         let nowStr = formatDate(Date())
-        let filter = "due_date < \"\(nowStr)\" && due_date > \"0001-01-02T00:00:00Z\" && done = false"
+        // Inclusive lower bound: a task whose due_date is exactly now is overdue, not upcoming.
+        // Pairs with fetchTodayTasks' strict `due_date > now` so every timestamp falls in one bucket.
+        let filter = "due_date <= \"\(nowStr)\" && due_date > \"0001-01-02T00:00:00Z\" && done = false"
 
         return try await fetchTasks(
             filter: filter,

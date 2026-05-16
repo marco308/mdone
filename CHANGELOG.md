@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Focus History Sync (Settings → iOS only): configure a focus-service URL and bearer token to sync completed focus sessions to your homelab service for cross-task analysis (#62). Blank URL keeps everything on-device. Pre-existing focus history is backfilled on first activation.
 
 ### Fixed
+- Widget: tasks whose due time has passed but were due today no longer appear twice — once in the overdue (red) section and once in the today list (#64).
 - Settings now displays the actual app version and build number instead of a hardcoded "1.0.0" (#65).
 
 ## [1.1.2] - 2026-05-13
