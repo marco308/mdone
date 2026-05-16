@@ -123,7 +123,9 @@ final class WidgetDataProvider: @unchecked Sendable {
 
     private func fetchOverdueTasks() async throws -> [WidgetTask] {
         let nowStr = formatDate(Date())
-        let filter = "due_date < \"\(nowStr)\" && due_date > \"0001-01-02T00:00:00Z\" && done = false"
+        // Inclusive lower bound: a task whose due_date is exactly now is overdue, not upcoming.
+        // Pairs with fetchTodayTasks' strict `due_date > now` so every timestamp falls in one bucket.
+        let filter = "due_date <= \"\(nowStr)\" && due_date > \"0001-01-02T00:00:00Z\" && done = false"
 
         return try await fetchTasks(
             filter: filter,
