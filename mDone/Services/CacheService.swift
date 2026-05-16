@@ -177,6 +177,13 @@ final class FocusRecord {
     /// this record. nil = pending delivery; the outbox drain picks these up.
     var deliveredAt: Date?
 
+    /// Set when the focus-service permanently rejected this record (e.g. 422
+    /// schema mismatch). The outbox stops retrying these rather than looping
+    /// the same bad payload forever. Distinct from `deliveredAt` so the
+    /// Settings UI can surface "X records were rejected" separately from
+    /// successful delivery counts.
+    var discardedAt: Date?
+
     init(
         taskId: Int64,
         taskTitle: String,
@@ -187,7 +194,8 @@ final class FocusRecord {
         focusedSeconds: Double,
         device: String,
         clientId: String? = nil,
-        deliveredAt: Date? = nil
+        deliveredAt: Date? = nil,
+        discardedAt: Date? = nil
     ) {
         self.taskId = taskId
         self.taskTitle = taskTitle
@@ -199,6 +207,7 @@ final class FocusRecord {
         self.device = device
         self.clientId = clientId
         self.deliveredAt = deliveredAt
+        self.discardedAt = discardedAt
     }
 }
 

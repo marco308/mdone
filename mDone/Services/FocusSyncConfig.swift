@@ -72,15 +72,24 @@ enum FocusSyncConfig {
 
     // MARK: - Convenience
 
-    /// True when both URL and token are present — i.e., the feature is configured.
+    /// True when both URL and token are present *and* the URL is well-formed
+    /// (http/https scheme + non-empty host). Settings UI uses this to decide
+    /// whether to show "Configured" — a bare hostname like `focus.example.com`
+    /// parses as a URL but URLSession can't deliver to it, so we treat that
+    /// as unconfigured rather than letting the user think sync is on.
     static func isConfigured() -> Bool {
-        getServerURL() != nil && getToken() != nil
+        focusEventsURL() != nil && getToken() != nil
     }
 
     /// Returns a URL pointing at `/focus-events` on the configured server, or
     /// nil if the feature is unconfigured / the URL is malformed.
     static func focusEventsURL() -> URL? {
-        guard let base = getServerURL(), let baseURL = URL(string: base) else {
+        guard let base = getServerURL(),
+              let baseURL = URL(string: base),
+              let scheme = baseURL.scheme?.lowercased(),
+              scheme == "https" || scheme == "http",
+              let host = baseURL.host, !host.isEmpty
+        else {
             return nil
         }
         return baseURL.appendingPathComponent("focus-events")

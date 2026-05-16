@@ -163,7 +163,7 @@ final class FocusOutboxServiceTests: XCTestCase {
         XCTAssertEqual(MockURLProtocol.capturedRequests.count, 1)
     }
 
-    func testSchemaRejectionSkipsRecordButContinues() async throws {
+    func testSchemaRejectionDiscardsRecordAndContinues() async throws {
         let bad = insertRecord(taskId: 60)
         let good = insertRecord(taskId: 61)
         var seenTaskIds: [Int] = []
@@ -184,7 +184,46 @@ final class FocusOutboxServiceTests: XCTestCase {
 
         XCTAssertEqual(seenTaskIds, [60, 61], "Drain must continue past a 422 to the next record")
         XCTAssertNil(bad.deliveredAt)
+        XCTAssertNotNil(bad.discardedAt, "422 must mark the record discarded so it isn't retried forever")
         XCTAssertNotNil(good.deliveredAt)
+    }
+
+    func testDiscardedRecordsNotRetriedOnSubsequentDrain() async throws {
+        // First drain: get a 422, record gets discarded.
+        let record = insertRecord(taskId: 65)
+        MockURLProtocol.requestHandler = { _ in
+            (MockURLProtocol.makeResponse(statusCode: 422), Data(#"{"detail":"bad"}"#.utf8))
+        }
+        await outbox.drain()
+        XCTAssertNotNil(record.discardedAt)
+        let firstCallCount = MockURLProtocol.capturedRequests.count
+
+        // Second drain: server is now healthy. The discarded record should
+        // NOT be retried (the schema problem requires a code fix, not a retry).
+        MockURLProtocol.requestHandler = { _ in
+            (MockURLProtocol.makeResponse(statusCode: 201), Data("{}".utf8))
+        }
+        await outbox.drain()
+
+        XCTAssertEqual(MockURLProtocol.capturedRequests.count, firstCallCount, "Discarded records must not be retried")
+    }
+
+    // MARK: - Multi-batch drain
+
+    func testDrainLoopsAcrossMultipleBatches() async throws {
+        // Insert more than one batch worth of records (51 > batchSize 50).
+        // A single-batch implementation would only deliver the first 50.
+        let total = 55
+        for index in 0 ..< total {
+            insertRecord(taskId: Int64(1000 + index))
+        }
+        MockURLProtocol.requestHandler = { _ in
+            (MockURLProtocol.makeResponse(statusCode: 201), Data("{}".utf8))
+        }
+
+        await outbox.drain()
+
+        XCTAssertEqual(MockURLProtocol.capturedRequests.count, total, "Drain must continue across batches until pending is empty")
     }
 
     func testTransientServerErrorStopsButLeavesRecordPending() async throws {
@@ -307,6 +346,34 @@ final class FocusSyncConfigTests: XCTestCase {
         XCTAssertFalse(FocusSyncConfig.isConfigured(), "URL alone shouldn't count as configured")
         FocusSyncConfig.saveToken("t")
         XCTAssertTrue(FocusSyncConfig.isConfigured())
+    }
+
+    func testBareHostnameRejectedAsNotConfigured() {
+        // URL(string: "focus.example.com") returns non-nil but has no scheme,
+        // so URLSession can't deliver. Settings UI must show "not configured"
+        // rather than letting the user think sync is on.
+        FocusSyncConfig.saveServerURL("focus.example.com")
+        FocusSyncConfig.saveToken("t")
+        XCTAssertNil(FocusSyncConfig.focusEventsURL())
+        XCTAssertFalse(FocusSyncConfig.isConfigured())
+    }
+
+    func testNonHttpSchemeRejected() {
+        FocusSyncConfig.saveServerURL("ftp://focus.example.com")
+        FocusSyncConfig.saveToken("t")
+        XCTAssertNil(FocusSyncConfig.focusEventsURL())
+        XCTAssertFalse(FocusSyncConfig.isConfigured())
+    }
+
+    func testHttpsSchemeAccepted() {
+        FocusSyncConfig.saveServerURL("https://focus.example.com")
+        XCTAssertEqual(FocusSyncConfig.focusEventsURL()?.absoluteString, "https://focus.example.com/focus-events")
+    }
+
+    func testHttpSchemeAccepted() {
+        // Useful for the local dev compose on the LAN.
+        FocusSyncConfig.saveServerURL("http://localhost:8090")
+        XCTAssertEqual(FocusSyncConfig.focusEventsURL()?.absoluteString, "http://localhost:8090/focus-events")
     }
 
     func testTokenRoundTrips() {

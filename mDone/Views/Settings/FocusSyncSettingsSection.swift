@@ -13,11 +13,16 @@ struct FocusSyncSettingsSection: View {
     @State private var revealToken: Bool = false
     @State private var lastSyncMessage: String?
 
-    @Query(filter: #Predicate<FocusRecord> { $0.deliveredAt == nil })
+    @Query(filter: #Predicate<FocusRecord> {
+        $0.deliveredAt == nil && $0.discardedAt == nil
+    })
     private var pending: [FocusRecord]
 
     @Query(filter: #Predicate<FocusRecord> { $0.deliveredAt != nil })
     private var delivered: [FocusRecord]
+
+    @Query(filter: #Predicate<FocusRecord> { $0.discardedAt != nil })
+    private var discarded: [FocusRecord]
 
     var body: some View {
         Section {
@@ -54,6 +59,12 @@ struct FocusSyncSettingsSection: View {
 
             LabeledContent("Pending", value: "\(pending.count)")
             LabeledContent("Delivered", value: "\(delivered.count)")
+            if !discarded.isEmpty {
+                LabeledContent("Discarded") {
+                    Text("\(discarded.count)")
+                        .foregroundStyle(.orange)
+                }
+            }
 
             Button("Sync now") {
                 lastSyncMessage = "Syncing…"

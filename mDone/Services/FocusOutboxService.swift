@@ -41,7 +41,8 @@ final class FocusOutboxService {
 
     /// Drain all undelivered records. Safe to call repeatedly — calls are
     /// coalesced. Returns silently when nothing to do or when the feature
-    /// is unconfigured.
+    /// is unconfigured. Loops through batches until pending is empty or
+    /// a stop condition fires (rate limit, auth failure, transient error).
     func drain() async {
         guard !drainInFlight else { return }
         drainInFlight = true
@@ -59,34 +60,45 @@ final class FocusOutboxService {
             return
         }
 
-        let records = fetchPending()
-        guard !records.isEmpty else { return }
+        // Loop over batches until pending is empty or a stop condition trips.
+        // Hard cap on iterations as a backstop — a single drain delivering
+        // 50 × 64 = 3200 records is well beyond any realistic backlog.
+        var batchesProcessed = 0
+        let maxBatches = 64
 
-        logger.info("Draining \(records.count) pending focus record(s) → \(url.absoluteString, privacy: .public)")
+        while batchesProcessed < maxBatches {
+            let records = fetchPending()
+            if records.isEmpty { return }
 
-        for record in records {
-            let outcome = await deliver(record, to: url, token: token)
-            switch outcome {
-            case .accepted:
-                record.deliveredAt = Date()
-                try? modelContainer.mainContext.save()
-            case .rateLimited(let retryAfter):
-                rateLimitedUntil = Date().addingTimeInterval(retryAfter)
-                logger.notice("Rate-limited, backing off \(retryAfter)s")
-                return
-            case .authFailed:
-                logger.error("focus-service rejected token (401/403). Pausing drain — user must fix settings.")
-                return
-            case .schemaRejected(let body):
-                logger.error("focus-service rejected payload (422): \(body, privacy: .public). Skipping record clientId=\(record.clientId ?? "<nil>", privacy: .public).")
-                // Don't mark delivered, don't loop forever — move on to the
-                // next record. Same record will be retried on next drain.
-                continue
-            case .transient:
-                logger.info("Transient failure delivering focus record — will retry on next drain")
-                return
+            logger.info("Draining batch of \(records.count) pending focus record(s) → \(url.absoluteString, privacy: .public)")
+
+            for record in records {
+                let outcome = await deliver(record, to: url, token: token)
+                switch outcome {
+                case .accepted:
+                    record.deliveredAt = Date()
+                    try? modelContainer.mainContext.save()
+                case .rateLimited(let retryAfter):
+                    rateLimitedUntil = Date().addingTimeInterval(retryAfter)
+                    logger.notice("Rate-limited, backing off \(retryAfter)s")
+                    return
+                case .authFailed:
+                    logger.error("focus-service rejected token (401/403). Pausing drain — user must fix settings.")
+                    return
+                case .schemaRejected(let body):
+                    logger.error("focus-service rejected payload (422): \(body, privacy: .public). Discarding record clientId=\(record.clientId ?? "<nil>", privacy: .public) — schema drift requires a code fix, not a retry.")
+                    record.discardedAt = Date()
+                    try? modelContainer.mainContext.save()
+                case .transient:
+                    logger.info("Transient failure delivering focus record — will retry on next drain")
+                    return
+                }
             }
+
+            batchesProcessed += 1
         }
+
+        logger.notice("Drain hit batch cap (\(maxBatches)) — more pending records remain, will continue on next drain")
     }
 
     // MARK: - Delivery
@@ -144,7 +156,9 @@ final class FocusOutboxService {
 
     private func fetchPending() -> [FocusRecord] {
         var descriptor = FetchDescriptor<FocusRecord>(
-            predicate: #Predicate<FocusRecord> { $0.deliveredAt == nil },
+            predicate: #Predicate<FocusRecord> {
+                $0.deliveredAt == nil && $0.discardedAt == nil
+            },
             sortBy: [SortDescriptor(\FocusRecord.endedAt, order: .forward)]
         )
         descriptor.fetchLimit = Self.batchSize
