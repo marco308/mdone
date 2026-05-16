@@ -8,13 +8,16 @@ struct mDoneApp: App {
     @Environment(\.scenePhase) private var scenePhase
     #if os(iOS)
     @State private var focusManager: FocusManager
+    private let focusOutbox: FocusOutboxService
     #endif
 
     init() {
         let deps = AppDependencies()
         dependencies = deps
         #if os(iOS)
-        _focusManager = State(initialValue: FocusManager(modelContainer: deps.modelContainer))
+        let outbox = FocusOutboxService(modelContainer: deps.modelContainer)
+        focusOutbox = outbox
+        _focusManager = State(initialValue: FocusManager(modelContainer: deps.modelContainer, outbox: outbox))
         #endif
     }
 
@@ -35,6 +38,7 @@ struct mDoneApp: App {
             .environment(dependencies.networkMonitor)
             #if os(iOS)
                 .environment(focusManager)
+                .environment(focusOutbox)
             #endif
                 .modelContainer(dependencies.modelContainer)
                 .onAppear {
@@ -87,10 +91,18 @@ struct mDoneApp: App {
                 }
                 .onChange(of: dependencies.networkMonitor.isConnected) { _, isConnected in
                     appState.handleConnectivityChange(isConnected: isConnected)
+                    #if os(iOS)
+                    if isConnected {
+                        Task { await focusOutbox.drain() }
+                    }
+                    #endif
                 }
                 .onChange(of: scenePhase) { _, newPhase in
                     if newPhase == .active, appState.isAuthenticated {
                         Task { await appState.refreshAll() }
+                        #if os(iOS)
+                        Task { await focusOutbox.drain() }
+                        #endif
                     }
                 }
             #if os(iOS)

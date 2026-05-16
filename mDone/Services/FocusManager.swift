@@ -32,6 +32,7 @@ final class FocusManager {
 
     private var activity: Activity<FocusTaskAttributes>?
     private let modelContainer: ModelContainer?
+    private let outbox: FocusOutboxService?
 
     private var sharedDefaults: UserDefaults {
         FocusConstants.sharedDefaults
@@ -39,8 +40,9 @@ final class FocusManager {
 
     // MARK: - Init
 
-    init(modelContainer: ModelContainer? = nil) {
+    init(modelContainer: ModelContainer? = nil, outbox: FocusOutboxService? = nil) {
         self.modelContainer = modelContainer
+        self.outbox = outbox
         restoreSession()
     }
 
@@ -371,13 +373,15 @@ final class FocusManager {
             startedAt: session.sessionStartDate,
             endedAt: endedAt,
             focusedSeconds: focusedSeconds,
-            device: Self.deviceIdentifier()
+            device: Self.deviceIdentifier(),
+            clientId: UUID().uuidString
         )
 
         let context = modelContainer.mainContext
         context.insert(record)
         do {
             try context.save()
+            outbox?.enqueue(record)
         } catch {
             #if DEBUG
             print("[FocusManager] Failed to persist FocusRecord: \(error)")

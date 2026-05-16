@@ -168,6 +168,22 @@ final class FocusRecord {
     var focusedSeconds: Double
     var device: String
 
+    /// Idempotency key for the focus-service outbox (mdone#62). Optional so
+    /// pre-outbox records migrate without a custom plan — the outbox fills
+    /// this in lazily before its first delivery attempt.
+    var clientId: String?
+
+    /// Set when the focus-service has accepted (or duplicate-acknowledged)
+    /// this record. nil = pending delivery; the outbox drain picks these up.
+    var deliveredAt: Date?
+
+    /// Set when the focus-service permanently rejected this record (e.g. 422
+    /// schema mismatch). The outbox stops retrying these rather than looping
+    /// the same bad payload forever. Distinct from `deliveredAt` so the
+    /// Settings UI can surface "X records were rejected" separately from
+    /// successful delivery counts.
+    var discardedAt: Date?
+
     init(
         taskId: Int64,
         taskTitle: String,
@@ -176,7 +192,10 @@ final class FocusRecord {
         startedAt: Date,
         endedAt: Date,
         focusedSeconds: Double,
-        device: String
+        device: String,
+        clientId: String? = nil,
+        deliveredAt: Date? = nil,
+        discardedAt: Date? = nil
     ) {
         self.taskId = taskId
         self.taskTitle = taskTitle
@@ -186,6 +205,9 @@ final class FocusRecord {
         self.endedAt = endedAt
         self.focusedSeconds = focusedSeconds
         self.device = device
+        self.clientId = clientId
+        self.deliveredAt = deliveredAt
+        self.discardedAt = discardedAt
     }
 }
 

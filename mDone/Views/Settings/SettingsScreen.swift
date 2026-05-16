@@ -57,6 +57,10 @@ struct SettingsScreen: View {
                 }
             }
 
+            #if os(iOS)
+            FocusSyncSettingsSection()
+            #endif
+
             Section {
                 Button("Disconnect", role: .destructive) {
                     showLogoutConfirm = true
