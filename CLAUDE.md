@@ -62,6 +62,26 @@ View → AppState (method call) → Service (TaskService/ProjectService)
 
 Update `CHANGELOG.md` whenever making user-facing changes (features, fixes, UI changes). Add entries under the `[Unreleased]` section using Keep a Changelog categories: Added, Changed, Fixed, Removed. Keep entries concise and written from the user's perspective.
 
+## Test Coverage
+
+Code coverage is gathered by default — `gatherCoverageData: true` is set on both schemes in `project.yml`. Read coverage from any test run with `xcrun xccov view --report <path-to-.xcresult>`.
+
+Apply tiered coverage targets by layer rather than chasing a single overall percentage:
+
+| Layer | Target |
+|---|---|
+| Services (`mDone/Services/`) | 85%+ (never drop a service below 70% without a reason) |
+| Models with logic (e.g. `VTask`) | 90%+ |
+| `AppState` | 75%+ |
+| Widgets (`mDoneShared/`, `mDoneWidgets/`) | 70%+ |
+| SwiftUI views | no line-coverage target — use snapshot tests |
+
+Rules of practice:
+- New code in services, models, or `AppState` ships with tests in the same PR. Coverage-of-the-diff matters more than overall %.
+- Verify a test file actually exercises its target with `xccov` — a file's existence isn't proof of coverage. `SyncServiceTests` once had 12 tests but only hit 3.78% of `SyncService` because it mocked the wrong layer.
+- Don't pad the overall % with shallow view tests. SwiftUI view files at 0% line coverage are normal.
+- If a service in a diff is below 70%, flag it as a good moment to add tests.
+
 ## Linting & Formatting
 
 SwiftLint runs as a post-build script (configured in `project.yml`). Config in `.swiftlint.yml` — notably disables `line_length`, `trailing_whitespace`, `type_body_length`, `file_length`, `function_body_length`, and `cyclomatic_complexity`.
