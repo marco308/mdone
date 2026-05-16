@@ -401,7 +401,27 @@ final class AppState {
     func postponeTask(_ task: VTask, byHours hours: Int) async {
         let baseDate = task.effectiveDueDate ?? Date()
         let newDate = Calendar.current.date(byAdding: .hour, value: hours, to: baseDate) ?? baseDate
-        await updateTask(id: task.id, request: TaskUpdateRequest(dueDate: newDate))
+
+        let originalDueDate: Date?
+        if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+            originalDueDate = tasks[index].dueDate
+            tasks[index].dueDate = newDate
+        } else {
+            originalDueDate = nil
+        }
+
+        do {
+            let updated = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(dueDate: newDate))
+            if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
+                tasks[index] = updated
+            }
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+                tasks[index].dueDate = originalDueDate
+            }
+            handleError(error)
+        }
     }
 
     @MainActor
