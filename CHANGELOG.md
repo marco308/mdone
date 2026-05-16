@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - Widget: tasks whose due time has passed but were due today no longer appear twice — once in the overdue (red) section and once in the today list (#64).
+- Settings now displays the actual app version and build number instead of a hardcoded "1.0.0" (#65).
 
 ## [1.1.2] - 2026-05-13
 

@@ -73,7 +73,7 @@ struct SettingsScreen: View {
                     VStack(spacing: 4) {
                         Text("mDone")
                             .font(.caption.bold())
-                        Text("Version 1.0.0")
+                        Text(Self.versionString)
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
@@ -94,5 +94,12 @@ struct SettingsScreen: View {
         } message: {
             Text("This will remove your server configuration. You'll need to reconnect.")
         }
+    }
+
+    private static var versionString: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "—"
+        let build = info?["CFBundleVersion"] as? String ?? "—"
+        return "Version \(short) (\(build))"
     }
 }
