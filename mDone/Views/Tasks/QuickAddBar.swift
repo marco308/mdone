@@ -40,6 +40,13 @@ struct QuickAddBar: View {
         .shadow(color: .black.opacity(0.1), radius: 8, y: -2)
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
+        .task(id: appState.quickAddTrigger) {
+            // Consume the trigger so a later-mounted QuickAddBar (e.g. switching
+            // to a project's task list) doesn't see a stale value and steal focus.
+            guard appState.quickAddTrigger != nil else { return }
+            isFocused = true
+            appState.quickAddTrigger = nil
+        }
     }
 
     private func addTask() {

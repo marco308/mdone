@@ -25,6 +25,11 @@ final class AppState {
     var pendingOperationsCount: Int = 0
     var isRetrying: Bool = false
 
+    /// Bumped when the user opens the app via the widget's "+ Add Task" shortcut
+    /// or the mdone://create URL. Observed by MainTabView (switch to Inbox) and
+    /// QuickAddBar (focus the text field).
+    var quickAddTrigger: UUID?
+
     // Calendar integration
     var calendarEvents: [CalendarEvent] = []
     var calendarAccessGranted: Bool = false

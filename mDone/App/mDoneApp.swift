@@ -107,10 +107,16 @@ struct mDoneApp: App {
                 }
             #if os(iOS)
                 .onOpenURL { url in
-                    if url.scheme == "mdone", url.host == "focus",
-                       focusManager.currentSession != nil
-                    {
-                        focusManager.showFocusView = true
+                    guard url.scheme == "mdone" else { return }
+                    switch url.host {
+                    case "focus":
+                        if focusManager.currentSession != nil {
+                            focusManager.showFocusView = true
+                        }
+                    case "create":
+                        appState.quickAddTrigger = UUID()
+                    default:
+                        break
                     }
                 }
             #endif
