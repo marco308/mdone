@@ -4,11 +4,17 @@ options:
   deploymentTarget:
     iOS: "18.0"
     macOS: "15.0"
-  xcodeVersion: "16.0"
+  xcodeVersion: "26.0"
   generateEmptyDirectories: true
 
 settings:
   base:
+    # Xcode 26.5 + XcodeGen 2.45.4 no longer inject a default PRODUCT_NAME, so
+    # swiftc gets `-module-name ` (empty) and every target fails with
+    # "module name "" is not a valid identifier". Pin it to the target name
+    # (the historical XcodeGen default) so all schemes build. Build-infra fix,
+    # not feature-related — see PR "decisions".
+    PRODUCT_NAME: "$(TARGET_NAME)"
     SWIFT_VERSION: "5.9"
     MARKETING_VERSION: "1.3.0"
     CURRENT_PROJECT_VERSION: "25"
@@ -33,6 +39,12 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_EMIT_LOC_STRINGS: "YES"
+        # XcodeGen 2.45.4 + the stale xcodeVersion below stopped emitting an
+        # iOS SDKROOT, so the build system treated this target as macOS-only
+        # and no simulator destinations resolved. Pin it explicitly.
+        SDKROOT: iphoneos
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+        TARGETED_DEVICE_FAMILY: "1,2"
     postBuildScripts:
       - script: |
           if which swiftlint > /dev/null; then
