@@ -12,6 +12,7 @@ struct AppDependencies {
             CachedLabel.self,
             PendingOperation.self,
             FocusRecord.self,
+            TaskEstimate.self,
         ])
 
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)

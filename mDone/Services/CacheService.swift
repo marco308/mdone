@@ -211,6 +211,26 @@ final class FocusRecord {
     }
 }
 
+/// mDone-local estimated duration for a task, keyed by Vikunja task id.
+///
+/// Vikunja's task schema has no estimated-duration field, and this estimate is
+/// deliberately *not* round-tripped to the server (see PR / non-goals). It
+/// lives only in the local SwiftData store, mirroring how `FocusRecord`
+/// persists focus history without touching the API. One row per task id;
+/// absence of a row means "no estimate" and the feature stays invisible.
+@Model
+final class TaskEstimate {
+    @Attribute(.unique) var taskId: Int64
+    var estimatedSeconds: TimeInterval
+    var updatedAt: Date
+
+    init(taskId: Int64, estimatedSeconds: TimeInterval, updatedAt: Date = Date()) {
+        self.taskId = taskId
+        self.estimatedSeconds = estimatedSeconds
+        self.updatedAt = updatedAt
+    }
+}
+
 @Model
 final class PendingOperation {
     var id: UUID
