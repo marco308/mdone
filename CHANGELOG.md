@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Settings now displays the actual app version and build number instead of a hardcoded "1.0.0" (#65).
 - Swiping a task left for +24h now updates the displayed due date instantly instead of waiting for the server to respond.
 - Calendar: weekday header row (Mon/Tue/…) now correctly rotates to match the configured first day of the week (#60).
+- Advanced Filter: applying a date range of Today / This Week / This Month no longer fails with "Something went wrong with that request" — the filter is now sent as an absolute date instead of a relative expression that the server mis-parsed.
 
 ## [1.1.2] - 2026-05-13
 
