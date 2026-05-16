@@ -118,9 +118,10 @@ struct TaskFilterSheet: View {
         // Vikunja's "now+7d" relative dates can't be used here: URLComponents
         // doesn't percent-encode "+" in query values, but the server's form-
         // decoder treats "+" as a space, turning "now+7d" into "now 7d" and
-        // returning 400. We resolve the dates client-side instead.
+        // returning 400. We resolve the dates client-side instead, using
+        // Calendar arithmetic so DST transitions don't shift the boundaries.
         let now = Date()
-        let day: TimeInterval = 24 * 3600
+        let calendar = Calendar.current
 
         switch selectedDateRange {
         case .any:
@@ -128,13 +129,16 @@ struct TaskFilterSheet: View {
         case .overdue:
             parts.append("due_date < \"\(Self.isoString(from: now))\"")
         case .today:
-            let startOfDay = Calendar.current.startOfDay(for: now)
-            let endOfDay = startOfDay.addingTimeInterval(day)
+            let startOfDay = calendar.startOfDay(for: now)
+            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
             parts.append("due_date > \"\(Self.isoString(from: startOfDay))\" && due_date < \"\(Self.isoString(from: endOfDay))\"")
         case .thisWeek:
-            parts.append("due_date > \"\(Self.isoString(from: now))\" && due_date < \"\(Self.isoString(from: now.addingTimeInterval(7 * day)))\"")
+            let weekEnd = calendar.date(byAdding: .day, value: 7, to: now) ?? now
+            parts.append("due_date > \"\(Self.isoString(from: now))\" && due_date < \"\(Self.isoString(from: weekEnd))\"")
         case .thisMonth:
-            parts.append("due_date > \"\(Self.isoString(from: now))\" && due_date < \"\(Self.isoString(from: now.addingTimeInterval(30 * day)))\"")
+            // Actual calendar-month boundary: now → start of next month.
+            let monthEnd = calendar.dateInterval(of: .month, for: now)?.end ?? now
+            parts.append("due_date > \"\(Self.isoString(from: now))\" && due_date < \"\(Self.isoString(from: monthEnd))\"")
         case .custom:
             parts.append("due_date > \"\(Self.isoString(from: customStartDate))\" && due_date < \"\(Self.isoString(from: customEndDate))\"")
         }
