@@ -46,6 +46,7 @@ targets:
       testTargets:
         - mDoneTests
         - mDoneUITests
+      gatherCoverageData: true
 
   mDone-macOS:
     type: application
@@ -73,6 +74,7 @@ targets:
     scheme:
       testTargets:
         - mDoneMacUITests
+      gatherCoverageData: true
 
   mDoneMacUITests:
     type: bundle.ui-testing
