@@ -15,7 +15,7 @@ enum TaskFilter: String, CaseIterable, Identifiable {
         switch self {
         case .all: "All"
         case .highPriority: "High Priority"
-        case .dueThisWeek: "Due This Week"
+        case .dueThisWeek: "Due in 7 Days"
         case .completed: "Completed"
         case .hasLabels: "Has Labels"
         }

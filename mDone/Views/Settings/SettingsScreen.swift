@@ -4,6 +4,7 @@ struct SettingsScreen: View {
     @Environment(AppState.self) private var appState
     @AppStorage("notificationsEnabled") private var notificationsEnabled = false
     @AppStorage("reminderOffset") private var reminderOffset = 30
+    @AppStorage(WeekStartPreference.storageKey) private var firstWeekday = WeekStartPreference.system.rawValue
     @State private var showLogoutConfirm = false
 
     private var serverURL: String {
@@ -22,6 +23,14 @@ struct SettingsScreen: View {
                             .accessibilityHidden(true)
                         Text(appState.isAuthenticated ? "Connected" : "Disconnected")
                             .font(.subheadline)
+                    }
+                }
+            }
+
+            Section("Appearance") {
+                Picker("Start week on", selection: $firstWeekday) {
+                    ForEach(WeekStartPreference.allCases) { preference in
+                        Text(preference.label).tag(preference.rawValue)
                     }
                 }
             }

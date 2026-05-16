@@ -115,23 +115,32 @@ struct TaskFilterSheet: View {
             parts.append("priority = \(selectedPriority.rawValue)")
         }
 
+        // Vikunja's "now+7d" relative dates can't be used here: URLComponents
+        // doesn't percent-encode "+" in query values, but the server's form-
+        // decoder treats "+" as a space, turning "now+7d" into "now 7d" and
+        // returning 400. We resolve the dates client-side instead, using
+        // Calendar arithmetic so DST transitions don't shift the boundaries.
+        let now = Date()
+        let calendar = Calendar.current
+
         switch selectedDateRange {
         case .any:
             break
         case .overdue:
-            parts.append("due_date < now")
+            parts.append("due_date < \"\(Self.isoString(from: now))\"")
         case .today:
-            parts.append("due_date > now-1d && due_date < now+1d")
+            let startOfDay = calendar.startOfDay(for: now)
+            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
+            parts.append("due_date > \"\(Self.isoString(from: startOfDay))\" && due_date < \"\(Self.isoString(from: endOfDay))\"")
         case .thisWeek:
-            parts.append("due_date > now && due_date < now+7d")
+            let weekEnd = calendar.date(byAdding: .day, value: 7, to: now) ?? now
+            parts.append("due_date > \"\(Self.isoString(from: now))\" && due_date < \"\(Self.isoString(from: weekEnd))\"")
         case .thisMonth:
-            parts.append("due_date > now && due_date < now+30d")
+            // Actual calendar-month boundary: now → start of next month.
+            let monthEnd = calendar.dateInterval(of: .month, for: now)?.end ?? now
+            parts.append("due_date > \"\(Self.isoString(from: now))\" && due_date < \"\(Self.isoString(from: monthEnd))\"")
         case .custom:
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime]
-            let start = formatter.string(from: customStartDate)
-            let end = formatter.string(from: customEndDate)
-            parts.append("due_date > \"\(start)\" && due_date < \"\(end)\"")
+            parts.append("due_date > \"\(Self.isoString(from: customStartDate))\" && due_date < \"\(Self.isoString(from: customEndDate))\"")
         }
 
         switch doneFilter {
@@ -149,5 +158,15 @@ struct TaskFilterSheet: View {
 
         guard !parts.isEmpty else { return nil }
         return parts.joined(separator: " && ")
+    }
+
+    private static let isoFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    private static func isoString(from date: Date) -> String {
+        isoFormatter.string(from: date)
     }
 }
