@@ -12,12 +12,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Widget customisation: long-press the Today's Tasks or Upcoming widget and tap Edit Widget to choose font size (Compact / Standard / Large), pick what to show (Today + Overdue / Today only / Overdue only), toggle the tap-to-complete button, and toggle the "+" Add Task shortcut (#66).
 - Small (1×1) and Extra Large (iPad) layouts for the Today's Tasks and Upcoming widgets (#66).
 - "+" Add Task shortcut in the Today's Tasks and Upcoming widget headers — opens the app on the Inbox tab with the "Add a task…" field already focused so you can start typing immediately (#66). The Quick Add widget's tap behaviour follows the same flow.
+- Settings → Appearance: "Start week on" lets you override the calendar's first day (System / Sunday / Monday / Saturday) (#60).
+
+### Changed
+- "Due This Week" filter chip is now labelled "Due in 7 Days" to match its actual behaviour (a rolling 7-day window from now).
 
 ### Fixed
 - Widget: tasks whose due time has passed but were due today no longer appear twice — once in the overdue (red) section and once in the today list (#64).
 - Widget: the "Today" header no longer creeps off the top of the medium widget when several tasks are showing — visible row counts are now tuned per widget size, and accessibility text sizes are capped so the layout stays inside the widget canvas (#66).
 - Settings now displays the actual app version and build number instead of a hardcoded "1.0.0" (#65).
 - Swiping a task left for +24h now updates the displayed due date instantly instead of waiting for the server to respond.
+- Calendar: weekday header row (Mon/Tue/…) now correctly rotates to match the configured first day of the week (#60).
 
 ## [1.1.2] - 2026-05-13
 

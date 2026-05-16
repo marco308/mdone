@@ -6,8 +6,22 @@ struct CalendarGrid: View {
     let tasksForMonth: [Date: [VTask]]
     var eventsForMonth: [Date: [CalendarEvent]] = [:]
 
-    private let calendar = Calendar.current
-    private let weekdays = Calendar.current.shortWeekdaySymbols
+    @AppStorage(WeekStartPreference.storageKey) private var firstWeekdayPref = WeekStartPreference.system.rawValue
+
+    private var calendar: Calendar {
+        var cal = Calendar.current
+        if (1 ... 7).contains(firstWeekdayPref) {
+            cal.firstWeekday = firstWeekdayPref
+        }
+        return cal
+    }
+
+    private var weekdays: [String] {
+        let symbols = calendar.shortWeekdaySymbols
+        let offset = calendar.firstWeekday - 1
+        return Array(symbols[offset...]) + Array(symbols[..<offset])
+    }
+
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
 
     var body: some View {
