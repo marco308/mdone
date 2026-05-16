@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Task detail screen shows total focus time and session count for tasks you've used the Focus Timer on (#61).
 - Focus History Sync (Settings → iOS only): configure a focus-service URL and bearer token to sync completed focus sessions to your homelab service for cross-task analysis (#62). Blank URL keeps everything on-device. Pre-existing focus history is backfilled on first activation.
 
+### Fixed
+- Settings now displays the actual app version and build number instead of a hardcoded "1.0.0" (#65).
+
 ## [1.1.2] - 2026-05-13
 
 ### Added
