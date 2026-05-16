@@ -21,6 +21,14 @@ settings:
     DEVELOPMENT_TEAM: "Z62E7MGREE"
     CODE_SIGN_IDENTITY: "Apple Development"
     CODE_SIGN_STYLE: Automatic
+  configs:
+    Debug:
+      # Same XcodeGen 2.45.4 regression: the historical Debug default of
+      # ENABLE_TESTABILITY=YES is no longer emitted, so the app module is
+      # built without -enable-testing and every `@testable import mDone`
+      # test fails to resolve the module. Pin it for Debug. Build-infra fix.
+      ENABLE_TESTABILITY: "YES"
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
 
 targets:
   mDone:
