@@ -14,10 +14,11 @@ struct MacTaskDetailView: View {
     @State private var reminders: [TaskReminder]
     @State private var showDeleteConfirm = false
     @State private var isShowingDescriptionPreview: Bool
+    @State private var estimateSeconds: TimeInterval?
 
     init(task: VTask) {
         self.task = task
-        let initialDescription = task.description ?? ""
+        let initialDescription = task.userVisibleDescription ?? ""
         _title = State(initialValue: task.title)
         _descriptionText = State(initialValue: initialDescription)
         _dueDate = State(initialValue: task.dueDate)
@@ -27,6 +28,7 @@ struct MacTaskDetailView: View {
         _repeatInterval = State(initialValue: task.repeatAfter ?? 0)
         _reminders = State(initialValue: task.reminders ?? [])
         _isShowingDescriptionPreview = State(initialValue: !initialDescription.isEmpty)
+        _estimateSeconds = State(initialValue: task.estimatedSeconds)
     }
 
     var body: some View {
@@ -93,6 +95,10 @@ struct MacTaskDetailView: View {
                         displayedComponents: [.date, .hourAndMinute]
                     )
                 }
+            }
+
+            Section {
+                EstimatePicker(estimateSeconds: $estimateSeconds)
             }
 
             Section("Repeat") {
@@ -191,7 +197,7 @@ struct MacTaskDetailView: View {
         }
         .onChange(of: task) { _, newTask in
             title = newTask.title
-            let newDescription = newTask.description ?? ""
+            let newDescription = newTask.userVisibleDescription ?? ""
             descriptionText = newDescription
             dueDate = newTask.dueDate
             hasDueDate = newTask.dueDate != nil
@@ -200,13 +206,16 @@ struct MacTaskDetailView: View {
             repeatInterval = newTask.repeatAfter ?? 0
             reminders = newTask.reminders ?? []
             isShowingDescriptionPreview = !newDescription.isEmpty
+            estimateSeconds = newTask.estimatedSeconds
         }
     }
 
     private func saveTask() {
+        let body = descriptionText.isEmpty ? nil : descriptionText
+        let composedDescription = EstimateMarker.apply(estimateSeconds, to: body)
         let request = TaskUpdateRequest(
             title: title,
-            description: descriptionText.isEmpty ? nil : descriptionText,
+            description: composedDescription,
             dueDate: hasDueDate ? (dueDate ?? Date()) : nil,
             priority: priority,
             projectId: selectedProjectId,

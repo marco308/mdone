@@ -20,12 +20,12 @@ struct TaskDetailSheet: View {
     @State private var reminders: [TaskReminder]
     @State private var showDeleteConfirm = false
     @State private var isShowingDescriptionPreview: Bool
-    /// Loaded from `EstimateStore` on appear; `nil` == no estimate.
+    /// Loaded from the description's estimate marker; `nil` == no estimate.
     @State private var estimateSeconds: TimeInterval?
 
     init(task: VTask) {
         self.task = task
-        let initialDescription = task.description ?? ""
+        let initialDescription = task.userVisibleDescription ?? ""
         _title = State(initialValue: task.title)
         _description = State(initialValue: initialDescription)
         _dueDate = State(initialValue: task.effectiveDueDate)
@@ -35,6 +35,7 @@ struct TaskDetailSheet: View {
         _repeatInterval = State(initialValue: task.repeatAfter ?? 0)
         _reminders = State(initialValue: task.reminders ?? [])
         _isShowingDescriptionPreview = State(initialValue: !initialDescription.isEmpty)
+        _estimateSeconds = State(initialValue: task.estimatedSeconds)
     }
 
     var body: some View {
@@ -176,9 +177,6 @@ struct TaskDetailSheet: View {
                 }
             }
             .navigationTitle("Edit Task")
-            .onAppear {
-                estimateSeconds = EstimateStore.estimate(for: task.id, in: modelContext)
-            }
             #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -210,9 +208,14 @@ struct TaskDetailSheet: View {
     }
 
     private func saveTask() {
+        // Bake the optional estimate into the description as a marker so it
+        // round-trips through Vikunja and is visible to any agent that reads
+        // the task via the API. `apply` strips any prior marker first.
+        let body = description.isEmpty ? nil : description
+        let composedDescription = EstimateMarker.apply(estimateSeconds, to: body)
         let request = TaskUpdateRequest(
             title: title,
-            description: description.isEmpty ? nil : description,
+            description: composedDescription,
             dueDate: hasDueDate ? (dueDate ?? Date()) : nil,
             priority: priority,
             projectId: selectedProjectId,
@@ -220,13 +223,6 @@ struct TaskDetailSheet: View {
             reminders: reminders,
             clearDueDate: !hasDueDate
         )
-        // Persist the mDone-local estimate (not sent to Vikunja). `set` with a
-        // non-positive value clears, so a removed estimate is honoured too.
-        if let seconds = estimateSeconds {
-            EstimateStore.set(seconds, for: task.id, in: modelContext)
-        } else {
-            EstimateStore.clear(for: task.id, in: modelContext)
-        }
         Task {
             await appState.updateTask(id: task.id, request: request)
             dismiss()

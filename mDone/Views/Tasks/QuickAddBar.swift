@@ -156,17 +156,14 @@ struct QuickAddBar: View {
     private func addTask() {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        let chosenEstimate = estimateSeconds
+        let description = EstimateMarker.apply(estimateSeconds, to: nil)
         Task {
-            let created = await appState.createTask(
+            await appState.createTask(
                 title: trimmed,
                 projectId: projectId,
+                description: description,
                 dueDate: defaultDueDate
             )
-            // Persist the local estimate against the real task id once we have it.
-            if let created, let chosenEstimate {
-                EstimateStore.set(chosenEstimate, for: created.id, in: modelContext)
-            }
             title = ""
             estimateSeconds = nil
             suggestion = nil
