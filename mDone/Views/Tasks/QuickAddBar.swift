@@ -13,6 +13,11 @@ struct QuickAddBar: View {
     @State private var estimateSeconds: TimeInterval?
     /// Most recent suggestion from the offline matcher, if any.
     @State private var suggestion: EstimateSuggestion?
+    /// Trimmed title the current `suggestion` was computed for — used to
+    /// hide the hint as soon as the user keeps typing past it, so a stale
+    /// suggestion can't briefly display against an unrelated title during
+    /// the 250ms debounce window before the next lookup fires.
+    @State private var suggestionForTitle: String?
     /// Trimmed title the user explicitly dismissed the hint for, so we don't
     /// nag them again *for that title* — clears once they type something
     /// different.
@@ -22,7 +27,7 @@ struct QuickAddBar: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            if let suggestion, !isHintDismissed, estimateSeconds == nil {
+            if let suggestion, suggestionMatchesCurrentTitle, !isHintDismissed, estimateSeconds == nil {
                 suggestionHint(suggestion)
             }
 
@@ -135,12 +140,21 @@ struct QuickAddBar: View {
         return dismissedTitle == title.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// True when the cached suggestion was computed for what the user is
+    /// currently typing, so the hint always reflects the present title and
+    /// never a stale one from the just-finished keystroke.
+    private var suggestionMatchesCurrentTitle: Bool {
+        guard let suggestionForTitle else { return false }
+        return suggestionForTitle == title.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func scheduleSuggestion(for rawTitle: String) {
         debounceTask?.cancel()
         let trimmed = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard trimmed.count >= 3 else {
             suggestion = nil
+            suggestionForTitle = nil
             return
         }
 
@@ -155,6 +169,7 @@ struct QuickAddBar: View {
             )
             if Task.isCancelled { return }
             suggestion = result
+            suggestionForTitle = result == nil ? nil : trimmed
         }
     }
 
@@ -172,6 +187,7 @@ struct QuickAddBar: View {
             title = ""
             estimateSeconds = nil
             suggestion = nil
+            suggestionForTitle = nil
             dismissedTitle = nil
         }
     }

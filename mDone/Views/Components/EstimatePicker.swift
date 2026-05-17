@@ -114,10 +114,14 @@ private struct CustomEstimateSheet: View {
         _estimateSeconds = estimateSeconds
         let totalMinutes = Int((estimateSeconds.wrappedValue ?? 1800) / 60)
         // Minutes wheel only contains 0..55 in 5-minute increments. A non-
-        // 5-multiple seed (e.g. a fuzzy suggestion like 27m) would have no
-        // matching tag and the picker would render an invalid selection.
-        // Round to the nearest 5 minutes, carrying into hours when needed.
-        let snapped = Int(((Double(totalMinutes) / 5).rounded()) * 5)
+        // 5-multiple seed (e.g. a 27m suggestion from focus history) has no
+        // matching tag, so we snap to the nearest 5 minutes.
+        var snapped = Int(((Double(totalMinutes) / 5).rounded()) * 5)
+        // ...but never snap a positive seed down to 0, or the user opens the
+        // custom sheet on an existing tiny estimate (e.g. an agent-set 2m)
+        // and tapping Set silently clears it. Floor to the smallest valid
+        // non-zero tag when the source had any value.
+        if totalMinutes > 0, snapped == 0 { snapped = 5 }
         _hours = State(initialValue: snapped / 60)
         _minutes = State(initialValue: snapped % 60)
     }
