@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Optional estimated duration for tasks. Add a quick estimate (15m / 30m / 1h / 2h / 4h presets, or a custom hours+minutes value) when creating a task in the Quick Add bar or later from the task detail screen (iOS and macOS). The estimate is stored inside the task's Vikunja description as an `<!-- mdone:estimate=N -->` marker, so AI agents and other API clients can read and set it directly without any mDone-specific endpoint. mDone hides the marker from previews and editors.
+- As you type a new task title, mDone can suggest an estimate from how long similar tasks you've focused on actually took ("Similar tasks took ~25m"). The hint is offline, never auto-fills, and only fills the field if you tap it.
 - Task detail screen shows total focus time and session count for tasks you've used the Focus Timer on (#61).
 - Focus History Sync (Settings → iOS only): configure a focus-service URL and bearer token to sync completed focus sessions to your homelab service for cross-task analysis (#62). Blank URL keeps everything on-device. Pre-existing focus history is backfilled on first activation.
 - Widget customisation: long-press the Today's Tasks or Upcoming widget and tap Edit Widget to choose font size (Compact / Standard / Large), pick what to show (Today + Overdue / Today only / Overdue only), toggle the tap-to-complete button, and toggle the "+" Add Task shortcut (#66).

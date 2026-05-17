@@ -45,6 +45,19 @@ struct VTask: Codable, Identifiable, Hashable {
         (repeatAfter ?? 0) > 0
     }
 
+    /// `description` with the mDone estimate marker stripped — what the user
+    /// should see in editors and previews. `nil` if the description has no
+    /// body once the marker is removed.
+    var userVisibleDescription: String? {
+        EstimateMarker.strip(description)
+    }
+
+    /// The optional mDone estimated duration parsed from the description's
+    /// trailing marker. `nil` if no estimate is set.
+    var estimatedSeconds: TimeInterval? {
+        EstimateMarker.parse(description)
+    }
+
     var repeatDescription: String? {
         guard let interval = repeatAfter, interval > 0 else { return nil }
         let hours = interval / 3600

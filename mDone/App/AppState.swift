@@ -387,9 +387,19 @@ final class AppState {
         }
     }
 
+    /// Creates a task and returns it on success (or `nil` on failure).
+    /// `@discardableResult` so existing call sites that don't need the new id
+    /// stay unchanged.
     @MainActor
-    func createTask(title: String, projectId: Int64, dueDate: Date? = nil, priority: Int64 = 0) async {
-        let request = TaskCreateRequest(title: title, dueDate: dueDate, priority: priority)
+    @discardableResult
+    func createTask(
+        title: String,
+        projectId: Int64,
+        description: String? = nil,
+        dueDate: Date? = nil,
+        priority: Int64 = 0
+    ) async -> VTask? {
+        let request = TaskCreateRequest(title: title, description: description, dueDate: dueDate, priority: priority)
         do {
             let newTask = try await taskService.createTask(projectId: projectId, request: request)
             tasks.append(newTask)
@@ -397,8 +407,10 @@ final class AppState {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             #endif
             WidgetCenter.shared.reloadAllTimelines()
+            return newTask
         } catch {
             handleError(error)
+            return nil
         }
     }
 
