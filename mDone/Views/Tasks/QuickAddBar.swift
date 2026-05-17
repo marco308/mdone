@@ -13,15 +13,16 @@ struct QuickAddBar: View {
     @State private var estimateSeconds: TimeInterval?
     /// Most recent suggestion from the offline matcher, if any.
     @State private var suggestion: EstimateSuggestion?
-    /// Set true once the user dismisses the hint for the current title so we
-    /// don't nag them again until they change the title materially.
-    @State private var hintDismissed = false
+    /// Trimmed title the user explicitly dismissed the hint for, so we don't
+    /// nag them again *for that title* — clears once they type something
+    /// different.
+    @State private var dismissedTitle: String?
     /// Debounce token — only the latest keystroke's task computes a suggestion.
     @State private var debounceTask: Task<Void, Never>?
 
     var body: some View {
         VStack(spacing: 8) {
-            if let suggestion, !hintDismissed, estimateSeconds == nil {
+            if let suggestion, !isHintDismissed, estimateSeconds == nil {
                 suggestionHint(suggestion)
             }
 
@@ -108,7 +109,7 @@ struct QuickAddBar: View {
             }
             .buttonStyle(.plain)
             Button {
-                hintDismissed = true
+                dismissedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
             } label: {
                 Image(systemName: "xmark")
                     .font(.caption2.weight(.semibold))
@@ -126,13 +127,17 @@ struct QuickAddBar: View {
     /// Debounce keystrokes (250ms) so the matcher doesn't run on every
     /// character. The matcher itself is sub-millisecond, but debouncing keeps
     /// the hint from flickering as a word is typed.
+    /// True when the user dismissed the hint for the exact title they're
+    /// looking at — keeps the hint hidden while they continue typing the
+    /// same task and surfaces again only once the title meaningfully changes.
+    private var isHintDismissed: Bool {
+        guard let dismissedTitle else { return false }
+        return dismissedTitle == title.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func scheduleSuggestion(for rawTitle: String) {
         debounceTask?.cancel()
         let trimmed = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Re-typing resets the dismissal so a meaningfully different title can
-        // surface a fresh hint.
-        hintDismissed = false
 
         guard trimmed.count >= 3 else {
             suggestion = nil
@@ -167,7 +172,7 @@ struct QuickAddBar: View {
             title = ""
             estimateSeconds = nil
             suggestion = nil
-            hintDismissed = false
+            dismissedTitle = nil
         }
     }
 }

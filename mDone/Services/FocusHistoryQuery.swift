@@ -30,14 +30,24 @@ enum FocusHistoryQuery {
     /// duration". `FocusRecord` carries `projectName` (display string) but no
     /// project/label ids, so those weak signals are left unset here; the
     /// suggester degrades gracefully to title-only matching.
+    ///
+    /// Runs on the typing-path debounce so it: (a) only fetches the columns
+    /// the suggester actually consumes, and (b) sorts records oldest-first
+    /// so the per-task title we land on is deterministically the most recent
+    /// one (later rows overwrite earlier).
     @MainActor
     static func historicalTasks(in context: ModelContext) -> [HistoricalTask] {
-        guard let records = try? context.fetch(FetchDescriptor<FocusRecord>()) else { return [] }
+        var descriptor = FetchDescriptor<FocusRecord>(
+            sortBy: [SortDescriptor(\.endedAt, order: .forward)]
+        )
+        descriptor.propertiesToFetch = [\.taskId, \.taskTitle, \.focusedSeconds, \.endedAt]
+        guard let records = try? context.fetch(descriptor) else { return [] }
         var byTask: [Int64: (title: String, seconds: TimeInterval)] = [:]
         for r in records {
             if var existing = byTask[r.taskId] {
                 existing.seconds += r.focusedSeconds
-                // Keep the most recent title for the task.
+                // Records are sorted oldest-first, so each iteration moves
+                // closer to the latest title — the final write wins.
                 existing.title = r.taskTitle
                 byTask[r.taskId] = existing
             } else {

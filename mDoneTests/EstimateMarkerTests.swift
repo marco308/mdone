@@ -115,6 +115,15 @@ final class EstimateMarkerTests: XCTestCase {
         XCTAssertEqual(EstimateMarker.apply(60.6, to: nil), "<!-- mdone:estimate=61 -->")
     }
 
+    func testApplyClampsTinyPositiveSoMarkerStillParses() {
+        // Without clamping, Int(0.4.rounded()) == 0, which would emit
+        // `mdone:estimate=0` — and `parse` rejects non-positive seconds,
+        // breaking the round-trip.
+        let out = EstimateMarker.apply(0.4, to: nil)
+        XCTAssertEqual(out, "<!-- mdone:estimate=1 -->")
+        XCTAssertEqual(EstimateMarker.parse(out), 1)
+    }
+
     // MARK: - round-trip via VTask
 
     func testRoundTripViaVTaskComputedAccessors() {

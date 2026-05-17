@@ -23,13 +23,17 @@ enum EstimateMarker {
     /// other tools' markers.
     static let pattern = #"<!--\s*mdone:estimate=(\d+)\s*-->"#
 
+    /// Pre-compiled regex reused on every call so we don't re-parse the
+    /// pattern per task render. `try?` matches `RichTextRenderer`'s style
+    /// and keeps SwiftLint happy; a `nil` here would mean the literal
+    /// pattern is malformed, which the marker test suite catches.
+    private static let regex = try? NSRegularExpression(pattern: pattern)
+
     /// Extract the estimated duration (seconds) from a description, or `nil`
     /// if absent / malformed. First match wins if a description somehow
     /// contains more than one marker — `apply` deduplicates on write.
     static func parse(_ description: String?) -> TimeInterval? {
-        guard let description, !description.isEmpty,
-              let regex = try? NSRegularExpression(pattern: pattern)
-        else { return nil }
+        guard let description, !description.isEmpty, let regex else { return nil }
         let range = NSRange(description.startIndex..., in: description)
         guard let match = regex.firstMatch(in: description, range: range),
               match.numberOfRanges >= 2,
@@ -46,7 +50,7 @@ enum EstimateMarker {
     static func strip(_ description: String?) -> String? {
         guard let description else { return nil }
         let source: String
-        if let regex = try? NSRegularExpression(pattern: pattern) {
+        if let regex {
             let range = NSRange(description.startIndex..., in: description)
             source = regex.stringByReplacingMatches(in: description, range: range, withTemplate: "")
         } else {
@@ -66,7 +70,9 @@ enum EstimateMarker {
     static func apply(_ estimate: TimeInterval?, to body: String?) -> String? {
         let cleanBody = strip(body)
         guard let estimate, estimate > 0 else { return cleanBody }
-        let seconds = Int(estimate.rounded())
+        // Clamp to >= 1 so a tiny positive (e.g. 0.4s) doesn't round to 0,
+        // which `parse` would then reject — breaking the round-trip.
+        let seconds = max(1, Int(estimate.rounded()))
         let marker = "<!-- mdone:estimate=\(seconds) -->"
         if let cleanBody, !cleanBody.isEmpty {
             return "\(cleanBody)\n\n\(marker)"

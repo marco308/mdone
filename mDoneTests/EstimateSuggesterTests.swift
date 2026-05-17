@@ -93,9 +93,10 @@ final class EstimateSuggesterTests: XCTestCase {
             HistoricalTask(title: "Fix login bug huge outlier", actualSeconds: 36000)
         ]
         let s = EstimateSuggester.suggestion(for: "Fix login bug", history: history, threshold: 0.2)
-        // Median of [1200,1500,1800,36000] = (1500+1800)/2 = 1650.
-        // Mean would be ~10125 — the outlier must not dominate.
-        XCTAssertEqual(s?.suggestedSeconds, 1650)
+        // Median of [1200,1500,1800,36000] = (1500+1800)/2 = 1650, rounded
+        // up to the next whole minute = 1680. Mean would be ~10125 — the
+        // outlier must not dominate.
+        XCTAssertEqual(s?.suggestedSeconds, 1680)
         XCTAssertLessThan(s!.suggestedSeconds, 5000)
     }
 
@@ -143,15 +144,22 @@ final class EstimateSuggesterTests: XCTestCase {
             projectId: 42,
             threshold: 0.55
         )
-        // The project-match bonus should never *lower* the score; if the
-        // title alone is just under threshold, the bonus can carry it over.
-        if withoutBonus == nil {
-            // Bonus may or may not push over depending on exact scores, but it
-            // must not make a previously-passing match fail.
-            XCTAssertNotNil(withBonus, "Same-project bonus must not reduce score")
+        // The project-match bonus is additive and capped, so it must (a)
+        // never reduce the score (if the title alone passed, the bonus
+        // version must also pass) and (b) never lower the top score for an
+        // already-passing match.
+        if let withoutBonus {
+            XCTAssertNotNil(withBonus, "Same-project bonus must not reject a previously-passing match")
+            if let withBonus {
+                XCTAssertGreaterThanOrEqual(
+                    withBonus.topScore,
+                    withoutBonus.topScore,
+                    "Same-project bonus must not lower an already-passing match's top score"
+                )
+            }
         }
-        XCTAssertTrue(true)
     }
+
 
     func testMetadataBonusCannotRescueACompletelyUnrelatedTitle() {
         let history = [HistoricalTask(

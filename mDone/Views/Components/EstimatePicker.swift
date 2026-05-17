@@ -112,9 +112,14 @@ private struct CustomEstimateSheet: View {
 
     init(estimateSeconds: Binding<TimeInterval?>) {
         _estimateSeconds = estimateSeconds
-        let total = Int((estimateSeconds.wrappedValue ?? 1800) / 60)
-        _hours = State(initialValue: total / 60)
-        _minutes = State(initialValue: total % 60)
+        let totalMinutes = Int((estimateSeconds.wrappedValue ?? 1800) / 60)
+        // Minutes wheel only contains 0..55 in 5-minute increments. A non-
+        // 5-multiple seed (e.g. a fuzzy suggestion like 27m) would have no
+        // matching tag and the picker would render an invalid selection.
+        // Round to the nearest 5 minutes, carrying into hours when needed.
+        let snapped = Int(((Double(totalMinutes) / 5).rounded()) * 5)
+        _hours = State(initialValue: snapped / 60)
+        _minutes = State(initialValue: snapped % 60)
     }
 
     var body: some View {

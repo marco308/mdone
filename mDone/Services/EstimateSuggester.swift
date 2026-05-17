@@ -134,7 +134,12 @@ enum EstimateSuggester {
         }
 
         let top = Array(scored.prefix(topN))
-        let suggested = median(top.map(\.seconds))
+        // Round the median up to the next whole minute so the suggestion
+        // aligns with the UI's minute-granular formatter (and the custom
+        // picker's 5-minute wheel after we round again on edit). A small
+        // bias upward avoids "<1m" leaking into the hint when a few sub-
+        // minute focus blips dominate the median.
+        let suggested = (median(top.map(\.seconds)) / 60).rounded(.up) * 60
         return EstimateSuggestion(
             suggestedSeconds: suggested,
             matchCount: top.count,
