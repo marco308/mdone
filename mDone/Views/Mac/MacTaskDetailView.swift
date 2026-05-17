@@ -220,7 +220,8 @@ struct MacTaskDetailView: View {
             priority: priority,
             projectId: selectedProjectId,
             repeatAfter: repeatInterval,
-            reminders: reminders
+            reminders: reminders,
+            clearDueDate: !hasDueDate
         )
         Task {
             await appState.updateTask(id: task.id, request: request)

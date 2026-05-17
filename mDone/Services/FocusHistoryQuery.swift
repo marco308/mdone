@@ -22,33 +22,43 @@ enum FocusHistoryQuery {
         return (try? context.fetchCount(descriptor)) ?? 0
     }
 
+    /// Most this many recent `FocusRecord` rows feed the suggester. Caps
+    /// the typing-path fetch so a pathological focus history can't tank
+    /// the UI; in practice an active user accrues a few rows per task per
+    /// day, so 500 rows covers a long working memory without truncating
+    /// the realistic "tasks I might do again" set.
+    static let historicalTasksFetchLimit = 500
+
     /// Every task that has recorded focus time, collapsed to one
     /// `HistoricalTask` per task id with its title and *total* focused
-    /// seconds. This is the input the offline `EstimateSuggester` matches a
-    /// new title against — only tasks the user actually spent focused time on
-    /// are eligible, which is our proxy for "completed work with a known
-    /// duration". `FocusRecord` carries `projectName` (display string) but no
-    /// project/label ids, so those weak signals are left unset here; the
-    /// suggester degrades gracefully to title-only matching.
+    /// seconds across the inspected window. This is the input the offline
+    /// `EstimateSuggester` matches a new title against — only tasks the
+    /// user actually spent focused time on are eligible, which is our proxy
+    /// for "completed work with a known duration". `FocusRecord` carries
+    /// `projectName` (display string) but no project/label ids, so those
+    /// weak signals are left unset here; the suggester degrades gracefully
+    /// to title-only matching.
     ///
     /// Runs on the typing-path debounce so it: (a) only fetches the columns
-    /// the suggester actually consumes, and (b) sorts records oldest-first
-    /// so the per-task title we land on is deterministically the most recent
-    /// one (later rows overwrite earlier).
+    /// the suggester actually consumes, (b) caps the row count at
+    /// `historicalTasksFetchLimit` so worst-case fetch is bounded, and
+    /// (c) sorts records newest-first and keeps the first-seen title per
+    /// taskId (so the kept title is deterministically the most recent).
     @MainActor
     static func historicalTasks(in context: ModelContext) -> [HistoricalTask] {
         var descriptor = FetchDescriptor<FocusRecord>(
-            sortBy: [SortDescriptor(\.endedAt, order: .forward)]
+            sortBy: [SortDescriptor(\.endedAt, order: .reverse)]
         )
         descriptor.propertiesToFetch = [\.taskId, \.taskTitle, \.focusedSeconds, \.endedAt]
+        descriptor.fetchLimit = historicalTasksFetchLimit
         guard let records = try? context.fetch(descriptor) else { return [] }
         var byTask: [Int64: (title: String, seconds: TimeInterval)] = [:]
         for r in records {
             if var existing = byTask[r.taskId] {
                 existing.seconds += r.focusedSeconds
-                // Records are sorted oldest-first, so each iteration moves
-                // closer to the latest title — the final write wins.
-                existing.title = r.taskTitle
+                // Title is set from the first sighting (newest record)
+                // because we iterate newest-first; older rows only
+                // contribute their seconds, not a stale title.
                 byTask[r.taskId] = existing
             } else {
                 byTask[r.taskId] = (r.taskTitle, r.focusedSeconds)

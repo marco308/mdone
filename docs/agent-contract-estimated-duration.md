@@ -97,4 +97,4 @@ Content-Type: application/json
 
 ## When to suggest setting an estimate
 
-If you're planning the user's day, suggesting what to do at lunch, or creating tasks on their behalf, **always include an estimate** when you can make a reasonable guess from the task title (e.g. "reply to email" → 300s, "write quarterly review" → 7200s). The user's mDone app uses these to filter and suggest tasks that fit available time windows.
+If you're planning the user's day, suggesting what to do at lunch, or creating tasks on their behalf, **include an estimate when you can make a reasonable guess** from the task title (e.g. "reply to email" → 300s, "write quarterly review" → 7200s). Today the value shows up in mDone's Task Detail screen and feeds the Quick Add bar's "similar tasks took ~Xm" suggestion; future work in mDone may use it to filter tasks that fit available time windows, but you should also use it yourself when planning the user's day from outside the app.

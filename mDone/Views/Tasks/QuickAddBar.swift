@@ -183,6 +183,11 @@ struct QuickAddBar: View {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         let description = EstimateMarker.apply(estimateSeconds, to: nil)
+        // Cancel any in-flight debounce so a suggestion that lands after
+        // submission can't overwrite the now-empty `suggestion` / cause a
+        // flicker against the next task the user starts typing.
+        debounceTask?.cancel()
+        debounceTask = nil
         // Same `@MainActor` pin as `scheduleSuggestion`: this body mutates
         // `@State` after the async create; without explicit isolation a
         // future strict-concurrency mode could move it off-main.
