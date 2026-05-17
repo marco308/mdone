@@ -94,6 +94,11 @@ enum EstimateSuggester {
         threshold: Double = defaultThreshold,
         topN: Int = defaultTopN
     ) -> EstimateSuggestion? {
+        // A caller passing `topN <= 0` would otherwise land us at
+        // `prefix(0)` → empty top → `median([])` → a nonsensical
+        // 0-second "suggestion". Clamp instead so the call still
+        // produces a usable answer with a single best match.
+        let effectiveTopN = max(1, topN)
         let queryTokens = tokenize(title)
         guard !queryTokens.isEmpty, !history.isEmpty else { return nil }
         let queryTrigrams = trigrams(from: queryTokens)
@@ -136,7 +141,7 @@ enum EstimateSuggester {
             return lhs.seconds < rhs.seconds
         }
 
-        let top = Array(scored.prefix(topN))
+        let top = Array(scored.prefix(effectiveTopN))
         // Round the median up to the next whole minute so the suggestion
         // aligns with the UI's minute-granular formatter (and the custom
         // picker's 5-minute wheel after we round again on edit). A small

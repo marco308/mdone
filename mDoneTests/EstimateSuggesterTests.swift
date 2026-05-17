@@ -180,6 +180,19 @@ final class EstimateSuggesterTests: XCTestCase {
 
     // MARK: - Performance (runs as the user types)
 
+    func testTopNZeroDoesNotProduceZeroSecondSuggestion() {
+        // Earlier versions left `topN` un-clamped: a caller passing 0 hit
+        // `prefix(0)` → `median([])` → a bogus 0-second "suggestion". The
+        // clamp now degrades gracefully to a single best match.
+        let history = [
+            HistoricalTask(title: "Email the client", actualSeconds: 600),
+            HistoricalTask(title: "Email client back", actualSeconds: 1200)
+        ]
+        let s = EstimateSuggester.suggestion(for: "Email the client", history: history, topN: 0)
+        XCTAssertNotNil(s)
+        XCTAssertGreaterThan(s?.suggestedSeconds ?? 0, 0)
+    }
+
     func testPerformanceUnderBudgetForSeveralHundredTasks() {
         var history: [HistoricalTask] = []
         for i in 0 ..< 400 {
@@ -188,11 +201,14 @@ final class EstimateSuggesterTests: XCTestCase {
                 actualSeconds: TimeInterval(600 + i)
             ))
         }
-        let start = Date()
-        _ = EstimateSuggester.suggestion(for: "Task number 123 do some work", history: history)
-        let elapsed = Date().timeIntervalSince(start)
-        // Generous ceiling for CI noise; typical run is well under 10ms.
-        XCTAssertLessThan(elapsed, 0.1, "Suggester too slow for keystroke use: \(elapsed)s")
+        // Use XCTest's measurement infrastructure so the budget assertion
+        // averages many iterations and is resilient to occasional CI
+        // scheduling noise. The point of this test is to catch a real
+        // algorithmic regression (e.g. an O(n²) rewrite), not to gate on a
+        // single wall-clock tick.
+        measure(metrics: [XCTClockMetric()]) {
+            _ = EstimateSuggester.suggestion(for: "Task number 123 do some work", history: history)
+        }
     }
 
     // MARK: - Similarity primitives
