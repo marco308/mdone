@@ -18,9 +18,11 @@ struct QuickAddBar: View {
     /// suggestion can't briefly display against an unrelated title during
     /// the 250ms debounce window before the next lookup fires.
     @State private var suggestionForTitle: String?
-    /// Trimmed title the user explicitly dismissed the hint for, so we don't
-    /// nag them again *for that title* — clears once they type something
-    /// different.
+    /// Trimmed title the user explicitly dismissed the hint for. The hint
+    /// stays hidden whenever the current title matches it (we don't nag
+    /// them about the same task again) and re-appears when they switch to a
+    /// different title. If they later type the dismissed title verbatim
+    /// the dismissal still applies; full reset happens on add.
     @State private var dismissedTitle: String?
     /// Debounce token — only the latest keystroke's task computes a suggestion.
     @State private var debounceTask: Task<Void, Never>?
@@ -181,7 +183,10 @@ struct QuickAddBar: View {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         let description = EstimateMarker.apply(estimateSeconds, to: nil)
-        Task {
+        // Same `@MainActor` pin as `scheduleSuggestion`: this body mutates
+        // `@State` after the async create; without explicit isolation a
+        // future strict-concurrency mode could move it off-main.
+        Task { @MainActor in
             await appState.createTask(
                 title: trimmed,
                 projectId: projectId,

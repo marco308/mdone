@@ -67,6 +67,24 @@ final class EstimateMarkerTests: XCTestCase {
         XCTAssertNil(EstimateMarker.strip("<!-- mdone:estimate=300 -->"))
     }
 
+    func testStripPreservesLeadingWhitespaceWhenNoMarker() {
+        // User-intentional leading whitespace (indentation, a blank line
+        // they typed deliberately) must survive a no-marker strip — earlier
+        // versions of `strip` trimmed both ends and silently rewrote bodies.
+        XCTAssertEqual(EstimateMarker.strip("  hello"), "  hello")
+        XCTAssertEqual(EstimateMarker.strip("\n\nhello"), "\n\nhello")
+    }
+
+    func testStripDoesNotConcatenateWordsAroundInlineMarker() {
+        // An agent that drops the marker mid-body must not cause `strip` to
+        // glue the adjacent words together — replacement inserts a single
+        // space so word boundaries survive.
+        let input = "foo <!-- mdone:estimate=600 --> bar"
+        let stripped = EstimateMarker.strip(input) ?? ""
+        XCTAssertFalse(stripped.contains("foobar"), "Inline marker removal must not concatenate words")
+        XCTAssertTrue(stripped.contains("foo") && stripped.contains("bar"))
+    }
+
     // MARK: - apply
 
     func testApplyWithNilEstimateAndNilBodyReturnsNil() {
