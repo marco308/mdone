@@ -124,9 +124,20 @@ private struct CustomEstimateSheet: View {
         // The guard is on the original seconds — not on `totalMinutes` —
         // because anything 0 < seed < 60s already has totalMinutes == 0.
         if seed > 0, snapped == 0 { snapped = 5 }
-        _hours = State(initialValue: snapped / 60)
-        _minutes = State(initialValue: snapped % 60)
+        // Clamp into the picker's representable range so an agent-set
+        // estimate larger than the hours wheel (currently up to 12h) lands
+        // on a valid tag instead of leaving the picker in a no-selection
+        // state. The wire-format value remains whatever was set; this only
+        // affects what gets seeded into the wheels.
+        let clampedHours = min(snapped / 60, Self.maxHours)
+        let clampedMinutes = clampedHours == Self.maxHours ? 0 : snapped % 60
+        _hours = State(initialValue: clampedHours)
+        _minutes = State(initialValue: clampedMinutes)
     }
+
+    /// Inclusive upper bound for the hours wheel — kept in one place so the
+    /// init's clamp and the picker's `ForEach` range can't drift apart.
+    fileprivate static let maxHours = 12
 
     var body: some View {
         NavigationStack {
@@ -134,7 +145,7 @@ private struct CustomEstimateSheet: View {
                 Section("Estimated duration") {
                     HStack {
                         Picker("Hours", selection: $hours) {
-                            ForEach(0 ..< 13) { Text("\($0) h").tag($0) }
+                            ForEach(0 ... CustomEstimateSheet.maxHours, id: \.self) { Text("\($0) h").tag($0) }
                         }
                         #if os(iOS)
                         .pickerStyle(.wheel)

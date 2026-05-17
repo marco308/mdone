@@ -106,6 +106,7 @@ struct QuickAddBar: View {
             Image(systemName: "sparkle.magnifyingglass")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             Button {
                 estimateSeconds = s.suggestedSeconds
             } label: {
