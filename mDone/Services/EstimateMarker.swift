@@ -17,11 +17,13 @@ import Foundation
 /// the standard Vikunja description field. No proprietary endpoint, no custom
 /// field, no label namespace.
 enum EstimateMarker {
-    /// Matches one marker. The capture group is the integer seconds.
-    /// Tolerates surrounding whitespace inside the comment but the prefix
-    /// `mdone:estimate=` is exact (case-sensitive) so we don't collide with
-    /// other tools' markers.
-    static let pattern = #"<!--\s*mdone:estimate=(\d+)\s*-->"#
+    /// Matches one marker and any whitespace immediately surrounding it,
+    /// so `strip` cleans up the blank line we insert on `apply` without
+    /// touching user-intentional whitespace elsewhere in the body. The
+    /// capture group is the integer seconds. Tolerates surrounding
+    /// whitespace inside the comment but `mdone:estimate=` is exact
+    /// (case-sensitive) so we don't collide with other tools' markers.
+    static let pattern = #"\s*<!--\s*mdone:estimate=(\d+)\s*-->\s*"#
 
     /// Pre-compiled regex reused on every call so we don't re-parse the
     /// pattern per task render. `try?` matches `RichTextRenderer`'s style
@@ -44,9 +46,11 @@ enum EstimateMarker {
         return seconds
     }
 
-    /// The description with the marker(s) removed and trailing whitespace
-    /// trimmed. Returns `nil` for an empty / whitespace-only body so callers
-    /// can treat "marker-only" descriptions as "no body".
+    /// The description with the marker(s) and the whitespace immediately
+    /// around them removed. User-intentional whitespace elsewhere in the
+    /// body (leading indentation, deliberate blank lines between paragraphs)
+    /// is preserved. Returns `nil` for an empty / whitespace-only body so
+    /// callers can treat "marker-only" descriptions as "no body".
     static func strip(_ description: String?) -> String? {
         guard let description else { return nil }
         let source: String
@@ -56,8 +60,10 @@ enum EstimateMarker {
         } else {
             source = description
         }
-        let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+        if source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return nil
+        }
+        return source
     }
 
     /// Compose a wire description from a visible body and an estimate.

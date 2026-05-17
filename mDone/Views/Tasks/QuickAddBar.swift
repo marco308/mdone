@@ -158,7 +158,11 @@ struct QuickAddBar: View {
             return
         }
 
-        debounceTask = Task {
+        // Explicit `@MainActor`: `historicalTasks` and the `@State` mutations
+        // below are all main-actor isolated, and inferred inheritance via
+        // plain `Task {}` would not survive a future move to strict
+        // concurrency. Cross-actor at the boundary, not inside the hot path.
+        debounceTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(250))
             if Task.isCancelled { return }
             let history = FocusHistoryQuery.historicalTasks(in: modelContext)

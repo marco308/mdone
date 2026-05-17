@@ -97,6 +97,9 @@ enum EstimateSuggester {
         let queryTokens = tokenize(title)
         guard !queryTokens.isEmpty, !history.isEmpty else { return nil }
         let queryTrigrams = trigrams(from: queryTokens)
+        // Hoist the query token set out of the loop — it's invariant per
+        // suggestion call and otherwise gets rebuilt for every candidate.
+        let queryTokenSet = Set(queryTokens)
 
         // Score every candidate, keep those above threshold.
         var scored: [(score: Double, seconds: TimeInterval)] = []
@@ -105,7 +108,7 @@ enum EstimateSuggester {
             let candTokens = tokenize(task.title)
             if candTokens.isEmpty { continue }
             let tri = dice(queryTrigrams, trigrams(from: candTokens))
-            let tok = jaccard(Set(queryTokens), Set(candTokens))
+            let tok = jaccard(queryTokenSet, Set(candTokens))
             var score = trigramWeight * tri + tokenWeight * tok
 
             // Weak metadata signals — additive, capped, never decisive.

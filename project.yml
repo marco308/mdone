@@ -47,9 +47,10 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_EMIT_LOC_STRINGS: "YES"
-        # XcodeGen 2.45.4 + the stale xcodeVersion below stopped emitting an
-        # iOS SDKROOT, so the build system treated this target as macOS-only
-        # and no simulator destinations resolved. Pin it explicitly.
+        # XcodeGen 2.45.4 stopped emitting an iOS SDKROOT for app targets
+        # (used to be inferred when `options.xcodeVersion` was current), so
+        # the build system was treating this target as macOS-only and no
+        # simulator destinations resolved. Pin it explicitly.
         SDKROOT: iphoneos
         SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
         TARGETED_DEVICE_FAMILY: "1,2"
