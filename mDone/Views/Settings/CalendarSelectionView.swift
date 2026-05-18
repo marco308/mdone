@@ -60,6 +60,10 @@ struct CalendarSelectionView: View {
             }
             .task {
                 calendars = await appState.availableCalendars()
+                // Drop hidden entries for calendars that no longer exist, then
+                // read the persisted set back so the toggles always reflect
+                // exactly what the store holds.
+                store.prune(toExisting: Set(calendars.map(\.id)))
                 hidden = store.hiddenIdentifiers
                 isLoading = false
             }

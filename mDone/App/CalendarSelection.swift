@@ -21,7 +21,13 @@ struct CalendarInfo: Identifiable, Hashable {
         color = ekCalendar.cgColor
     }
 
-    // MARK: - Hashable (identity by id only — CGColor isn't Hashable)
+    // MARK: - Hashable
+
+    // Equality and hashing both use id + title (CGColor isn't Hashable, so
+    // colour is intentionally excluded). Comparing title as well as id means
+    // a renamed calendar is treated as changed, which the selection UI relies
+    // on to re-render. `==` and `hash` stay in sync: equal values always hash
+    // equally.
 
     static func == (lhs: CalendarInfo, rhs: CalendarInfo) -> Bool {
         lhs.id == rhs.id && lhs.title == rhs.title
@@ -29,6 +35,7 @@ struct CalendarInfo: Identifiable, Hashable {
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+        hasher.combine(title)
     }
 }
 

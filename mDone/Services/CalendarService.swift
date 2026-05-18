@@ -21,12 +21,10 @@ actor CalendarService {
         }
     }
 
-    /// All event calendars the user has, for the selection UI. Also prunes
-    /// hidden entries for calendars that no longer exist.
+    /// All event calendars the user has, for the selection UI. Pure read —
+    /// pruning of stale hidden ids is done explicitly by the caller.
     func availableCalendars() -> [CalendarInfo] {
-        let calendars = eventStore.calendars(for: .event)
-        hiddenStore.prune(toExisting: Set(calendars.map(\.calendarIdentifier)))
-        return calendars
+        eventStore.calendars(for: .event)
             .map(CalendarInfo.init(from:))
             .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
     }
