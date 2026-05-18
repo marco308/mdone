@@ -55,6 +55,10 @@ struct CalendarScreen: View {
         .task(id: displayedMonth) {
             monthCalendarEvents = await appState.calendarEventsForMonth(displayedMonth)
         }
+        .task(id: appState.calendarFilterToken) {
+            dayCalendarEvents = await appState.calendarEventsForDate(selectedDate)
+            monthCalendarEvents = await appState.calendarEventsForMonth(displayedMonth)
+        }
     }
 
     private var calendarAccessBanner: some View {

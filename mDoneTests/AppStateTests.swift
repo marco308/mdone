@@ -35,6 +35,27 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(AppState.uniquedById([]).count, 0)
     }
 
+    // MARK: - Calendar selection (#69)
+
+    func testCalendarSelectionDidChangeBumpsFilterToken() async {
+        let appState = AppState()
+        let before = appState.calendarFilterToken
+        await appState.calendarSelectionDidChange()
+        XCTAssertNotEqual(
+            appState.calendarFilterToken,
+            before,
+            "Toggling a calendar must change the token so calendar views re-query"
+        )
+    }
+
+    func testCalendarSelectionTokenChangesEachCall() async {
+        let appState = AppState()
+        await appState.calendarSelectionDidChange()
+        let first = appState.calendarFilterToken
+        await appState.calendarSelectionDidChange()
+        XCTAssertNotEqual(appState.calendarFilterToken, first)
+    }
+
     // MARK: - tasksForProject with duplicate-cache regression (issue #54)
 
     /// Reproduces the crash that issue #54 reported. Before the fix, `tasksForProject`

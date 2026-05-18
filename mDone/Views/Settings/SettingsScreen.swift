@@ -35,6 +35,14 @@ struct SettingsScreen: View {
                 }
             }
 
+            Section("Calendar") {
+                NavigationLink {
+                    CalendarSelectionView()
+                } label: {
+                    Label("Calendars in mDone", systemImage: "calendar")
+                }
+            }
+
             Section("Notifications") {
                 Toggle("Enable Reminders", isOn: $notificationsEnabled)
                     .onChange(of: notificationsEnabled) { _, newValue in
