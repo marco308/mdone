@@ -3,6 +3,11 @@ import Foundation
 
 actor CalendarService {
     private let eventStore = EKEventStore()
+    private let hiddenStore: HiddenCalendarStore
+
+    init(hiddenStore: HiddenCalendarStore = HiddenCalendarStore()) {
+        self.hiddenStore = hiddenStore
+    }
 
     var authorizationStatus: EKAuthorizationStatus {
         EKEventStore.authorizationStatus(for: .event)
@@ -16,11 +21,20 @@ actor CalendarService {
         }
     }
 
+    /// All event calendars the user has, for the selection UI. Pure read —
+    /// pruning of stale hidden ids is done explicitly by the caller.
+    func availableCalendars() -> [CalendarInfo] {
+        eventStore.calendars(for: .event)
+            .map(CalendarInfo.init(from:))
+            .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+    }
+
     func fetchEvents(from startDate: Date, to endDate: Date) -> [CalendarEvent] {
         let predicate = eventStore.predicateForEvents(withStart: startDate, end: endDate, calendars: nil)
         let ekEvents = eventStore.events(matching: predicate)
-        return ekEvents.map { CalendarEvent(from: $0) }
+        let events = ekEvents.map { CalendarEvent(from: $0) }
             .sorted { $0.startDate < $1.startDate }
+        return hiddenStore.visibleEvents(events)
     }
 
     /// Fetch events for a single day

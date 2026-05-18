@@ -49,10 +49,14 @@ struct CalendarScreen: View {
         .task {
             await appState.requestCalendarAccess()
         }
-        .task(id: selectedDate) {
+        // Folding the filter token into each id means the day refetches only
+        // when the day or the calendar selection changes (likewise the month),
+        // and every task fires exactly once on first appear — no duplicate
+        // EventKit reads.
+        .task(id: CalendarFetchKey(date: selectedDate, token: appState.calendarFilterToken)) {
             dayCalendarEvents = await appState.calendarEventsForDate(selectedDate)
         }
-        .task(id: displayedMonth) {
+        .task(id: CalendarFetchKey(date: displayedMonth, token: appState.calendarFilterToken)) {
             monthCalendarEvents = await appState.calendarEventsForMonth(displayedMonth)
         }
     }
@@ -87,4 +91,11 @@ struct CalendarScreen: View {
         .padding(.vertical, 8)
         .background(.ultraThinMaterial)
     }
+}
+
+/// Composite `.task(id:)` key so an event fetch re-runs when either the
+/// date (day or month) or the visible-calendar selection changes.
+private struct CalendarFetchKey: Hashable {
+    let date: Date
+    let token: UUID
 }

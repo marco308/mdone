@@ -35,6 +35,11 @@ final class AppState {
     var calendarAccessGranted: Bool = false
     private let calendarService = CalendarService()
 
+    /// Changes whenever the visible-calendar selection changes. Calendar
+    /// views key their event fetch on this so toggling a calendar refreshes
+    /// the grid and day list immediately, not just the Today view.
+    private(set) var calendarFilterToken = UUID()
+
     var onTaskCompleted: ((Int64) -> Void)?
     var onTaskDeleted: ((Int64) -> Void)?
 
@@ -549,6 +554,20 @@ final class AppState {
     func calendarEventsForMonth(_ date: Date) async -> [Date: [CalendarEvent]] {
         guard calendarAccessGranted else { return [:] }
         return await calendarService.eventsForMonth(date)
+    }
+
+    /// Event calendars available for the "Show in mDone" selection screen.
+    func availableCalendars() async -> [CalendarInfo] {
+        guard calendarAccessGranted else { return [] }
+        return await calendarService.availableCalendars()
+    }
+
+    /// Call after the user changes which calendars are visible. Bumps the
+    /// token so calendar views re-query, and refreshes the Today window.
+    @MainActor
+    func calendarSelectionDidChange() async {
+        calendarFilterToken = UUID()
+        await refreshCalendarEvents()
     }
 
     var todayCalendarEvents: [CalendarEvent] {
