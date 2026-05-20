@@ -5,7 +5,23 @@ struct SettingsScreen: View {
     @AppStorage("notificationsEnabled") private var notificationsEnabled = false
     @AppStorage("reminderOffset") private var reminderOffset = 30
     @AppStorage(WeekStartPreference.storageKey) private var firstWeekday = WeekStartPreference.system.rawValue
+    @AppStorage(DueDateDefaults.storageKey) private var defaultDueMinutes = DueDateDefaults.defaultMinutes
     @State private var showLogoutConfirm = false
+
+    private var defaultDueTimeBinding: Binding<Date> {
+        Binding(
+            get: {
+                let calendar = Calendar.current
+                let hour = max(0, min(defaultDueMinutes, 24 * 60 - 1)) / 60
+                let minute = max(0, min(defaultDueMinutes, 24 * 60 - 1)) % 60
+                return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: Date()) ?? Date()
+            },
+            set: { newValue in
+                let components = Calendar.current.dateComponents([.hour, .minute], from: newValue)
+                defaultDueMinutes = (components.hour ?? 0) * 60 + (components.minute ?? 0)
+            }
+        )
+    }
 
     private var serverURL: String {
         AuthService.shared.getServerURL() ?? "Not configured"
@@ -33,6 +49,18 @@ struct SettingsScreen: View {
                         Text(preference.label).tag(preference.rawValue)
                     }
                 }
+            }
+
+            Section {
+                DatePicker(
+                    "Default due time",
+                    selection: defaultDueTimeBinding,
+                    displayedComponents: .hourAndMinute
+                )
+            } header: {
+                Text("Tasks")
+            } footer: {
+                Text("Used for tasks created with a date but no specific time, so they don't appear overdue immediately.")
             }
 
             Section("Calendar") {

@@ -107,7 +107,7 @@ struct TaskDetailSheet: View {
                         DatePicker(
                             "Date",
                             selection: Binding(
-                                get: { dueDate ?? Date() },
+                                get: { dueDate ?? DueDateDefaults.apply(to: Calendar.current.startOfDay(for: Date())) },
                                 set: { dueDate = $0 }
                             ),
                             displayedComponents: [.date, .hourAndMinute]
@@ -214,7 +214,9 @@ struct TaskDetailSheet: View {
         let request = TaskUpdateRequest(
             title: title,
             description: composedDescription,
-            dueDate: hasDueDate ? (dueDate ?? Date()) : nil,
+            dueDate: hasDueDate
+                ? (dueDate ?? DueDateDefaults.apply(to: Calendar.current.startOfDay(for: Date())))
+                : nil,
             priority: priority,
             projectId: selectedProjectId,
             repeatAfter: repeatInterval,
