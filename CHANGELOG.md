@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - Settings → Calendar → "Calendars in mDone" lets you choose which device calendars contribute events to mDone's Calendar and Today views. Turn off shared family or work calendars you don't want cluttering your task context; new calendars show by default until you hide them (#69).
+- Settings → Tasks: "Default due time" picks the time of day applied to tasks you add to Today without typing a time (9 AM / noon / 5 PM / 6 PM / 9 PM / End of day). Defaults to 6 PM, matching Vikunja's web client (#81).
+
+### Fixed
+- Quick-adding a task on the Today list no longer makes it instantly overdue. Tasks added without an explicit time now use the configured default due time (6 PM by default) instead of midnight (#81).
 
 ## [1.3.0] - 2026-05-17
 

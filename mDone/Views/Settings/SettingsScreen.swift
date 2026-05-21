@@ -5,6 +5,7 @@ struct SettingsScreen: View {
     @AppStorage("notificationsEnabled") private var notificationsEnabled = false
     @AppStorage("reminderOffset") private var reminderOffset = 30
     @AppStorage(WeekStartPreference.storageKey) private var firstWeekday = WeekStartPreference.system.rawValue
+    @AppStorage(DefaultDueTimePreference.storageKey) private var defaultDueTime = DefaultDueTimePreference.defaultRawValue
     @State private var showLogoutConfirm = false
 
     private var serverURL: String {
@@ -33,6 +34,18 @@ struct SettingsScreen: View {
                         Text(preference.label).tag(preference.rawValue)
                     }
                 }
+            }
+
+            Section {
+                Picker("Default due time", selection: $defaultDueTime) {
+                    ForEach(DefaultDueTimePreference.allCases.filter { $0 != .unset }) { preference in
+                        Text(preference.label).tag(preference.rawValue)
+                    }
+                }
+            } header: {
+                Text("Tasks")
+            } footer: {
+                Text("Used when you add a task to Today without picking a time, so it isn't marked overdue immediately.")
             }
 
             Section("Calendar") {
