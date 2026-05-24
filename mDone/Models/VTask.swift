@@ -29,14 +29,6 @@ struct VTask: Codable, Identifiable, Hashable {
     var bucketId: Int64?
     var coverImageAttachmentId: Int64?
 
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
-
-    static func == (lhs: VTask, rhs: VTask) -> Bool {
-        lhs.id == rhs.id
-    }
-
     var priorityLevel: PriorityLevel {
         PriorityLevel(rawValue: Int(priority)) ?? .none
     }

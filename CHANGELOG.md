@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - Settings → Calendar → "Calendars in mDone" lets you choose which device calendars contribute events to mDone's Calendar and Today views. Turn off shared family or work calendars you don't want cluttering your task context; new calendars show by default until you hide them (#69).
 
+### Fixed
+- Edits to a task's description (and other fields) now appear immediately. Previously the task detail sheet would still show the old value until the app was force-quit and reopened, because `VTask` equality only compared by ID — SwiftUI saw "no change" and skipped re-rendering. The local SwiftData cache is also now written on every task mutation, so cold launches see the latest data even before the first refresh completes (#84).
+
 ## [1.3.0] - 2026-05-17
 
 ### Added
