@@ -2,7 +2,9 @@ import SwiftUI
 
 struct ServerSetupView: View {
     @Environment(AppState.self) private var appState
-    @State private var serverURL = ""
+    // When the session expires we keep the server URL in AuthService so the
+    // user doesn't have to retype it — prefill it here on appear (issue #80).
+    @State private var serverURL = AuthService.shared.getServerURL() ?? ""
     @State private var username = ""
     @State private var password = ""
     @State private var apiToken = ""

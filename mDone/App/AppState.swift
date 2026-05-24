@@ -70,6 +70,25 @@ final class AppState {
         isRetrying = await APIClient.shared.isRetrying
     }
 
+    init() {
+        // Wire APIClient → AppState so refreshed tokens land in the keychain
+        // and unrecoverable 401s push the user back to the login screen
+        // without nuking the saved server URL.
+        Task { [weak self] in
+            await APIClient.shared.setOnTokensUpdated { token, refreshToken in
+                AuthService.shared.saveToken(token)
+                if let refreshToken {
+                    AuthService.shared.saveRefreshToken(refreshToken)
+                }
+            }
+            await APIClient.shared.setOnSessionExpired { [weak self] in
+                Task { @MainActor [weak self] in
+                    await self?.expireSession()
+                }
+            }
+        }
+    }
+
     func configureSyncService(_ syncService: SyncService, networkMonitor: NetworkMonitor) {
         self.syncService = syncService
         self.networkMonitor = networkMonitor
@@ -168,7 +187,11 @@ final class AppState {
     func configureAPIClient() async {
         guard let serverURL = authService.getServerURL(),
               let token = authService.getToken() else { return }
-        await APIClient.shared.configure(serverURL: serverURL, token: token)
+        await APIClient.shared.configure(
+            serverURL: serverURL,
+            token: token,
+            refreshToken: authService.getRefreshToken()
+        )
     }
 
     @MainActor
@@ -211,12 +234,20 @@ final class AppState {
         let url = serverURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         await APIClient.shared.configure(serverURL: url, token: "")
 
-        // Get JWT token via login endpoint
+        // Get JWT token via login endpoint. The Vikunja 2.0+ `Set-Cookie:
+        // vikunja_refresh_token=…` header is captured inside APIClient as part
+        // of the response — we read it back after this call to persist it.
         let loginRequest = LoginRequest(username: username, password: password)
         let loginResponse: LoginResponse = try await APIClient.shared.send(Endpoint.login, body: loginRequest)
+        let capturedRefreshToken = await APIClient.shared.currentRefreshToken()
 
-        // Configure with the JWT token
-        await APIClient.shared.configure(serverURL: url, token: loginResponse.token)
+        // Configure with the JWT token + refresh cookie so subsequent requests
+        // (and the 401 retry path) have everything they need.
+        await APIClient.shared.configure(
+            serverURL: url,
+            token: loginResponse.token,
+            refreshToken: capturedRefreshToken
+        )
 
         // Validate
         let projects: [Project] = try await APIClient.shared.fetch(Endpoint.projects())
@@ -226,6 +257,9 @@ final class AppState {
 
         authService.saveServerURL(url)
         authService.saveToken(loginResponse.token)
+        if let capturedRefreshToken {
+            authService.saveRefreshToken(capturedRefreshToken)
+        }
         isAuthenticated = true
     }
 
@@ -235,6 +269,25 @@ final class AppState {
         print("[mDone] logout() called")
         #endif
         authService.clearAll()
+        await tearDownSession()
+    }
+
+    /// Called when the server stops accepting our credentials (refresh failed,
+    /// API token revoked, etc.). Drops the session creds but keeps the server
+    /// URL so the user only has to re-enter their password on the next launch.
+    /// Issue #80: previously a stale JWT triggered a full `clearAll()`, which
+    /// wiped the server URL too.
+    @MainActor
+    func expireSession() async {
+        #if DEBUG
+        print("[mDone] expireSession() called")
+        #endif
+        authService.clearSession()
+        await tearDownSession()
+    }
+
+    @MainActor
+    private func tearDownSession() async {
         await APIClient.shared.clearCredentials()
         tasks = []
         projects = []
@@ -315,9 +368,9 @@ final class AppState {
             #endif
             if case .unauthorized = error {
                 #if DEBUG
-                print("[mDone] refreshAll: got .unauthorized, calling logout()")
+                print("[mDone] refreshAll: got .unauthorized, expiring session")
                 #endif
-                await logout()
+                await expireSession()
             }
             handleError(error)
         } catch {
@@ -344,7 +397,7 @@ final class AppState {
             activeError = nil
         } catch let error as NetworkError {
             if case .unauthorized = error {
-                await logout()
+                await expireSession()
             }
             handleError(error)
         } catch {
@@ -365,7 +418,7 @@ final class AppState {
             activeError = nil
         } catch let error as NetworkError {
             if case .unauthorized = error {
-                await logout()
+                await expireSession()
             }
             handleError(error)
         } catch {

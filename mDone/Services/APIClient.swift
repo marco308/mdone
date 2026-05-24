@@ -6,6 +6,8 @@ actor APIClient {
     private let encoder: JSONEncoder
     private var serverURL: String?
     private var apiToken: String?
+    private var refreshToken: String?
+    private var isJWTSession: Bool = false
 
     /// Whether a request is currently being retried after a transient failure.
     /// Callers can observe this to show retry state in the UI.
@@ -13,6 +15,22 @@ actor APIClient {
 
     private let maxRetries = 3
     private let baseRetryDelay: UInt64 = 1_000_000_000 // 1 second in nanoseconds
+    private static let refreshCookieName = "vikunja_refresh_token"
+
+    /// Fired when the access token (and optionally its refresh cookie) change
+    /// because of a `/login` response or a refresh-on-401. Callers should
+    /// persist both to the keychain so the new credentials survive relaunch.
+    private var onTokensUpdated: (@Sendable (_ token: String, _ refreshToken: String?) -> Void)?
+
+    /// Fired when a 401 cannot be recovered via refresh (no refresh token,
+    /// API-token session, or refresh itself returned 401). Callers should
+    /// clear the session and present the login screen.
+    private var onSessionExpired: (@Sendable () -> Void)?
+
+    /// Deduplicates concurrent refresh attempts. The first 401-handler kicks
+    /// off the refresh; subsequent handlers `await` the same task instead of
+    /// racing each other with the now-invalidated cookie.
+    private var inFlightRefresh: Task<Void, Error>?
 
     static let shared = APIClient()
 
@@ -45,15 +63,33 @@ actor APIClient {
         encoder.dateEncodingStrategy = .iso8601
     }
 
-    func configure(serverURL: String, token: String) {
+    func configure(serverURL: String, token: String, refreshToken: String? = nil) {
         self.serverURL = serverURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         apiToken = token
+        self.refreshToken = refreshToken
+        isJWTSession = JWTHelpers.isJWT(token)
     }
 
     func clearCredentials() {
         serverURL = nil
         apiToken = nil
+        refreshToken = nil
+        isJWTSession = false
     }
+
+    func setOnTokensUpdated(_ handler: @Sendable @escaping (_ token: String, _ refreshToken: String?) -> Void) {
+        onTokensUpdated = handler
+    }
+
+    func setOnSessionExpired(_ handler: @Sendable @escaping () -> Void) {
+        onSessionExpired = handler
+    }
+
+    /// Test/inspection hook for the currently stored refresh token.
+    func currentRefreshToken() -> String? { refreshToken }
+
+    /// Test/inspection hook for the currently stored access token.
+    func currentToken() -> String? { apiToken }
 
     private func buildRequest(for endpoint: Endpoint) throws -> URLRequest {
         guard let serverURL else { throw NetworkError.invalidURL }
@@ -125,6 +161,10 @@ actor APIClient {
                 guard let httpResponse = response as? HTTPURLResponse else {
                     throw NetworkError.unknown(URLError(.badServerResponse))
                 }
+
+                // Auto-capture the refresh cookie whenever the server sets it
+                // (login + refresh both emit it; the old value is invalidated).
+                captureRefreshCookie(from: httpResponse, requestURL: request.url)
 
                 // If the status code is retryable and we have retries left, back off and retry.
                 if isRetryableStatusCode(httpResponse.statusCode), attempt < maxRetries {
@@ -207,11 +247,142 @@ actor APIClient {
         }
     }
 
+    // MARK: - Refresh
+
+    /// Runs the request once, and if it returns 401 attempts a single token
+    /// refresh + retry. Falls back to surfacing `.unauthorized` and notifying
+    /// `onSessionExpired` if recovery isn't possible.
+    private func executeWithRefresh(
+        _ build: () throws -> URLRequest
+    ) async throws -> (Data, HTTPURLResponse) {
+        let request = try build()
+        let (data, httpResponse) = try await performRequest(request)
+
+        // Fast path: not unauthorized, return as-is.
+        if httpResponse.statusCode != 401 {
+            return (data, httpResponse)
+        }
+
+        // 401 with no refresh capability — let the caller see it.
+        guard isJWTSession, refreshToken != nil else {
+            notifySessionExpired()
+            return (data, httpResponse)
+        }
+
+        // Try to refresh the JWT once. If that fails, surface the original 401.
+        // Snapshot the token we used so we can tell whether someone else
+        // already refreshed for us while we were awaiting elsewhere.
+        let tokenBeforeRefresh = apiToken
+        do {
+            try await sharedRefresh()
+        } catch {
+            notifySessionExpired()
+            return (data, httpResponse)
+        }
+
+        // If neither our refresh nor a concurrent one updated the token, the
+        // session is unrecoverable.
+        guard apiToken != tokenBeforeRefresh else {
+            notifySessionExpired()
+            return (data, httpResponse)
+        }
+
+        // Rebuild the request so the new bearer token is attached, then retry.
+        let retryRequest = try build()
+        return try await performRequest(retryRequest)
+    }
+
+    /// Single-flight wrapper around `performRefresh()`. Concurrent callers
+    /// `await` the same in-flight task so they don't each try to spend the
+    /// already-rotated refresh cookie.
+    private func sharedRefresh() async throws {
+        if let inFlightRefresh {
+            try await inFlightRefresh.value
+            return
+        }
+        let task = Task<Void, Error> { [weak self] in
+            guard let self else { return }
+            try await self.performRefresh()
+        }
+        inFlightRefresh = task
+        defer { inFlightRefresh = nil }
+        try await task.value
+    }
+
+    /// Calls Vikunja's refresh endpoint with the stored refresh-token cookie.
+    /// Updates the stored access token (and the rotated refresh cookie) on
+    /// success; throws `NetworkError.unauthorized` on failure.
+    private func performRefresh() async throws {
+        guard let serverURL,
+              let refreshToken,
+              let url = URL(string: serverURL + Endpoint.refreshToken.path)
+        else {
+            throw NetworkError.unauthorized
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = Endpoint.refreshToken.method.rawValue
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("\(Self.refreshCookieName)=\(refreshToken)", forHTTPHeaderField: "Cookie")
+
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            throw NetworkError.unauthorized
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.unauthorized
+        }
+
+        // Capture the rotated cookie even on non-2xx so a future attempt with
+        // a valid cookie can still recover; the server invalidates the old one
+        // either way.
+        captureRefreshCookie(from: httpResponse, requestURL: url)
+
+        guard (200 ... 299).contains(httpResponse.statusCode) else {
+            throw NetworkError.unauthorized
+        }
+
+        let loginResponse: LoginResponse
+        do {
+            loginResponse = try decoder.decode(LoginResponse.self, from: data)
+        } catch {
+            throw NetworkError.unauthorized
+        }
+
+        apiToken = loginResponse.token
+        isJWTSession = JWTHelpers.isJWT(loginResponse.token)
+        onTokensUpdated?(loginResponse.token, self.refreshToken)
+    }
+
+    /// Reads the `vikunja_refresh_token` cookie from a response and stores it.
+    /// Callers that pair the cookie with a new access token (login, refresh)
+    /// are responsible for firing `onTokensUpdated` so both get persisted.
+    private func captureRefreshCookie(from response: HTTPURLResponse, requestURL: URL?) {
+        guard let requestURL,
+              let headers = response.allHeaderFields as? [String: String]
+        else { return }
+        let cookies = HTTPCookie.cookies(withResponseHeaderFields: headers, for: requestURL)
+        guard let cookie = cookies.first(where: { $0.name == Self.refreshCookieName }),
+              !cookie.value.isEmpty,
+              cookie.value != refreshToken
+        else { return }
+        refreshToken = cookie.value
+    }
+
+    private func notifySessionExpired() {
+        guard let handler = onSessionExpired else { return }
+        // Drop the refresh token so we don't loop forever on the same 401.
+        refreshToken = nil
+        handler()
+    }
+
     // MARK: - Public API
 
     func fetch<T: Decodable>(_ endpoint: Endpoint) async throws -> T {
-        let request = try buildRequest(for: endpoint)
-        let (data, httpResponse) = try await performRequest(request)
+        let (data, httpResponse) = try await executeWithRefresh { try self.buildRequest(for: endpoint) }
         let responseData = try handleResponse(data: data, httpResponse: httpResponse)
 
         do {
@@ -231,8 +402,7 @@ actor APIClient {
 
         while true {
             let endpoint = endpointBuilder(page, perPage)
-            let request = try buildRequest(for: endpoint)
-            let (data, httpResponse) = try await performRequest(request)
+            let (data, httpResponse) = try await executeWithRefresh { try self.buildRequest(for: endpoint) }
             let responseData = try handleResponse(data: data, httpResponse: httpResponse)
 
             let items: [T]
@@ -252,10 +422,12 @@ actor APIClient {
     }
 
     func send<R: Decodable>(_ endpoint: Endpoint, body: some Encodable) async throws -> R {
-        var request = try buildRequest(for: endpoint)
-        request.httpBody = try encoder.encode(body)
-
-        let (data, httpResponse) = try await performRequest(request)
+        let bodyData = try encoder.encode(body)
+        let (data, httpResponse) = try await executeWithRefresh {
+            var request = try self.buildRequest(for: endpoint)
+            request.httpBody = bodyData
+            return request
+        }
         let responseData = try handleResponse(data: data, httpResponse: httpResponse)
 
         do {
@@ -266,25 +438,27 @@ actor APIClient {
     }
 
     func sendExpectingEmpty(_ endpoint: Endpoint, body: some Encodable) async throws {
-        var request = try buildRequest(for: endpoint)
-        request.httpBody = try encoder.encode(body)
-
-        let (data, httpResponse) = try await performRequest(request)
+        let bodyData = try encoder.encode(body)
+        let (data, httpResponse) = try await executeWithRefresh {
+            var request = try self.buildRequest(for: endpoint)
+            request.httpBody = bodyData
+            return request
+        }
         _ = try handleResponse(data: data, httpResponse: httpResponse)
     }
 
     /// Sends a request with pre-encoded JSON body data. Used for replaying pending offline operations.
     func sendRawData(_ endpoint: Endpoint, bodyData: Data?) async throws {
-        var request = try buildRequest(for: endpoint)
-        request.httpBody = bodyData
-
-        let (data, httpResponse) = try await performRequest(request)
+        let (data, httpResponse) = try await executeWithRefresh {
+            var request = try self.buildRequest(for: endpoint)
+            request.httpBody = bodyData
+            return request
+        }
         _ = try handleResponse(data: data, httpResponse: httpResponse)
     }
 
     func delete(_ endpoint: Endpoint) async throws {
-        let request = try buildRequest(for: endpoint)
-        let (data, httpResponse) = try await performRequest(request)
+        let (data, httpResponse) = try await executeWithRefresh { try self.buildRequest(for: endpoint) }
         _ = try handleResponse(data: data, httpResponse: httpResponse)
     }
 }

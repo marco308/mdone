@@ -19,6 +19,11 @@ struct Endpoint {
 
     static let login = Endpoint(path: "/api/v1/login", method: .POST)
 
+    /// Vikunja 2.0.0+ JWT refresh. Accepts the `vikunja_refresh_token` cookie
+    /// (not a Bearer token) and returns a fresh short-lived JWT plus a new
+    /// Set-Cookie that invalidates the previous refresh token.
+    static let refreshToken = Endpoint(path: "/api/v1/user/token/refresh", method: .POST)
+
     // MARK: - User
 
     static let currentUser = Endpoint(path: "/api/v1/user")
