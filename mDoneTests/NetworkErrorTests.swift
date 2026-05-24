@@ -321,6 +321,6 @@ final class NetworkErrorTests: XCTestCase {
         set.insert(task2)
         set.insert(task1Copy)
 
-        XCTAssertEqual(set.count, 2, "Tasks differing in any field hash differently; identical copies dedupe")
+        XCTAssertEqual(set.count, 2, "Tasks differing in any field are distinct Set members; identical copies dedupe")
     }
 }
