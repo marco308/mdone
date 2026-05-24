@@ -70,23 +70,36 @@ final class AppState {
         isRetrying = await APIClient.shared.isRetrying
     }
 
-    init() {
-        // Wire APIClient → AppState so refreshed tokens land in the keychain
-        // and unrecoverable 401s push the user back to the login screen
-        // without nuking the saved server URL.
-        Task { [weak self] in
-            await APIClient.shared.setOnTokensUpdated { token, refreshToken in
-                AuthService.shared.saveToken(token)
-                if let refreshToken {
-                    AuthService.shared.saveRefreshToken(refreshToken)
-                }
-            }
-            await APIClient.shared.setOnSessionExpired { [weak self] in
-                Task { @MainActor [weak self] in
-                    await self?.expireSession()
-                }
+    /// Tracks whether `registerAPIClientHandlers()` has installed the
+    /// refreshed-tokens and session-expired callbacks on `APIClient.shared`.
+    /// Installation is idempotent but we skip the actor hop after the first
+    /// successful pass.
+    private var handlersRegistered: Bool = false
+
+    /// Installs the APIClient → AppState callbacks. Must be awaited **before**
+    /// any network traffic so refreshed tokens get persisted and unrecoverable
+    /// 401s push the user back to the login screen instead of hanging on a
+    /// stale session.
+    ///
+    /// Previously this lived in `init()` inside an unstructured `Task`, which
+    /// raced the first network call. Every public entry point that touches the
+    /// network (`checkAuth`, `login`, `loginWithCredentials`) now awaits this
+    /// up-front instead.
+    @MainActor
+    func registerAPIClientHandlers() async {
+        guard !handlersRegistered else { return }
+        await APIClient.shared.setOnTokensUpdated { token, refreshToken in
+            AuthService.shared.saveToken(token)
+            if let refreshToken {
+                AuthService.shared.saveRefreshToken(refreshToken)
             }
         }
+        await APIClient.shared.setOnSessionExpired { [weak self] in
+            Task { @MainActor [weak self] in
+                await self?.expireSession()
+            }
+        }
+        handlersRegistered = true
     }
 
     func configureSyncService(_ syncService: SyncService, networkMonitor: NetworkMonitor) {
@@ -170,6 +183,7 @@ final class AppState {
     }
 
     func checkAuth() async {
+        await registerAPIClientHandlers()
         let authenticated = authService.isAuthenticated()
         if authenticated {
             await configureAPIClient()
@@ -203,6 +217,7 @@ final class AppState {
         errorMessage = nil
         defer { isLoading = false }
 
+        await registerAPIClientHandlers()
         await APIClient.shared.configure(serverURL: serverURL, token: token)
 
         // Validate by fetching projects — works with both JWT and API tokens
@@ -231,6 +246,7 @@ final class AppState {
         errorMessage = nil
         defer { isLoading = false }
 
+        await registerAPIClientHandlers()
         let url = serverURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         await APIClient.shared.configure(serverURL: url, token: "")
 

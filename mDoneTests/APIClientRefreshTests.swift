@@ -274,6 +274,155 @@ final class APIClientRefreshTests: XCTestCase {
         XCTAssertEqual(result?.refresh, "refresh-new")
     }
 
+    // MARK: - Edge cases surfaced by PR review
+
+    /// Real `HTTPURLResponse.allHeaderFields` is `[AnyHashable: Any]` whose
+    /// values may be `NSString`. Cookie capture must still work in that case.
+    func testStringHeadersNormalisesMixedKeyValueTypes() {
+        let raw: [AnyHashable: Any] = [
+            "Set-Cookie": "vikunja_refresh_token=value1; Path=/",
+            "X-Foo" as NSString: "swift-string-value",
+            "X-Bar": "nsstring-value" as NSString,
+            // NSString key + NSString value — the previous `as? [String: String]`
+            // cast in `captureRefreshCookie` would silently drop this one even
+            // though Foundation can deliver it from a real response.
+            "X-Baz" as NSString: "both-ns" as NSString,
+            // Non-string values should be skipped rather than crashing.
+            "X-Ignored": 42
+        ]
+
+        let normalised = APIClient.stringHeaders(from: raw)
+        XCTAssertEqual(normalised["Set-Cookie"], "vikunja_refresh_token=value1; Path=/")
+        XCTAssertEqual(normalised["X-Foo"], "swift-string-value")
+        XCTAssertEqual(normalised["X-Bar"], "nsstring-value")
+        XCTAssertEqual(normalised["X-Baz"], "both-ns")
+        XCTAssertNil(normalised["X-Ignored"])
+    }
+
+    /// Transport failure during refresh (offline, timeout, DNS) must not be
+    /// mistaken for an auth failure. Previously this called `expireSession()`
+    /// and bounced users to the login screen over a momentary network blip.
+    func testTransportErrorDuringRefreshDoesNotExpireSession() async {
+        let client = makeClient()
+        await client.configure(
+            serverURL: "https://mock.vikunja.io",
+            token: Self.validJWT(),
+            refreshToken: "refresh-token-1"
+        )
+
+        let expiredFlag = AsyncBox<Bool>()
+        await client.setOnSessionExpired { expiredFlag.set(true) }
+
+        MockURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+            if path.hasSuffix("/user/token/refresh") {
+                // Simulate offline mid-refresh.
+                throw URLError(.notConnectedToInternet)
+            }
+            return (MockURLProtocol.makeResponse(statusCode: 401, url: request.url), Data())
+        }
+
+        do {
+            let _: VTask = try await client.fetch(Endpoint.task(id: 1))
+            XCTFail("Expected the transport error to propagate")
+        } catch let error as NetworkError {
+            // Either .networkUnavailable or .unknown — what matters is that
+            // we did NOT silently swallow the failure as .unauthorized.
+            if case .unauthorized = error {
+                XCTFail("Transport error during refresh must not surface as .unauthorized")
+            }
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+
+        XCTAssertNotEqual(expiredFlag.value, true,
+                          "Session must survive a transient refresh failure")
+        let stillStored = await client.currentRefreshToken()
+        XCTAssertEqual(stillStored, "refresh-token-1",
+                       "Refresh token must not be dropped on transport error so the next attempt can succeed")
+    }
+
+    /// A 5xx from the refresh endpoint is transient — let the caller retry the
+    /// original request later rather than killing the session.
+    func testServerErrorDuringRefreshDoesNotExpireSession() async {
+        let client = makeClient()
+        await client.configure(
+            serverURL: "https://mock.vikunja.io",
+            token: Self.validJWT(),
+            refreshToken: "refresh-token-1"
+        )
+
+        let expiredFlag = AsyncBox<Bool>()
+        await client.setOnSessionExpired { expiredFlag.set(true) }
+
+        MockURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+            if path.hasSuffix("/user/token/refresh") {
+                return (MockURLProtocol.makeResponse(statusCode: 500, url: request.url), Data())
+            }
+            return (MockURLProtocol.makeResponse(statusCode: 401, url: request.url), Data())
+        }
+
+        do {
+            let _: VTask = try await client.fetch(Endpoint.task(id: 1))
+            XCTFail("Expected server error to propagate")
+        } catch let error as NetworkError {
+            if case .unauthorized = error {
+                XCTFail("5xx during refresh must not surface as .unauthorized")
+            }
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+
+        XCTAssertNotEqual(expiredFlag.value, true)
+    }
+
+    /// If the retried request also returns 401 (server raced the rotation, or
+    /// the freshly-issued JWT is somehow already invalid), we still need to
+    /// notify session-expired so AppState can surface the login screen instead
+    /// of leaving the user stuck on a broken-but-not-flagged session.
+    func testRetriedRequestAlso401FiresSessionExpired() async {
+        let client = makeClient()
+        let originalJWT = Self.validJWT()
+        let refreshedJWT = Self.validJWT(payloadOverride: ["exp": 9_000_000_000])
+        await client.configure(
+            serverURL: "https://mock.vikunja.io",
+            token: originalJWT,
+            refreshToken: "refresh-1"
+        )
+
+        let expiredFlag = AsyncBox<Bool>()
+        await client.setOnSessionExpired { expiredFlag.set(true) }
+
+        MockURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+            if path.hasSuffix("/user/token/refresh") {
+                let resp = MockURLProtocol.makeResponse(
+                    statusCode: 200,
+                    url: request.url,
+                    headers: ["Set-Cookie": "vikunja_refresh_token=refresh-2; Path=/"]
+                )
+                return (resp, #"{"token":"\#(refreshedJWT)"}"#.data(using: .utf8)!)
+            }
+            // Every call to the original endpoint 401s, even after refresh.
+            return (MockURLProtocol.makeResponse(statusCode: 401, url: request.url), Data())
+        }
+
+        do {
+            let _: VTask = try await client.fetch(Endpoint.task(id: 1))
+            XCTFail("Expected unauthorized")
+        } catch let error as NetworkError {
+            guard case .unauthorized = error else {
+                return XCTFail("Expected .unauthorized, got \(error)")
+            }
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+
+        XCTAssertEqual(expiredFlag.value, true,
+                       "Persistent 401 after a successful refresh must escalate to session expiry")
+    }
+
     // MARK: - Helpers
 
     /// Builds a JWT-shaped token. We never verify signatures — only the

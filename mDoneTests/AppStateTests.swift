@@ -146,6 +146,16 @@ final class AppStateTests: XCTestCase {
         XCTAssertNil(auth.getRefreshToken(), "Stale refresh token must be removed")
     }
 
+    func testRegisterAPIClientHandlersIsIdempotent() async {
+        let appState = AppState()
+        // Should be safe to call multiple times — second pass becomes a no-op.
+        await appState.registerAPIClientHandlers()
+        await appState.registerAPIClientHandlers()
+        await appState.registerAPIClientHandlers()
+        // If this hangs or crashes the test fails; the contract is just that
+        // repeated calls don't accumulate handlers or block.
+    }
+
     func testLogoutWipesEverything() async {
         let auth = AuthService.shared
         auth.clearAll()
