@@ -38,14 +38,14 @@ struct SettingsScreen: View {
 
             Section {
                 Picker("Default due time", selection: $defaultDueTime) {
-                    ForEach(DefaultDueTimePreference.allCases.filter { $0 != .unset }) { preference in
+                    ForEach(DefaultDueTimePreference.allCases) { preference in
                         Text(preference.label).tag(preference.rawValue)
                     }
                 }
             } header: {
                 Text("Tasks")
             } footer: {
-                Text("Used when you add a task to Today without picking a time, so it isn't marked overdue immediately.")
+                Text("Time of day applied to tasks you add to Today without picking a time. Pick a time later in the day to avoid the task showing as overdue right away.")
             }
 
             Section("Calendar") {

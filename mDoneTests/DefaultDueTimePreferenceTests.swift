@@ -26,6 +26,17 @@ final class DefaultDueTimePreferenceTests: XCTestCase {
         XCTAssertEqual(DefaultDueTimePreference.current(defaults: defaults), .noon)
     }
 
+    func testCurrentFallsBackWhenStoredValueIsCorrupted() {
+        // Raw values not in the enum (e.g. a leftover value from an older
+        // version of the picker, or a hand-edited defaults plist) must not
+        // crash or produce an invalid hour/minute via the raw-value math.
+        defaults.set(-1, forKey: DefaultDueTimePreference.storageKey)
+        XCTAssertEqual(DefaultDueTimePreference.current(defaults: defaults), .sixPM)
+
+        defaults.set(9999, forKey: DefaultDueTimePreference.storageKey)
+        XCTAssertEqual(DefaultDueTimePreference.current(defaults: defaults), .sixPM)
+    }
+
     func testApplyReplacesTimeWithSixPMByDefault() {
         var components = DateComponents()
         components.year = 2026

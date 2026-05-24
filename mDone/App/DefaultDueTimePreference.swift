@@ -1,13 +1,14 @@
 import Foundation
 
 /// Stored values for the "Default due time" setting. The raw value encodes the
-/// time of day as `hour * 100 + minute`, so 0 is midnight, 1800 is 18:00, and
-/// `endOfDay` (2359) is one minute before midnight. An unset preference reads
-/// back as 0 (`UserDefaults.integer(forKey:)`), which would land tasks at
-/// midnight — exactly the bug we're fixing — so an explicit `.unset` sentinel
-/// triggers the `defaultRawValue` fallback when no choice has been made yet.
+/// time of day as `hour * 100 + minute`, so 900 is 09:00, 1800 is 18:00, and
+/// `endOfDay` (2359) is one minute before midnight.
+///
+/// `current()` reads the key via `object(forKey:) as? Int`, so a missing key
+/// becomes `nil` (not 0) and falls through to `defaultRawValue` — there is no
+/// `.unset` sentinel because we never need to represent "user has not chosen
+/// yet" in the type; the unset case is handled at read time.
 enum DefaultDueTimePreference: Int, CaseIterable, Identifiable {
-    case unset = -1
     case nineAM = 900
     case noon = 1200
     case fivePM = 1700
@@ -24,7 +25,6 @@ enum DefaultDueTimePreference: Int, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .unset: "Default"
         case .nineAM: "9:00 AM"
         case .noon: "12:00 PM"
         case .fivePM: "5:00 PM"
@@ -38,10 +38,14 @@ enum DefaultDueTimePreference: Int, CaseIterable, Identifiable {
     var minute: Int { rawValue % 100 }
 
     /// Reads the user's stored preference, falling back to `defaultRawValue`
-    /// when nothing has been set or the stored value is unrecognised.
+    /// when nothing has been set or the stored value is unrecognised. The
+    /// final `?? .sixPM` is a defensive belt-and-braces in case `defaultRawValue`
+    /// itself ever drifts to a value not present in this enum.
     static func current(defaults: UserDefaults = .standard) -> DefaultDueTimePreference {
         let stored = defaults.object(forKey: storageKey) as? Int ?? defaultRawValue
-        return DefaultDueTimePreference(rawValue: stored) ?? sixPM
+        return DefaultDueTimePreference(rawValue: stored)
+            ?? DefaultDueTimePreference(rawValue: defaultRawValue)
+            ?? .sixPM
     }
 
     /// Returns `date` with its time component replaced by the user's chosen
