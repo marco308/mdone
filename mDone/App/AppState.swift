@@ -43,6 +43,22 @@ final class AppState {
     var onTaskCompleted: ((Int64) -> Void)?
     var onTaskDeleted: ((Int64) -> Void)?
 
+    #if os(iOS)
+    /// Snapshot of the most recent task completion that shake-to-undo (#82)
+    /// can revert. Set by `toggleTaskDone` after a false → true transition,
+    /// cleared when the undo runs or another completion replaces it.
+    struct CompletionUndoRecord: Equatable {
+        let taskId: Int64
+        let title: String
+        let previousDone: Bool
+    }
+
+    var pendingUndoCompletion: CompletionUndoRecord?
+    /// Drives the SwiftUI alert presented by `MainTabView` when a shake gesture
+    /// arrives while `pendingUndoCompletion` is non-nil.
+    var showShakeUndoAlert: Bool = false
+    #endif
+
     /// Per-project ordered task lists fetched from the view endpoint (preserves positions).
     var projectTaskCache: [Int64: [VTask]] = [:]
 
@@ -375,6 +391,7 @@ final class AppState {
 
     @MainActor
     func toggleTaskDone(_ task: VTask) async {
+        let wasDone = task.done
         do {
             let updated = try await taskService.toggleDone(task: task)
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
@@ -383,6 +400,13 @@ final class AppState {
             syncService?.updateCachedTask(updated)
             if updated.done {
                 onTaskCompleted?(updated.id)
+                #if os(iOS)
+                pendingUndoCompletion = CompletionUndoRecord(
+                    taskId: updated.id,
+                    title: updated.title,
+                    previousDone: wasDone
+                )
+                #endif
             }
             #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -392,6 +416,59 @@ final class AppState {
             handleError(error)
         }
     }
+
+    #if os(iOS)
+    /// Called by `MainTabView` when a `UIWindow.deviceDidShakeNotification`
+    /// arrives. Surfaces the SwiftUI undo alert if (and only if) there's a
+    /// completion waiting to be reverted — shake with nothing to undo is a
+    /// no-op, matching iOS's native shake-to-undo behavior (#82).
+    @MainActor
+    func handleShakeGesture() {
+        guard pendingUndoCompletion != nil else { return }
+        showShakeUndoAlert = true
+    }
+
+    /// Confirms the shake-to-undo prompt and reverts the pending completion.
+    @MainActor
+    func confirmUndoLastCompletion() async {
+        guard let pending = pendingUndoCompletion else { return }
+        pendingUndoCompletion = nil
+        await undoTaskCompletion(taskId: pending.taskId, restoringDone: pending.previousDone)
+    }
+
+    /// Reverts a task to its pre-completion `done` state. Applies the change
+    /// to the local cache *first* (subscript mutation, since whole-array
+    /// reassignment doesn't reliably fire @Observable's view-update tracking)
+    /// so the UI reflects the undo immediately, then syncs to Vikunja; if the
+    /// server call fails we restore the prior state and surface an error so
+    /// the user is never silently left with stale UI.
+    @MainActor
+    func undoTaskCompletion(taskId: Int64, restoringDone: Bool) async {
+        let originalTask = tasks.first(where: { $0.id == taskId })
+        if let index = tasks.firstIndex(where: { $0.id == taskId }) {
+            tasks[index].done = restoringDone
+        }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        WidgetCenter.shared.reloadAllTimelines()
+
+        do {
+            let request = TaskUpdateRequest(done: restoringDone)
+            let updated = try await taskService.updateTask(id: taskId, request: request)
+            if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
+                tasks[index] = updated
+            }
+            syncService?.updateCachedTask(updated)
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            // Roll back the optimistic update before surfacing the error.
+            if let originalTask, let index = tasks.firstIndex(where: { $0.id == taskId }) {
+                tasks[index] = originalTask
+                WidgetCenter.shared.reloadAllTimelines()
+            }
+            handleError(error)
+        }
+    }
+    #endif
 
     /// Creates a task and returns it on success (or `nil` on failure).
     /// `@discardableResult` so existing call sites that don't need the new id
@@ -536,6 +613,13 @@ final class AppState {
 
     @MainActor
     func requestCalendarAccess() async {
+        #if DEBUG
+        // Test hook: scripted smoke tests can set this to keep the OS calendar
+        // permission alert from overlaying the surface under test.
+        if UserDefaults.standard.bool(forKey: "MDONE_SKIP_CALENDAR_REQUEST") {
+            return
+        }
+        #endif
         calendarAccessGranted = await calendarService.requestAccess()
         if calendarAccessGranted {
             await refreshCalendarEvents()

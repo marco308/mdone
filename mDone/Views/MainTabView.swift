@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 struct MainTabView: View {
     @Environment(AppState.self) private var appState
@@ -14,6 +17,7 @@ struct MainTabView: View {
 
     var body: some View {
         #if os(iOS)
+        let bindableAppState = Bindable(appState)
         TabView(selection: $selectedTab) {
             SwiftUI.Tab("Inbox", systemImage: "tray.fill", value: Tab.inbox) {
                 NavigationStack {
@@ -54,13 +58,33 @@ struct MainTabView: View {
                 selectedTab = .inbox
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIWindow.deviceDidShakeNotification)) { _ in
+            appState.handleShakeGesture()
+        }
+        .alert(
+            "Undo Mark Complete",
+            isPresented: bindableAppState.showShakeUndoAlert
+        ) {
+            Button("Cancel", role: .cancel) {
+                appState.pendingUndoCompletion = nil
+                appState.showShakeUndoAlert = false
+            }
+            Button("Undo") {
+                appState.showShakeUndoAlert = false
+                Task { await appState.confirmUndoLastCompletion() }
+            }
+        } message: {
+            if let title = appState.pendingUndoCompletion?.title {
+                Text("Reopen \u{201C}\(title)\u{201D}?")
+            }
+        }
         .sheet(isPresented: $showNotifications) {
             NotificationListView()
         }
         .fullScreenCover(isPresented: Bindable(focusManager).showFocusView) {
             FocusSessionView()
         }
-        .errorBanner(Bindable(appState).activeError) {
+        .errorBanner(bindableAppState.activeError) {
             Task { await appState.refreshAll() }
         }
         #else

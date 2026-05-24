@@ -120,4 +120,36 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertEqual(appState.tasksForProject(projectId).map(\.id), [1])
     }
+
+    // MARK: - Shake-to-undo completion (#82)
+
+    #if os(iOS)
+    func testFreshAppStateHasNothingPendingForUndo() {
+        let appState = AppState()
+        XCTAssertNil(appState.pendingUndoCompletion)
+        XCTAssertFalse(appState.showShakeUndoAlert)
+    }
+
+    func testHandleShakeGestureWithNoPendingCompletionIsNoOp() {
+        let appState = AppState()
+        appState.handleShakeGesture()
+        XCTAssertFalse(
+            appState.showShakeUndoAlert,
+            "Shaking with no recent completion must not raise the undo alert"
+        )
+    }
+
+    func testHandleShakeGestureWithPendingCompletionPresentsAlert() {
+        let appState = AppState()
+        appState.pendingUndoCompletion = AppState.CompletionUndoRecord(
+            taskId: 42,
+            title: "Refill vitamins",
+            previousDone: false
+        )
+
+        appState.handleShakeGesture()
+
+        XCTAssertTrue(appState.showShakeUndoAlert)
+    }
+    #endif
 }

@@ -11,6 +11,10 @@ struct mDoneApp: App {
     private let focusOutbox: FocusOutboxService
     #endif
 
+    #if os(iOS)
+    private let shakeDetector: ShakeDetector
+    #endif
+
     init() {
         let deps = AppDependencies()
         dependencies = deps
@@ -18,6 +22,9 @@ struct mDoneApp: App {
         let outbox = FocusOutboxService(modelContainer: deps.modelContainer)
         focusOutbox = outbox
         _focusManager = State(initialValue: FocusManager(modelContainer: deps.modelContainer, outbox: outbox))
+        let detector = ShakeDetector()
+        detector.start()
+        shakeDetector = detector
         #endif
     }
 
@@ -70,10 +77,12 @@ struct mDoneApp: App {
                         defaults.removeObject(forKey: "MDONE_TOKEN")
                         Task {
                             try? await appState.login(serverURL: serverURL, token: token)
+                            await runTestAutomationIfRequested(defaults: defaults)
                         }
                     } else {
                         Task {
                             await appState.checkAuth()
+                            await runTestAutomationIfRequested(defaults: defaults)
                         }
                     }
                     #else
@@ -122,4 +131,36 @@ struct mDoneApp: App {
             #endif
         }
     }
+
+    #if DEBUG
+    /// Drives a scripted toggle for end-to-end shake-to-undo verification. Set
+    /// `MDONE_AUTO_COMPLETE_TITLE` in shared defaults before a cold launch and
+    /// the app will find the matching task and mark it complete. If
+    /// `MDONE_TRIGGER_SHAKE_DELAY_MS` is also set, the app will post a
+    /// synthetic shake notification after that delay, since the simulator
+    /// has no accelerometer for CoreMotion to read.
+    @MainActor
+    private func runTestAutomationIfRequested(defaults: UserDefaults) async {
+        guard appState.isAuthenticated else { return }
+        if let title = defaults.string(forKey: "MDONE_AUTO_COMPLETE_TITLE"), !title.isEmpty {
+            defaults.removeObject(forKey: "MDONE_AUTO_COMPLETE_TITLE")
+            await appState.refreshAll()
+            if let task = appState.tasks.first(where: { $0.title == title }) {
+                await appState.toggleTaskDone(task)
+            }
+        }
+        #if os(iOS)
+        if let delayMs = defaults.object(forKey: "MDONE_TRIGGER_SHAKE_DELAY_MS") as? Int, delayMs > 0 {
+            defaults.removeObject(forKey: "MDONE_TRIGGER_SHAKE_DELAY_MS")
+            try? await Task.sleep(nanoseconds: UInt64(delayMs) * 1_000_000)
+            NotificationCenter.default.post(name: UIWindow.deviceDidShakeNotification, object: nil)
+        }
+        if let delayMs = defaults.object(forKey: "MDONE_TRIGGER_UNDO_DELAY_MS") as? Int, delayMs > 0 {
+            defaults.removeObject(forKey: "MDONE_TRIGGER_UNDO_DELAY_MS")
+            try? await Task.sleep(nanoseconds: UInt64(delayMs) * 1_000_000)
+            await appState.confirmUndoLastCompletion()
+        }
+        #endif
+    }
+    #endif
 }
