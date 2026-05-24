@@ -87,6 +87,17 @@ struct VTask: Codable, Identifiable, Hashable {
 
     var isOverdue: Bool {
         guard let dueDate = effectiveDueDate, !done else { return false }
+        // Date-only tasks (time = 00:00) should only count as overdue once
+        // the day they're due is fully past — otherwise they show red the
+        // moment they're created, even though Default-due-time may also have
+        // landed them at 00:00 (e.g. existing tasks synced from the web).
+        if !hasSpecificTime {
+            let calendar = Calendar.current
+            guard let endOfDay = calendar.date(
+                bySettingHour: 23, minute: 59, second: 59, of: dueDate
+            ) else { return dueDate < Date() }
+            return endOfDay < Date()
+        }
         return dueDate < Date()
     }
 
