@@ -380,6 +380,7 @@ final class AppState {
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
+            syncService?.updateCachedTask(updated)
             if updated.done {
                 onTaskCompleted?(updated.id)
             }
@@ -408,6 +409,7 @@ final class AppState {
         do {
             let newTask = try await taskService.createTask(projectId: projectId, request: request)
             tasks.append(newTask)
+            syncService?.updateCachedTask(newTask)
             #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             #endif
@@ -437,6 +439,7 @@ final class AppState {
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
+            syncService?.updateCachedTask(updated)
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
             if let index = tasks.firstIndex(where: { $0.id == task.id }) {
@@ -453,6 +456,7 @@ final class AppState {
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
+            syncService?.updateCachedTask(updated)
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
             handleError(error)
@@ -465,6 +469,7 @@ final class AppState {
             let taskId = task.id
             try await taskService.deleteTask(id: taskId)
             tasks.removeAll { $0.id == taskId }
+            syncService?.deleteCachedTask(id: taskId)
             onTaskDeleted?(taskId)
             #if os(iOS)
             UINotificationFeedbackGenerator().notificationOccurred(.warning)

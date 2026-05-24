@@ -288,22 +288,39 @@ final class NetworkErrorTests: XCTestCase {
 
     // MARK: - VTask Equality and Hashing
 
-    func testVTaskEquality() {
+    func testVTaskEqualityComparesAllFields() {
+        // Regression for #84: id-only equality made SwiftUI treat description
+        // (and every other field) edits as no-ops, so the task detail sheet
+        // would not re-render after a save until a cold app launch.
         let task1 = VTask(id: 1, title: "First", done: false, priority: 0, projectId: 1)
         let task2 = VTask(id: 1, title: "Different", done: true, priority: 5, projectId: 2)
         let task3 = VTask(id: 2, title: "First", done: false, priority: 0, projectId: 1)
+        let task4 = VTask(id: 1, title: "First", done: false, priority: 0, projectId: 1)
 
-        XCTAssertEqual(task1, task2, "Tasks with same ID should be equal")
-        XCTAssertNotEqual(task1, task3, "Tasks with different IDs should not be equal")
+        XCTAssertNotEqual(task1, task2, "Tasks differing in any field must not be equal")
+        XCTAssertNotEqual(task1, task3, "Tasks with different IDs are not equal")
+        XCTAssertEqual(task1, task4, "Tasks with identical fields are equal")
+    }
+
+    func testVTaskDescriptionChangeBreaksEquality() {
+        // Specific scenario from #84: edit a task to add a description, save,
+        // re-open. The "before" and "after" VTask values must compare unequal
+        // so SwiftUI re-evaluates views holding the task.
+        let before = VTask(id: 1, title: "Task", description: nil, done: false, priority: 0, projectId: 1)
+        let after = VTask(id: 1, title: "Task", description: "Added later", done: false, priority: 0, projectId: 1)
+
+        XCTAssertNotEqual(before, after, "A description change must produce an unequal VTask (#84)")
     }
 
     func testVTaskHashable() {
         let task1 = VTask(id: 1, title: "First", done: false, priority: 0, projectId: 1)
         let task2 = VTask(id: 1, title: "Different", done: true, priority: 5, projectId: 2)
+        let task1Copy = VTask(id: 1, title: "First", done: false, priority: 0, projectId: 1)
 
         var set: Set<VTask> = [task1]
         set.insert(task2)
+        set.insert(task1Copy)
 
-        XCTAssertEqual(set.count, 1, "Tasks with same ID should hash equally")
+        XCTAssertEqual(set.count, 2, "Tasks differing in any field are distinct Set members; identical copies dedupe")
     }
 }
