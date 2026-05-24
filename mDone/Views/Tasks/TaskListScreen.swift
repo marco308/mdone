@@ -76,7 +76,7 @@ struct TaskListScreen: View {
 
             QuickAddBar(
                 projectId: projectFilter?.id ?? defaultProjectId,
-                defaultDueDate: projectFilter == nil ? Calendar.current.startOfDay(for: Date()) : nil
+                defaultDueDate: projectFilter == nil ? DefaultDueTimePreference.apply(to: Date()) : nil
             )
         }
         .task(id: projectFilter?.id) {
