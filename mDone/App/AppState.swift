@@ -70,6 +70,38 @@ final class AppState {
         isRetrying = await APIClient.shared.isRetrying
     }
 
+    /// Tracks whether `registerAPIClientHandlers()` has installed the
+    /// refreshed-tokens and session-expired callbacks on `APIClient.shared`.
+    /// Installation is idempotent but we skip the actor hop after the first
+    /// successful pass.
+    private var handlersRegistered: Bool = false
+
+    /// Installs the APIClient → AppState callbacks. Must be awaited **before**
+    /// any network traffic so refreshed tokens get persisted and unrecoverable
+    /// 401s push the user back to the login screen instead of hanging on a
+    /// stale session.
+    ///
+    /// Previously this lived in `init()` inside an unstructured `Task`, which
+    /// raced the first network call. Every public entry point that touches the
+    /// network (`checkAuth`, `login`, `loginWithCredentials`) now awaits this
+    /// up-front instead.
+    @MainActor
+    func registerAPIClientHandlers() async {
+        guard !handlersRegistered else { return }
+        await APIClient.shared.setOnTokensUpdated { token, refreshToken in
+            AuthService.shared.saveToken(token)
+            if let refreshToken {
+                AuthService.shared.saveRefreshToken(refreshToken)
+            }
+        }
+        await APIClient.shared.setOnSessionExpired { [weak self] in
+            Task { @MainActor [weak self] in
+                await self?.expireSession()
+            }
+        }
+        handlersRegistered = true
+    }
+
     func configureSyncService(_ syncService: SyncService, networkMonitor: NetworkMonitor) {
         self.syncService = syncService
         self.networkMonitor = networkMonitor
@@ -151,6 +183,7 @@ final class AppState {
     }
 
     func checkAuth() async {
+        await registerAPIClientHandlers()
         let authenticated = authService.isAuthenticated()
         if authenticated {
             await configureAPIClient()
@@ -168,7 +201,11 @@ final class AppState {
     func configureAPIClient() async {
         guard let serverURL = authService.getServerURL(),
               let token = authService.getToken() else { return }
-        await APIClient.shared.configure(serverURL: serverURL, token: token)
+        await APIClient.shared.configure(
+            serverURL: serverURL,
+            token: token,
+            refreshToken: authService.getRefreshToken()
+        )
     }
 
     @MainActor
@@ -180,6 +217,7 @@ final class AppState {
         errorMessage = nil
         defer { isLoading = false }
 
+        await registerAPIClientHandlers()
         await APIClient.shared.configure(serverURL: serverURL, token: token)
 
         // Validate by fetching projects — works with both JWT and API tokens
@@ -208,15 +246,24 @@ final class AppState {
         errorMessage = nil
         defer { isLoading = false }
 
+        await registerAPIClientHandlers()
         let url = serverURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         await APIClient.shared.configure(serverURL: url, token: "")
 
-        // Get JWT token via login endpoint
+        // Get JWT token via login endpoint. The Vikunja 2.0+ `Set-Cookie:
+        // vikunja_refresh_token=…` header is captured inside APIClient as part
+        // of the response — we read it back after this call to persist it.
         let loginRequest = LoginRequest(username: username, password: password)
         let loginResponse: LoginResponse = try await APIClient.shared.send(Endpoint.login, body: loginRequest)
+        let capturedRefreshToken = await APIClient.shared.currentRefreshToken()
 
-        // Configure with the JWT token
-        await APIClient.shared.configure(serverURL: url, token: loginResponse.token)
+        // Configure with the JWT token + refresh cookie so subsequent requests
+        // (and the 401 retry path) have everything they need.
+        await APIClient.shared.configure(
+            serverURL: url,
+            token: loginResponse.token,
+            refreshToken: capturedRefreshToken
+        )
 
         // Validate
         let projects: [Project] = try await APIClient.shared.fetch(Endpoint.projects())
@@ -226,6 +273,9 @@ final class AppState {
 
         authService.saveServerURL(url)
         authService.saveToken(loginResponse.token)
+        if let capturedRefreshToken {
+            authService.saveRefreshToken(capturedRefreshToken)
+        }
         isAuthenticated = true
     }
 
@@ -235,6 +285,25 @@ final class AppState {
         print("[mDone] logout() called")
         #endif
         authService.clearAll()
+        await tearDownSession()
+    }
+
+    /// Called when the server stops accepting our credentials (refresh failed,
+    /// API token revoked, etc.). Drops the session creds but keeps the server
+    /// URL so the user only has to re-enter their password on the next launch.
+    /// Issue #80: previously a stale JWT triggered a full `clearAll()`, which
+    /// wiped the server URL too.
+    @MainActor
+    func expireSession() async {
+        #if DEBUG
+        print("[mDone] expireSession() called")
+        #endif
+        authService.clearSession()
+        await tearDownSession()
+    }
+
+    @MainActor
+    private func tearDownSession() async {
         await APIClient.shared.clearCredentials()
         tasks = []
         projects = []
@@ -315,9 +384,9 @@ final class AppState {
             #endif
             if case .unauthorized = error {
                 #if DEBUG
-                print("[mDone] refreshAll: got .unauthorized, calling logout()")
+                print("[mDone] refreshAll: got .unauthorized, expiring session")
                 #endif
-                await logout()
+                await expireSession()
             }
             handleError(error)
         } catch {
@@ -344,7 +413,7 @@ final class AppState {
             activeError = nil
         } catch let error as NetworkError {
             if case .unauthorized = error {
-                await logout()
+                await expireSession()
             }
             handleError(error)
         } catch {
@@ -365,7 +434,7 @@ final class AppState {
             activeError = nil
         } catch let error as NetworkError {
             if case .unauthorized = error {
-                await logout()
+                await expireSession()
             }
             handleError(error)
         } catch {

@@ -6,6 +6,7 @@ actor AuthService {
 
     private let serverURLKey = "com.mdone.serverURL"
     private let tokenKeychainKey = "com.mdone.apiToken"
+    private let refreshTokenKeychainKey = "com.mdone.refreshToken"
 
     // MARK: - Server URL (UserDefaults)
 
@@ -26,11 +27,61 @@ actor AuthService {
     // MARK: - API Token (Keychain)
 
     nonisolated func getToken() -> String? {
+        readKeychain(account: tokenKeychainKey)
+    }
+
+    nonisolated func saveToken(_ token: String) {
+        writeKeychain(account: tokenKeychainKey, value: token)
+        SharedKeys.sharedDefaults.set(token, forKey: SharedKeys.apiTokenKey)
+    }
+
+    nonisolated func deleteToken() {
+        deleteKeychain(account: tokenKeychainKey)
+        SharedKeys.sharedDefaults.removeObject(forKey: SharedKeys.apiTokenKey)
+    }
+
+    // MARK: - Refresh Token (Keychain)
+
+    nonisolated func getRefreshToken() -> String? {
+        readKeychain(account: refreshTokenKeychainKey)
+    }
+
+    nonisolated func saveRefreshToken(_ token: String) {
+        writeKeychain(account: refreshTokenKeychainKey, value: token)
+    }
+
+    nonisolated func deleteRefreshToken() {
+        deleteKeychain(account: refreshTokenKeychainKey)
+    }
+
+    // MARK: - Auth State
+
+    nonisolated func isAuthenticated() -> Bool {
+        getServerURL() != nil && getToken() != nil
+    }
+
+    /// Clears the session credentials (JWT + refresh token) but keeps the
+    /// server URL so the user only has to re-enter their password. Use this
+    /// when the session expires unexpectedly; use `clearAll()` for a deliberate
+    /// user-initiated logout.
+    nonisolated func clearSession() {
+        deleteToken()
+        deleteRefreshToken()
+    }
+
+    nonisolated func clearAll() {
+        clearServerURL()
+        clearSession()
+    }
+
+    // MARK: - Keychain helpers
+
+    nonisolated private func readKeychain(account: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: tokenKeychainKey,
+            kSecAttrAccount as String: account,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecMatchLimit as String: kSecMatchLimitOne
         ]
 
         var result: AnyObject?
@@ -43,43 +94,27 @@ actor AuthService {
         return String(data: data, encoding: .utf8)
     }
 
-    nonisolated func saveToken(_ token: String) {
-        deleteToken()
+    nonisolated private func writeKeychain(account: String, value: String) {
+        deleteKeychain(account: account)
 
-        guard let data = token.data(using: .utf8) else { return }
+        guard let data = value.data(using: .utf8) else { return }
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: tokenKeychainKey,
+            kSecAttrAccount as String: account,
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
         ]
 
         SecItemAdd(query as CFDictionary, nil)
-
-        // Also persist to shared App Group UserDefaults so widgets can access it
-        SharedKeys.sharedDefaults.set(token, forKey: SharedKeys.apiTokenKey)
     }
 
-    nonisolated func deleteToken() {
+    nonisolated private func deleteKeychain(account: String) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: tokenKeychainKey,
+            kSecAttrAccount as String: account
         ]
 
         SecItemDelete(query as CFDictionary)
-
-        SharedKeys.sharedDefaults.removeObject(forKey: SharedKeys.apiTokenKey)
-    }
-
-    // MARK: - Auth State
-
-    nonisolated func isAuthenticated() -> Bool {
-        getServerURL() != nil && getToken() != nil
-    }
-
-    nonisolated func clearAll() {
-        clearServerURL()
-        deleteToken()
     }
 }

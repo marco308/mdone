@@ -120,4 +120,60 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertEqual(appState.tasksForProject(projectId).map(\.id), [1])
     }
+
+    // MARK: - Session expiry vs logout (issue #80)
+
+    func testExpireSessionKeepsServerURL() async {
+        let auth = AuthService.shared
+        auth.clearAll()
+        defer { auth.clearAll() }
+
+        auth.saveServerURL("https://vikunja.example.com")
+        auth.saveToken("jwt-old")
+        auth.saveRefreshToken("refresh-old")
+
+        let appState = AppState()
+        appState.isAuthenticated = true
+        appState.tasks = [VTask(id: 1, title: "x", done: false, priority: 0, projectId: 1)]
+
+        await appState.expireSession()
+
+        XCTAssertFalse(appState.isAuthenticated, "Session expiry must flip auth state back to logged-out")
+        XCTAssertTrue(appState.tasks.isEmpty, "Session expiry should wipe in-memory data")
+        XCTAssertEqual(auth.getServerURL(), "https://vikunja.example.com",
+                       "Server URL must survive session expiry so the login screen can prefill it (issue #80)")
+        XCTAssertNil(auth.getToken(), "Stale access token must be removed")
+        XCTAssertNil(auth.getRefreshToken(), "Stale refresh token must be removed")
+    }
+
+    func testRegisterAPIClientHandlersIsIdempotent() async {
+        let appState = AppState()
+        // Should be safe to call multiple times — second pass becomes a no-op.
+        await appState.registerAPIClientHandlers()
+        await appState.registerAPIClientHandlers()
+        await appState.registerAPIClientHandlers()
+        // If this hangs or crashes the test fails; the contract is just that
+        // repeated calls don't accumulate handlers or block.
+    }
+
+    func testLogoutWipesEverything() async {
+        let auth = AuthService.shared
+        auth.clearAll()
+        defer { auth.clearAll() }
+
+        auth.saveServerURL("https://vikunja.example.com")
+        auth.saveToken("jwt-old")
+        auth.saveRefreshToken("refresh-old")
+
+        let appState = AppState()
+        appState.isAuthenticated = true
+
+        await appState.logout()
+
+        XCTAssertFalse(appState.isAuthenticated)
+        XCTAssertNil(auth.getServerURL(),
+                     "Explicit logout is a deliberate sign-out: server URL goes too")
+        XCTAssertNil(auth.getToken())
+        XCTAssertNil(auth.getRefreshToken())
+    }
 }

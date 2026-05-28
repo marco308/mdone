@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - Quick-adding a task on the Today list no longer makes it instantly overdue. Tasks added without an explicit time now use the configured default due time (6 PM by default) instead of midnight (#81).
 - Date-only tasks (existing ones synced from Vikunja's web client at 00:00, or any task where the time wasn't specified) no longer render with the red overdue style on the day they're due. They count as overdue only after the end of that day, matching how a paper diary works (#81).
+- Logging in with a Vikunja username and password no longer kicks you out after ~10 minutes. mDone now uses Vikunja 2.0's refresh-token cookie to renew your session in the background and only sends you back to the login screen if the refresh itself fails (#80). When that does happen, your server URL stays prefilled so you only have to re-enter your password.
 
 ### Fixed
 - Edits to a task's description (and other fields) now appear immediately. Previously the task detail sheet would still show the old value until the app was force-quit and reopened, because `VTask` equality only compared by ID — SwiftUI saw "no change" and skipped re-rendering. The local SwiftData cache is also now written on every task mutation, so cold launches see the latest data even before the first refresh completes (#84).
