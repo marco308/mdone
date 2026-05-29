@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-05-29
+
 ### Added
 - Shake your iPhone right after completing a task to undo it. mDone shows a confirmation prompt naming the task ("Undo completing "…"?") so an accidental shake never silently reverses anything, and only the most recent completion can be undone (#82).
 
