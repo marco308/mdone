@@ -483,8 +483,13 @@ final class AppState {
         undoableCompletion = nil
         do {
             let updated = try await taskService.updateTask(id: target.id, request: TaskUpdateRequest(done: false))
+            // The completed task may have been dropped from `tasks` by a refresh
+            // (the all-tasks fetch returns only undone tasks), so re-insert it
+            // when it's no longer present rather than silently doing nothing.
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
+            } else {
+                tasks.append(updated)
             }
             syncService?.updateCachedTask(updated)
             #if os(iOS)
