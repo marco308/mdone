@@ -20,6 +20,8 @@ private struct DeviceShakeViewModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content.onReceive(NotificationCenter.default.publisher(for: UIDevice.deviceDidShakeNotification)) { _ in
+            // iPhone-only feature (issue #82); ignore shakes on iPad.
+            guard UIDevice.current.userInterfaceIdiom == .phone else { return }
             action()
         }
     }

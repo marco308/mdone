@@ -59,7 +59,13 @@ final class AppState {
         notifications.filter { $0.read != true }.count
     }
 
-    private let taskService = TaskService()
+    /// `taskService` is injectable so tests can drive the network paths
+    /// (e.g. `undoLastCompletion`) through a mocked `APIClient`.
+    init(taskService: TaskService = TaskService()) {
+        self.taskService = taskService
+    }
+
+    private let taskService: TaskService
     private let projectService = ProjectService()
     private let authService = AuthService.shared
     private let notificationService = NotificationService.shared
@@ -503,7 +509,12 @@ final class AppState {
             #endif
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
-            undoableCompletion = target
+            // Only restore the old target if no newer completion was recorded
+            // while this request was in flight — otherwise we'd clobber the more
+            // recent undo target and break "undo the most recent completion".
+            if undoableCompletion == nil {
+                undoableCompletion = target
+            }
             handleError(error)
         }
     }

@@ -3,6 +3,24 @@ import XCTest
 
 @MainActor
 final class AppStateTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        MockURLProtocol.reset()
+    }
+
+    override func tearDown() {
+        MockURLProtocol.reset()
+        super.tearDown()
+    }
+
+    /// Builds an `AppState` whose `TaskService` talks to `MockURLProtocol`,
+    /// so tests can drive `undoLastCompletion()`'s network path deterministically.
+    private func makeMockedAppState() async -> AppState {
+        let client = APIClient(session: MockURLProtocol.mockSession())
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+        return AppState(taskService: TaskService(apiClient: client))
+    }
+
     // MARK: - uniquedById
 
     func testUniquedByIdRemovesDuplicates() {
@@ -225,5 +243,94 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(appState.canUndoLastCompletion,
                       "A different task changing state must not clear the pending undo")
         XCTAssertEqual(appState.undoableCompletion?.id, 5)
+    }
+
+    // MARK: - Shake-to-undo network path: undoLastCompletion() (#82)
+
+    func testUndoRestoresTaskInPlaceOnSuccess() async {
+        let appState = await makeMockedAppState()
+        let task = VTask(id: 42, title: "Buy milk", done: true, priority: 1, projectId: 3)
+        appState.tasks = [task]
+        appState.recordCompletionForUndo(task)
+
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url!)
+            let json = """
+            {"id": 42, "title": "Buy milk", "done": false, "priority": 1, "project_id": 3}
+            """
+            return (response, Data(json.utf8))
+        }
+
+        await appState.undoLastCompletion()
+
+        XCTAssertEqual(appState.tasks.count, 1, "Undo must not duplicate the already-present task")
+        XCTAssertEqual(appState.tasks.first?.id, 42)
+        XCTAssertEqual(appState.tasks.first?.done, false, "Undo must mark the task not-done locally")
+        XCTAssertFalse(appState.canUndoLastCompletion, "A successful undo consumes the pending target")
+    }
+
+    func testUndoReinsertsTaskWhenMissingFromList() async {
+        let appState = await makeMockedAppState()
+        // The completed task was dropped from `tasks` by an all-tasks refresh
+        // (that endpoint returns only undone tasks), so it's no longer present.
+        let task = VTask(id: 7, title: "Walk the dog", done: true, priority: 0, projectId: 10)
+        appState.tasks = []
+        appState.recordCompletionForUndo(task)
+
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url!)
+            let json = """
+            {"id": 7, "title": "Walk the dog", "done": false, "priority": 0, "project_id": 10}
+            """
+            return (response, Data(json.utf8))
+        }
+
+        await appState.undoLastCompletion()
+
+        XCTAssertEqual(appState.tasks.map(\.id), [7], "A missing task must be re-inserted, not silently lost")
+        XCTAssertEqual(appState.tasks.first?.done, false)
+    }
+
+    func testUndoPreservesDueDateFromSnapshotWhenResponseOmitsIt() async {
+        let appState = await makeMockedAppState()
+        let due = Date(timeIntervalSince1970: 1_750_000_000)
+        var task = VTask(id: 99, title: "Pay rent", done: true, priority: 2, projectId: 5)
+        task.dueDate = due
+        appState.tasks = [task]
+        appState.recordCompletionForUndo(task)
+
+        // The un-complete response omits due_date — the bug that put the task in
+        // the wrong Inbox section. The restore must rebuild from the snapshot.
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url!)
+            let json = """
+            {"id": 99, "title": "Pay rent", "done": false, "priority": 2, "project_id": 5}
+            """
+            return (response, Data(json.utf8))
+        }
+
+        await appState.undoLastCompletion()
+
+        XCTAssertEqual(appState.tasks.first?.effectiveDueDate, due,
+                       "Undo must preserve the original due date so the task returns to its Inbox section")
+    }
+
+    func testUndoKeepsTargetWhenRequestFails() async {
+        let appState = await makeMockedAppState()
+        let task = VTask(id: 11, title: "Flaky", done: true, priority: 0, projectId: 1)
+        appState.tasks = [task]
+        appState.recordCompletionForUndo(task)
+
+        // 400 (not 5xx) so APIClient fails fast instead of retrying with backoff.
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 400, url: request.url!)
+            return (response, Data("{\"message\": \"bad request\"}".utf8))
+        }
+
+        await appState.undoLastCompletion()
+
+        XCTAssertTrue(appState.canUndoLastCompletion,
+                      "A failed undo must keep the pending target so the user can retry")
+        XCTAssertEqual(appState.undoableCompletion?.id, 11)
     }
 }
