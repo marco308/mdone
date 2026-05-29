@@ -43,6 +43,15 @@ final class AppState {
     var onTaskCompleted: ((Int64) -> Void)?
     var onTaskDeleted: ((Int64) -> Void)?
 
+    /// The most recently completed task, eligible for shake-to-undo on iPhone.
+    /// Holds the task as it was *before* completion so undo can restore it.
+    /// Replaced when a newer task is completed, and cleared once undone or if
+    /// the same task is un-completed by other means.
+    private(set) var undoableCompletion: VTask?
+
+    var canUndoLastCompletion: Bool { undoableCompletion != nil }
+    var undoableCompletionTitle: String? { undoableCompletion?.title }
+
     /// Per-project ordered task lists fetched from the view endpoint (preserves positions).
     var projectTaskCache: [Int64: [VTask]] = [:]
 
@@ -451,7 +460,10 @@ final class AppState {
             }
             syncService?.updateCachedTask(updated)
             if updated.done {
+                recordCompletionForUndo(task)
                 onTaskCompleted?(updated.id)
+            } else {
+                clearUndoIfMatches(id: updated.id)
             }
             #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -459,6 +471,41 @@ final class AppState {
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
             handleError(error)
+        }
+    }
+
+    /// Restores the most recently completed task to its incomplete state.
+    /// Invoked by the iPhone shake-to-undo prompt. No-op when nothing is
+    /// pending undo. On failure the undo target is kept so the user can retry.
+    @MainActor
+    func undoLastCompletion() async {
+        guard let target = undoableCompletion else { return }
+        undoableCompletion = nil
+        do {
+            let updated = try await taskService.updateTask(id: target.id, request: TaskUpdateRequest(done: false))
+            if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
+                tasks[index] = updated
+            }
+            syncService?.updateCachedTask(updated)
+            #if os(iOS)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            #endif
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            undoableCompletion = target
+            handleError(error)
+        }
+    }
+
+    /// Records `task` (in its pre-completion state) as the pending shake-to-undo
+    /// target. Exposed for testing the tracking logic without a network round-trip.
+    func recordCompletionForUndo(_ task: VTask) {
+        undoableCompletion = task
+    }
+
+    func clearUndoIfMatches(id: Int64) {
+        if undoableCompletion?.id == id {
+            undoableCompletion = nil
         }
     }
 

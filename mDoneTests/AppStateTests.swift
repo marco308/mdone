@@ -176,4 +176,54 @@ final class AppStateTests: XCTestCase {
         XCTAssertNil(auth.getToken())
         XCTAssertNil(auth.getRefreshToken())
     }
+
+    // MARK: - Shake-to-undo completion tracking (#82)
+
+    func testNoUndoTargetByDefault() {
+        let appState = AppState()
+        XCTAssertFalse(appState.canUndoLastCompletion)
+        XCTAssertNil(appState.undoableCompletionTitle)
+    }
+
+    func testRecordingCompletionMakesItUndoable() {
+        let appState = AppState()
+        let task = VTask(id: 7, title: "Walk the dog", done: false, priority: 0, projectId: 10)
+
+        appState.recordCompletionForUndo(task)
+
+        XCTAssertTrue(appState.canUndoLastCompletion)
+        XCTAssertEqual(appState.undoableCompletionTitle, "Walk the dog")
+        XCTAssertEqual(appState.undoableCompletion?.id, 7)
+    }
+
+    func testRecordingNewerCompletionReplacesPrevious() {
+        let appState = AppState()
+        appState.recordCompletionForUndo(VTask(id: 1, title: "First", done: false, priority: 0, projectId: 10))
+        appState.recordCompletionForUndo(VTask(id: 2, title: "Second", done: false, priority: 0, projectId: 10))
+
+        XCTAssertEqual(appState.undoableCompletion?.id, 2,
+                       "Only the most recent completion is undoable")
+        XCTAssertEqual(appState.undoableCompletionTitle, "Second")
+    }
+
+    func testClearUndoMatchingIdResets() {
+        let appState = AppState()
+        appState.recordCompletionForUndo(VTask(id: 5, title: "Task", done: false, priority: 0, projectId: 10))
+
+        appState.clearUndoIfMatches(id: 5)
+
+        XCTAssertFalse(appState.canUndoLastCompletion,
+                       "Un-completing the same task by other means clears the undo target")
+    }
+
+    func testClearUndoNonMatchingIdKeepsTarget() {
+        let appState = AppState()
+        appState.recordCompletionForUndo(VTask(id: 5, title: "Task", done: false, priority: 0, projectId: 10))
+
+        appState.clearUndoIfMatches(id: 99)
+
+        XCTAssertTrue(appState.canUndoLastCompletion,
+                      "A different task changing state must not clear the pending undo")
+        XCTAssertEqual(appState.undoableCompletion?.id, 5)
+    }
 }
