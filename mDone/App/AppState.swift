@@ -43,6 +43,15 @@ final class AppState {
     var onTaskCompleted: ((Int64) -> Void)?
     var onTaskDeleted: ((Int64) -> Void)?
 
+    /// The most recently completed task, eligible for shake-to-undo on iPhone.
+    /// Holds the task as it was *before* completion so undo can restore it.
+    /// Replaced when a newer task is completed, and cleared once undone or if
+    /// the same task is un-completed by other means.
+    private(set) var undoableCompletion: VTask?
+
+    var canUndoLastCompletion: Bool { undoableCompletion != nil }
+    var undoableCompletionTitle: String? { undoableCompletion?.title }
+
     /// Per-project ordered task lists fetched from the view endpoint (preserves positions).
     var projectTaskCache: [Int64: [VTask]] = [:]
 
@@ -50,7 +59,13 @@ final class AppState {
         notifications.filter { $0.read != true }.count
     }
 
-    private let taskService = TaskService()
+    /// `taskService` is injectable so tests can drive the network paths
+    /// (e.g. `undoLastCompletion`) through a mocked `APIClient`.
+    init(taskService: TaskService = TaskService()) {
+        self.taskService = taskService
+    }
+
+    private let taskService: TaskService
     private let projectService = ProjectService()
     private let authService = AuthService.shared
     private let notificationService = NotificationService.shared
@@ -451,7 +466,10 @@ final class AppState {
             }
             syncService?.updateCachedTask(updated)
             if updated.done {
+                recordCompletionForUndo(task)
                 onTaskCompleted?(updated.id)
+            } else {
+                clearUndoIfMatches(id: updated.id)
             }
             #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -459,6 +477,57 @@ final class AppState {
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
             handleError(error)
+        }
+    }
+
+    /// Restores the most recently completed task to its incomplete state.
+    /// Invoked by the iPhone shake-to-undo prompt. No-op when nothing is
+    /// pending undo. On failure the undo target is kept so the user can retry.
+    @MainActor
+    func undoLastCompletion() async {
+        guard let target = undoableCompletion else { return }
+        undoableCompletion = nil
+        do {
+            _ = try await taskService.updateTask(id: target.id, request: TaskUpdateRequest(done: false))
+            // Restore the task to its exact pre-completion state. We rebuild from
+            // the stored snapshot rather than the update response because the
+            // response can omit fields like the due date, which would land the
+            // task in the wrong Inbox section (e.g. "No Date" instead of "Today").
+            // The completed task may also have been dropped from `tasks` by a
+            // refresh (the all-tasks fetch returns only undone tasks), so re-insert
+            // it when it's no longer present rather than silently doing nothing.
+            var restored = target
+            restored.done = false
+            if let index = tasks.firstIndex(where: { $0.id == restored.id }) {
+                tasks[index] = restored
+            } else {
+                tasks.append(restored)
+            }
+            syncService?.updateCachedTask(restored)
+            #if os(iOS)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            #endif
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            // Only restore the old target if no newer completion was recorded
+            // while this request was in flight — otherwise we'd clobber the more
+            // recent undo target and break "undo the most recent completion".
+            if undoableCompletion == nil {
+                undoableCompletion = target
+            }
+            handleError(error)
+        }
+    }
+
+    /// Records `task` (in its pre-completion state) as the pending shake-to-undo
+    /// target. Exposed for testing the tracking logic without a network round-trip.
+    func recordCompletionForUndo(_ task: VTask) {
+        undoableCompletion = task
+    }
+
+    func clearUndoIfMatches(id: Int64) {
+        if undoableCompletion?.id == id {
+            undoableCompletion = nil
         }
     }
 
