@@ -482,16 +482,22 @@ final class AppState {
         guard let target = undoableCompletion else { return }
         undoableCompletion = nil
         do {
-            let updated = try await taskService.updateTask(id: target.id, request: TaskUpdateRequest(done: false))
-            // The completed task may have been dropped from `tasks` by a refresh
-            // (the all-tasks fetch returns only undone tasks), so re-insert it
-            // when it's no longer present rather than silently doing nothing.
-            if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
-                tasks[index] = updated
+            _ = try await taskService.updateTask(id: target.id, request: TaskUpdateRequest(done: false))
+            // Restore the task to its exact pre-completion state. We rebuild from
+            // the stored snapshot rather than the update response because the
+            // response can omit fields like the due date, which would land the
+            // task in the wrong Inbox section (e.g. "No Date" instead of "Today").
+            // The completed task may also have been dropped from `tasks` by a
+            // refresh (the all-tasks fetch returns only undone tasks), so re-insert
+            // it when it's no longer present rather than silently doing nothing.
+            var restored = target
+            restored.done = false
+            if let index = tasks.firstIndex(where: { $0.id == restored.id }) {
+                tasks[index] = restored
             } else {
-                tasks.append(updated)
+                tasks.append(restored)
             }
-            syncService?.updateCachedTask(updated)
+            syncService?.updateCachedTask(restored)
             #if os(iOS)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             #endif
