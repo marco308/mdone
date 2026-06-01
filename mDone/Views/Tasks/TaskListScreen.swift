@@ -7,6 +7,8 @@ struct TaskListScreen: View {
     @Environment(FocusManager.self) private var focusManager
     #endif
     var projectFilter: Project?
+    /// When true, hides the quick-add bar — used for archived (read-only) projects.
+    var readOnly: Bool = false
     @State private var showAdvancedFilter = false
     @State private var sortOrder: SortOrder = .dueDate
     @State private var sortAscending: Bool = true
@@ -74,10 +76,12 @@ struct TaskListScreen: View {
                 }
             }
 
-            QuickAddBar(
-                projectId: projectFilter?.id ?? defaultProjectId,
-                defaultDueDate: projectFilter == nil ? DefaultDueTimePreference.apply(to: Date()) : nil
-            )
+            if !readOnly {
+                QuickAddBar(
+                    projectId: projectFilter?.id ?? defaultProjectId,
+                    defaultDueDate: projectFilter == nil ? DefaultDueTimePreference.apply(to: Date()) : nil
+                )
+            }
         }
         .task(id: projectFilter?.id) {
             if let projectFilter {
@@ -265,14 +269,13 @@ struct TaskListScreen: View {
 
     private func sorted(_ tasks: [VTask]) -> [VTask] {
         tasks.sorted { a, b in
-            let result: Bool
-            switch sortOrder {
+            let result: Bool = switch sortOrder {
             case .dueDate:
-                result = (a.effectiveDueDate ?? .distantFuture) < (b.effectiveDueDate ?? .distantFuture)
+                (a.effectiveDueDate ?? .distantFuture) < (b.effectiveDueDate ?? .distantFuture)
             case .priority:
-                result = a.priority > b.priority
+                a.priority > b.priority
             case .title:
-                result = a.title.localizedCompare(b.title) == .orderedAscending
+                a.title.localizedCompare(b.title) == .orderedAscending
             }
             return sortAscending ? result : !result
         }

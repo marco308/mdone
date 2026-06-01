@@ -1,3 +1,4 @@
+import SwiftData
 import XCTest
 @testable import mDone
 
@@ -281,5 +282,56 @@ final class SyncServiceTests: XCTestCase {
 
         operation.failed = true
         XCTAssertTrue(operation.failed)
+    }
+
+    // MARK: - Local Project Cache (in-memory container)
+
+    @MainActor
+    private func makeInMemorySyncService() throws -> SyncService {
+        let schema = Schema([
+            CachedTask.self,
+            CachedProject.self,
+            CachedLabel.self,
+            PendingOperation.self,
+            FocusRecord.self,
+        ])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let client = APIClient(session: MockURLProtocol.mockSession())
+        return SyncService(
+            taskService: TaskService(apiClient: client),
+            projectService: ProjectService(apiClient: client),
+            modelContainer: container
+        )
+    }
+
+    @MainActor
+    func testUpdateCachedProjectInsertsThenUpdatesInPlace() throws {
+        let sync = try makeInMemorySyncService()
+
+        sync.updateCachedProject(
+            Project(id: 1, title: "Work", hexColor: "#FF0000", isArchived: false, isFavorite: false)
+        )
+        var cached = try sync.loadCachedProjects()
+        XCTAssertEqual(cached.map(\.id), [1])
+        XCTAssertEqual(cached.first?.title, "Work")
+
+        // Same id mutates in place rather than inserting a duplicate.
+        sync.updateCachedProject(Project(id: 1, title: "Work (renamed)", isArchived: true, isFavorite: false))
+        cached = try sync.loadCachedProjects()
+        XCTAssertEqual(cached.count, 1)
+        XCTAssertEqual(cached.first?.title, "Work (renamed)")
+        XCTAssertEqual(cached.first?.isArchived, true)
+    }
+
+    @MainActor
+    func testDeleteCachedProjectRemovesIt() throws {
+        let sync = try makeInMemorySyncService()
+        sync.updateCachedProject(Project(id: 1, title: "Keep"))
+        sync.updateCachedProject(Project(id: 2, title: "Remove"))
+
+        sync.deleteCachedProject(id: 2)
+        let cached = try sync.loadCachedProjects()
+        XCTAssertEqual(cached.map(\.id), [1])
     }
 }

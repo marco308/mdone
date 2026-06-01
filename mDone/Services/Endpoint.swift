@@ -30,11 +30,17 @@ struct Endpoint {
 
     // MARK: - Projects
 
-    static func projects(page: Int = 1, perPage: Int = 50) -> Endpoint {
-        Endpoint(path: "/api/v1/projects", queryItems: [
+    /// Lists projects. Vikunja excludes archived projects unless `is_archived=true`
+    /// is passed, in which case it returns active **and** archived projects.
+    static func projects(page: Int = 1, perPage: Int = 50, includeArchived: Bool = false) -> Endpoint {
+        var items = [
             URLQueryItem(name: "page", value: "\(page)"),
             URLQueryItem(name: "per_page", value: "\(perPage)"),
-        ])
+        ]
+        if includeArchived {
+            items.append(URLQueryItem(name: "is_archived", value: "true"))
+        }
+        return Endpoint(path: "/api/v1/projects", queryItems: items)
     }
 
     static func project(id: Int64) -> Endpoint {
@@ -43,6 +49,21 @@ struct Endpoint {
 
     static func projectViews(projectId: Int64) -> Endpoint {
         Endpoint(path: "/api/v1/projects/\(projectId)/views")
+    }
+
+    /// Creates a project. Vikunja uses PUT (not POST) for creation.
+    static func createProject() -> Endpoint {
+        Endpoint(path: "/api/v1/projects", method: .PUT)
+    }
+
+    /// Updates a project (title, description, colour, favourite, archived).
+    static func updateProject(id: Int64) -> Endpoint {
+        Endpoint(path: "/api/v1/projects/\(id)", method: .POST)
+    }
+
+    /// Deletes a project. Vikunja cascades this to all tasks and descendant projects.
+    static func deleteProject(id: Int64) -> Endpoint {
+        Endpoint(path: "/api/v1/projects/\(id)", method: .DELETE)
     }
 
     // MARK: - Tasks

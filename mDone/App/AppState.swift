@@ -15,6 +15,9 @@ final class AppState {
 
     var tasks: [VTask] = []
     var projects: [Project] = []
+    /// Archived projects, loaded on demand for the Archived view. Kept separate
+    /// from `projects`, which only ever holds active (non-archived) projects.
+    var archivedProjects: [Project] = []
     var labels: [VLabel] = []
     var notifications: [VNotification] = []
     var selectedProject: Project?
@@ -49,8 +52,13 @@ final class AppState {
     /// the same task is un-completed by other means.
     private(set) var undoableCompletion: VTask?
 
-    var canUndoLastCompletion: Bool { undoableCompletion != nil }
-    var undoableCompletionTitle: String? { undoableCompletion?.title }
+    var canUndoLastCompletion: Bool {
+        undoableCompletion != nil
+    }
+
+    var undoableCompletionTitle: String? {
+        undoableCompletion?.title
+    }
 
     /// Per-project ordered task lists fetched from the view endpoint (preserves positions).
     var projectTaskCache: [Int64: [VTask]] = [:]
@@ -61,12 +69,13 @@ final class AppState {
 
     /// `taskService` is injectable so tests can drive the network paths
     /// (e.g. `undoLastCompletion`) through a mocked `APIClient`.
-    init(taskService: TaskService = TaskService()) {
+    init(taskService: TaskService = TaskService(), projectService: ProjectService = ProjectService()) {
         self.taskService = taskService
+        self.projectService = projectService
     }
 
     private let taskService: TaskService
-    private let projectService = ProjectService()
+    private let projectService: ProjectService
     private let authService = AuthService.shared
     private let notificationService = NotificationService.shared
 
@@ -668,6 +677,152 @@ final class AppState {
     static func uniquedById(_ tasks: [VTask]) -> [VTask] {
         var seen = Set<Int64>()
         return tasks.filter { seen.insert($0.id).inserted }
+    }
+
+    // MARK: - Project Mutations
+
+    /// Creates a project and returns it on success (or `nil` on failure).
+    /// Empty description/colour are sent as `nil` so Vikunja stores them empty.
+    @MainActor
+    @discardableResult
+    func createProject(
+        title: String,
+        description: String? = nil,
+        hexColor: String? = nil,
+        isFavorite: Bool = false
+    ) async -> Project? {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let request = ProjectCreateRequest(
+            title: trimmed,
+            description: description.flatMap { $0.isEmpty ? nil : $0 },
+            hexColor: hexColor.flatMap { $0.isEmpty ? nil : $0 },
+            isFavorite: isFavorite
+        )
+        do {
+            let newProject = try await projectService.createProject(request)
+            projects.append(newProject)
+            syncService?.updateCachedProject(newProject)
+            #if os(iOS)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
+            WidgetCenter.shared.reloadAllTimelines()
+            return newProject
+        } catch {
+            handleError(error)
+            return nil
+        }
+    }
+
+    /// Applies edits from the edit sheet. Sends the project's full field set so no
+    /// column is accidentally cleared server-side.
+    @MainActor
+    func updateProject(
+        _ project: Project,
+        title: String,
+        description: String,
+        hexColor: String,
+        isFavorite: Bool
+    ) async {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let request = ProjectUpdateRequest(
+            from: project,
+            title: trimmed,
+            description: description,
+            hexColor: hexColor,
+            isFavorite: isFavorite
+        )
+        await performProjectUpdate(id: project.id, request: request)
+    }
+
+    /// Archives a project (reversible). It leaves the active list and joins `archivedProjects`.
+    @MainActor
+    func archiveProject(_ project: Project) async {
+        guard project.id > 0 else { return }
+        await performProjectUpdate(id: project.id, request: ProjectUpdateRequest(from: project, isArchived: true))
+    }
+
+    /// Unarchives a project, returning it to the active list.
+    @MainActor
+    func unarchiveProject(_ project: Project) async {
+        guard project.id > 0 else { return }
+        await performProjectUpdate(id: project.id, request: ProjectUpdateRequest(from: project, isArchived: false))
+    }
+
+    /// Permanently deletes a project. Vikunja cascades this server-side to every task
+    /// and descendant project — it cannot be undone. Cleans up all local state that
+    /// referenced the project so no ghost rows or stale selection remain.
+    @MainActor
+    func deleteProject(_ project: Project) async {
+        guard project.id > 0 else { return } // never delete pseudo-projects (e.g. Favourites, id -1)
+        let projectId = project.id
+        do {
+            try await projectService.deleteProject(id: projectId)
+            projects.removeAll { $0.id == projectId }
+            archivedProjects.removeAll { $0.id == projectId }
+            tasks.removeAll { $0.projectId == projectId }
+            projectTaskCache[projectId] = nil
+            if selectedProject?.id == projectId { selectedProject = nil }
+            syncService?.deleteCachedProject(id: projectId)
+            #if os(iOS)
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            #endif
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            handleError(error)
+        }
+    }
+
+    /// Loads archived projects for the Archived view. Vikunja's include-archived fetch
+    /// returns active **and** archived projects, so we keep only the archived ones.
+    @MainActor
+    func fetchArchivedProjects() async {
+        do {
+            let all = try await projectService.fetchProjects(includeArchived: true)
+            archivedProjects = all.filter { $0.isArchived == true }
+        } catch {
+            handleError(error)
+        }
+    }
+
+    @MainActor
+    private func performProjectUpdate(id: Int64, request: ProjectUpdateRequest) async {
+        do {
+            var updated = try await projectService.updateProject(id: id, request: request)
+            // Trust our intended archived state for list placement, in case the
+            // server response omits `is_archived`.
+            updated.isArchived = request.isArchived
+            applyUpdatedProject(updated)
+            syncService?.updateCachedProject(updated)
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            handleError(error)
+        }
+    }
+
+    /// Routes an updated project into `projects` or `archivedProjects` based on its
+    /// archived state, removing it from the other list. Edits to an active project keep
+    /// their position (in-place replace); unarchived projects append until next refresh.
+    @MainActor
+    private func applyUpdatedProject(_ project: Project) {
+        if project.isArchived ?? false {
+            projects.removeAll { $0.id == project.id }
+            if let idx = archivedProjects.firstIndex(where: { $0.id == project.id }) {
+                archivedProjects[idx] = project
+            } else {
+                archivedProjects.append(project)
+            }
+            if selectedProject?.id == project.id { selectedProject = nil }
+        } else {
+            archivedProjects.removeAll { $0.id == project.id }
+            if let idx = projects.firstIndex(where: { $0.id == project.id }) {
+                projects[idx] = project
+            } else {
+                projects.append(project)
+            }
+            if selectedProject?.id == project.id { selectedProject = project }
+        }
     }
 
     // MARK: - Calendar Events
