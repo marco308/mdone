@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-06-01
+
+### Added
+- Settings → "About mDone" opens an About screen (iPhone and Mac) with the app version, a link to report bugs or request features, a link to the source on GitHub, and ways to support development (GitHub Sponsors and Buy Me a Coffee).
+
 ## [1.4.0] - 2026-05-29
 
 ### Added
