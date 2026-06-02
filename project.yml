@@ -67,6 +67,7 @@ targets:
       testTargets:
         - mDoneTests
         - mDoneUITests
+        - mDoneWidgetRenderTests
       gatherCoverageData: true
 
   mDone-macOS:
@@ -155,3 +156,24 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.uitests
         GENERATE_INFOPLIST_FILE: "YES"
         TEST_TARGET_NAME: mDone
+
+  # Unhosted logic-test target used only to render widget views to PNGs for the
+  # marketing site (ImageRenderer). Compiles the widget views + shared models
+  # directly (the same set the extension builds from), so it needs NO dependency
+  # on the app and can't clash with mDone's copy of the shared types. The
+  # generator inside self-disables outside the dev worktree.
+  mDoneWidgetRenderTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - mDoneWidgetRenderTests
+      - mDoneShared
+      - path: mDoneWidgets
+        excludes:
+          - mDoneWidgets.swift   # @main WidgetBundle — not valid in a test bundle
+          - Info.plist
+          - "*.entitlements"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.widgetrender
+        GENERATE_INFOPLIST_FILE: "YES"

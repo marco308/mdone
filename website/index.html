@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- Mark JS as available so scroll-reveal only hides content when it can also reveal it (no-JS / crawlers see everything). -->
+<script>document.documentElement.classList.add('js');</script>
+<title>mDone: A native task manager for your self-hosted Vikunja</title>
+<meta name="description" content="mDone is a polished, native iOS and macOS app for your self-hosted Vikunja server. Smart lists, widgets, a focus timer, repeating tasks, and offline sync, with zero tracking." />
+<meta name="theme-color" content="#527AFA" />
+
+<!-- Social / link previews -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="mDone: beautifully done tasks for self-hosted Vikunja" />
+<meta property="og:description" content="A polished, native iOS & macOS client for your Vikunja server. Smart lists, widgets, focus timer, offline sync, zero tracking." />
+<meta property="og:image" content="assets/icon.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="mDone: beautifully done tasks for self-hosted Vikunja" />
+<meta name="twitter:description" content="A polished, native iOS & macOS client for your Vikunja server. Zero tracking." />
+<meta name="twitter:image" content="assets/icon.png" />
+
+<link rel="icon" href="assets/icon.png" />
+<link rel="apple-touch-icon" href="assets/icon.png" />
+
+<!-- Fonts: Fraunces (editorial display) + Hanken Grotesk (body) -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+<style>
+/* ============================================================
+   mDone landing page
+   Palette anchor: app icon cobalt #527AFA on warm paper.
+   ============================================================ */
+:root{
+  --brand:        #527AFA;
+  --brand-ink:    #2f54d6;   /* darker cobalt for text/hover on light */
+  --brand-deep:   #1d2c66;
+  --brand-tint:   #eef2fe;   /* pale wash for chips/cards */
+  --brand-tint-2: #e3eafd;
+
+  --bg:     #faf8f4;         /* warm paper */
+  --bg-2:   #f3efe7;         /* deeper warm band */
+  --card:   #ffffff;
+  --ink:    #14161d;         /* near-black, faint blue */
+  --ink-2:  #565b69;         /* secondary text */
+  --ink-3:  #8a8f9c;         /* tertiary / captions */
+  --line:   rgba(20,22,29,.10);
+  --line-2: rgba(20,22,29,.06);
+
+  --night:  #0f1322;         /* dark section bg */
+  --night-2:#171c30;
+
+  --r-lg: 28px;
+  --r-md: 18px;
+  --r-sm: 12px;
+
+  --shadow-sm: 0 1px 2px rgba(20,30,70,.06), 0 4px 14px -6px rgba(20,30,70,.12);
+  --shadow-md: 0 10px 30px -12px rgba(20,30,70,.22);
+  --shadow-lg: 0 40px 80px -28px rgba(23,33,80,.40);
+
+  --maxw: 1140px;
+  --display: "Fraunces", Georgia, "Times New Roman", serif;
+  --sans: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; -webkit-text-size-adjust:100%; }
+body{
+  margin:0;
+  font-family:var(--sans);
+  color:var(--ink);
+  background:var(--bg);
+  line-height:1.6;
+  font-size:17px;
+  letter-spacing:-.005em;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  overflow-x:hidden;
+}
+
+/* Grain overlay adds quiet texture instead of flat fills */
+body::before{
+  content:"";
+  position:fixed; inset:0; z-index:9999; pointer-events:none;
+  opacity:.035; mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+a{ color:inherit; text-decoration:none; }
+img{ display:block; max-width:100%; }
+:focus-visible{ outline:2.5px solid var(--brand); outline-offset:3px; border-radius:6px; }
+
+.wrap{ width:100%; max-width:var(--maxw); margin:0 auto; padding:0 24px; }
+.eyebrow{
+  font-size:12.5px; font-weight:600; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--brand-ink);
+}
+.serif{ font-family:var(--display); }
+.muted{ color:var(--ink-2); }
+
+h1,h2,h3{ font-family:var(--display); font-weight:600; line-height:1.04; letter-spacing:-.02em; margin:0; }
+h2{ font-size:clamp(30px,4.4vw,46px); }
+h3{ font-size:21px; letter-spacing:-.01em; line-height:1.2; }
+p{ margin:0; }
+
+/* ---------- buttons ---------- */
+.btn{
+  display:inline-flex; align-items:center; gap:9px;
+  font-family:var(--sans); font-weight:600; font-size:16px;
+  padding:13px 22px; border-radius:999px; cursor:pointer;
+  border:1px solid transparent; transition:transform .18s ease, box-shadow .25s ease, background .2s ease, border-color .2s;
+  white-space:nowrap;
+}
+.btn:active{ transform:translateY(1px); }
+.btn-primary{ background:var(--brand); color:#fff; box-shadow:0 10px 24px -10px rgba(82,122,250,.7); }
+.btn-primary:hover{ background:var(--brand-ink); transform:translateY(-2px); box-shadow:0 16px 30px -10px rgba(82,122,250,.65); }
+.btn-ghost{ background:transparent; color:var(--ink); border-color:var(--line); }
+.btn-ghost:hover{ border-color:var(--ink); transform:translateY(-2px); background:rgba(20,22,29,.02); }
+
+/* Apple App Store badge (custom, tasteful) */
+.badge-apple{
+  display:inline-flex; align-items:center; gap:11px;
+  background:#111319; color:#fff; padding:11px 20px 11px 18px; border-radius:14px;
+  border:1px solid #2a2d36; transition:transform .18s ease, box-shadow .25s ease;
+  box-shadow:var(--shadow-sm);
+}
+.badge-apple:hover{ transform:translateY(-2px); box-shadow:var(--shadow-md); }
+.badge-apple svg{ width:26px; height:26px; flex:none; }
+.badge-apple .b-txt{ display:flex; flex-direction:column; line-height:1.05; }
+.badge-apple .b-txt small{ font-size:11px; letter-spacing:.03em; opacity:.82; }
+.badge-apple .b-txt strong{ font-size:18.5px; font-weight:600; letter-spacing:-.01em; }
+
+/* ---------- nav ---------- */
+header.nav{
+  position:sticky; top:0; z-index:100;
+  background:color-mix(in srgb, var(--bg) 78%, transparent);
+  backdrop-filter:saturate(160%) blur(14px);
+  -webkit-backdrop-filter:saturate(160%) blur(14px);
+  border-bottom:1px solid transparent; transition:border-color .3s, background .3s;
+}
+header.nav.scrolled{ border-bottom-color:var(--line); }
+.nav-inner{ display:flex; align-items:center; justify-content:space-between; height:68px; }
+.brand{ display:flex; align-items:center; gap:11px; font-weight:600; font-size:19px; letter-spacing:-.02em; }
+.brand .glyph{
+  width:34px; height:34px; border-radius:9px;
+  background:linear-gradient(150deg,#6b8dff,#3f63ee);
+  display:grid; place-items:center; box-shadow:0 6px 14px -6px rgba(82,122,250,.8), inset 0 1px 0 rgba(255,255,255,.4);
+}
+.brand .glyph svg{ width:20px; height:20px; }
+.nav-links{ display:flex; align-items:center; gap:34px; }
+.nav-links a{ font-size:15px; font-weight:500; color:var(--ink-2); transition:color .2s; }
+.nav-links a:hover{ color:var(--ink); }
+.nav-cta{ display:flex; align-items:center; gap:14px; }
+
+/* ---------- hero ---------- */
+.hero{ position:relative; padding:74px 0 90px; overflow:hidden; }
+.glow{ position:absolute; inset:0; z-index:-1; pointer-events:none; }
+.glow::before, .glow::after{ content:""; position:absolute; border-radius:50%; filter:blur(80px); opacity:.5; }
+.glow::before{ width:620px; height:620px; left:-160px; top:-220px;
+  background:radial-gradient(circle, rgba(82,122,250,.55), transparent 70%); }
+.glow::after{ width:520px; height:520px; right:-140px; top:40px;
+  background:radial-gradient(circle, rgba(120,160,255,.40), transparent 70%); }
+.hero-grid{ display:grid; grid-template-columns:1.05fr .95fr; gap:40px; align-items:center; }
+
+.pill{
+  display:inline-flex; align-items:center; gap:9px;
+  background:var(--card); border:1px solid var(--line);
+  padding:7px 14px 7px 11px; border-radius:999px; box-shadow:var(--shadow-sm);
+  font-size:13px; font-weight:500; color:var(--ink-2);
+}
+.pill .dot{ width:7px; height:7px; border-radius:50%; background:var(--brand); box-shadow:0 0 0 3px rgba(82,122,250,.18); }
+
+h1.hero-title{
+  font-size:clamp(42px,6.4vw,76px); line-height:.98; margin:22px 0 0;
+  letter-spacing:-.03em;
+}
+h1.hero-title em{ font-style:italic; color:var(--brand-ink); font-weight:500; }
+.hero-sub{ font-size:clamp(17px,2.2vw,20px); color:var(--ink-2); margin-top:22px; max-width:30em; }
+.hero-actions{ display:flex; align-items:center; gap:14px; margin-top:32px; flex-wrap:wrap; }
+.hero-note{ display:flex; align-items:center; gap:18px; margin-top:24px; color:var(--ink-3); font-size:14px; flex-wrap:wrap; }
+.hero-note span{ display:inline-flex; align-items:center; gap:7px; }
+.hero-note svg{ width:15px; height:15px; color:var(--brand-ink); }
+
+/* phone visual */
+.hero-art{ position:relative; justify-self:center; z-index:0; }
+.phone{
+  position:relative; width:300px; aspect-ratio:1284/2778;
+  background:#0c0c0e; border-radius:46px; padding:11px;
+  box-shadow:var(--shadow-lg), inset 0 0 0 2px rgba(255,255,255,.06);
+  border:1px solid rgba(0,0,0,.4);
+}
+.phone .screen{ width:100%; height:100%; border-radius:36px; overflow:hidden; background:#fff; position:relative; }
+.phone .screen img{ width:100%; height:100%; object-fit:cover; object-position:top center; }
+.phone .island{
+  position:absolute; top:13px; left:50%; transform:translateX(-50%);
+  width:88px; height:27px; background:#000; border-radius:999px; z-index:3;
+}
+.hero-art .phone.main{ animation:float 7s ease-in-out infinite; z-index:2; }
+.hero-art .phone.back{
+  position:absolute; width:228px; right:-66px; top:64px; z-index:1;
+  transform:rotate(7deg); opacity:.92; filter:saturate(.96);
+  box-shadow:var(--shadow-md);
+}
+
+@keyframes float{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-14px); } }
+
+/* ---------- logo / trust strip ---------- */
+.strip{ border-top:1px solid var(--line); border-bottom:1px solid var(--line); background:var(--bg); }
+.strip .wrap{ display:flex; flex-wrap:wrap; gap:14px 40px; justify-content:center; padding:22px 24px; }
+.strip .item{ display:inline-flex; align-items:center; gap:9px; font-size:14px; font-weight:500; color:var(--ink-2); }
+.strip .item svg{ width:17px; height:17px; color:var(--brand-ink); flex:none; }
+
+/* ---------- section scaffold ---------- */
+section{ padding:96px 0; }
+.sec-head{ max-width:620px; margin:0 auto 56px; text-align:center; }
+.sec-head .eyebrow{ display:block; margin-bottom:14px; }
+.sec-head p{ color:var(--ink-2); margin-top:16px; font-size:18px; }
+
+/* ---------- feature bento ---------- */
+.bento{ display:grid; grid-template-columns:repeat(6,1fr); gap:18px; }
+.card{
+  background:var(--card); border:1px solid var(--line); border-radius:var(--r-md);
+  padding:28px; box-shadow:var(--shadow-sm); position:relative; overflow:hidden;
+  transition:transform .25s ease, box-shadow .3s ease, border-color .3s;
+}
+.card:hover{ transform:translateY(-4px); box-shadow:var(--shadow-md); border-color:var(--brand-tint-2); }
+.card.col-3{ grid-column:span 3; }
+.card.col-2{ grid-column:span 2; }
+.card .ic{
+  width:46px; height:46px; border-radius:13px; display:grid; place-items:center; margin-bottom:18px;
+  background:var(--brand-tint); color:var(--brand-ink); border:1px solid var(--brand-tint-2);
+}
+.card .ic svg{ width:23px; height:23px; }
+.card h3{ margin-bottom:8px; }
+.card p{ color:var(--ink-2); font-size:15.5px; }
+
+/* ---------- alternating showcase ---------- */
+.show{ display:grid; grid-template-columns:1fr 1fr; gap:64px; align-items:center; margin-top:80px; }
+.show:first-of-type{ margin-top:0; }
+.show.flip .show-art{ order:2; }
+.show-copy .eyebrow{ display:block; margin-bottom:14px; }
+.show-copy h2{ font-size:clamp(28px,3.6vw,40px); }
+.show-copy p{ color:var(--ink-2); margin-top:18px; font-size:17.5px; }
+.show-list{ list-style:none; padding:0; margin:24px 0 0; display:grid; gap:13px; }
+.show-list li{ display:flex; gap:12px; align-items:flex-start; font-size:16px; }
+.show-list svg{ width:21px; height:21px; color:var(--brand); flex:none; margin-top:2px; }
+.show-art{ display:flex; justify-content:center; }
+.show-art .phone{ width:268px; }
+
+/* macOS window */
+.macwrap{ margin-top:90px; }
+.macframe{
+  max-width:980px; margin:42px auto 0; border-radius:16px; overflow:hidden;
+  border:1px solid var(--line); box-shadow:var(--shadow-lg); background:#fff;
+}
+.macbar{ height:42px; background:#f4f1ec; border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 16px; gap:8px; }
+.macbar i{ width:12px; height:12px; border-radius:50%; display:block; }
+.macbar .r{ background:#ff5f57; } .macbar .y{ background:#febc2e; } .macbar .g{ background:#28c840; }
+.macframe img{ width:100%; height:auto; display:block; }
+
+/* ---------- focus + widgets ---------- */
+.widgets-block{ margin-top:92px; }
+.widget-stage{
+  display:flex; flex-wrap:wrap; gap:30px; justify-content:center; align-items:flex-start;
+  padding:52px 34px; border-radius:var(--r-lg);
+  background:
+    radial-gradient(120% 140% at 18% 0%, rgba(93,131,251,.32), transparent 55%),
+    linear-gradient(158deg, #e7ecff, #f1eeff 72%);
+  border:1px solid var(--line);
+}
+.widget-tile{ margin:0; width:min(430px,100%); }
+.widget-tile img{ width:100%; height:auto; filter:drop-shadow(0 20px 34px rgba(23,33,80,.30)); }
+.widget-tile figcaption{ text-align:center; margin-top:16px; font-size:12.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); }
+
+/* ---------- privacy (dark) ---------- */
+.privacy{ background:var(--night); color:#fff; position:relative; overflow:hidden; }
+.privacy::before{ content:""; position:absolute; width:600px; height:600px; border-radius:50%;
+  background:radial-gradient(circle, rgba(82,122,250,.35), transparent 70%); filter:blur(70px);
+  top:-200px; right:-120px; }
+.privacy .wrap{ position:relative; }
+.privacy .eyebrow{ color:#8fa9ff; }
+.privacy h2{ color:#fff; max-width:14ch; }
+.privacy .lead{ color:#aeb4c6; font-size:19px; margin-top:18px; max-width:46ch; }
+.priv-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:20px; margin-top:48px; }
+.priv-card{ background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.10); border-radius:var(--r-md); padding:26px; }
+.priv-card .ic{ width:44px; height:44px; border-radius:12px; background:rgba(82,122,250,.18); color:#9db5ff;
+  display:grid; place-items:center; margin-bottom:16px; }
+.priv-card .ic svg{ width:22px; height:22px; }
+.priv-card h3{ color:#fff; font-size:19px; }
+.priv-card p{ color:#a6acbe; font-size:15px; margin-top:8px; }
+
+/* ---------- open source + support ---------- */
+.split{ display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.panel{ border:1px solid var(--line); border-radius:var(--r-lg); padding:42px; background:var(--card); box-shadow:var(--shadow-sm); }
+.panel.tint{ background:linear-gradient(160deg,var(--brand-tint),#fff); }
+.panel h2{ font-size:30px; }
+.panel p{ color:var(--ink-2); margin-top:14px; }
+.panel .actions{ display:flex; gap:12px; margin-top:26px; flex-wrap:wrap; }
+.codeline{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13.5px; background:var(--ink);
+  color:#dfe4ff; padding:14px 16px; border-radius:10px; margin-top:22px; overflow-x:auto; }
+.codeline .c{ color:#7f88a8; }
+
+/* ---------- final CTA ---------- */
+.final{ text-align:center; }
+.final .box{
+  max-width:760px; margin:0 auto; padding:64px 40px; border-radius:var(--r-lg);
+  background:linear-gradient(160deg,#5d83fb,#3f5fe6); color:#fff; position:relative; overflow:hidden;
+  box-shadow:var(--shadow-lg);
+}
+.final .box::after{ content:""; position:absolute; inset:0;
+  background:radial-gradient(circle at 70% -10%, rgba(255,255,255,.28), transparent 55%); }
+.final .box > *{ position:relative; }
+.final h2{ color:#fff; font-size:clamp(30px,4.4vw,44px); }
+.final p{ color:#e4ebff; margin-top:16px; font-size:18px; }
+.final .actions{ display:flex; gap:14px; justify-content:center; margin-top:30px; flex-wrap:wrap; }
+.final .req{ margin-top:22px; font-size:13.5px; color:#cdd9ff; }
+.final .badge-apple{ background:#fff; color:#111; border-color:rgba(255,255,255,.6); }
+.final .btn-ghost{ color:#fff; border-color:rgba(255,255,255,.55); }
+.final .btn-ghost:hover{ background:rgba(255,255,255,.12); border-color:#fff; }
+
+/* ---------- footer ---------- */
+footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0 40px; }
+.foot-grid{ display:flex; justify-content:space-between; gap:40px; flex-wrap:wrap; align-items:flex-start; }
+.foot-brand{ max-width:300px; }
+.foot-brand p{ color:var(--ink-2); font-size:14.5px; margin-top:14px; }
+.foot-cols{ display:flex; gap:64px; flex-wrap:wrap; }
+.foot-col h4{ font-size:13px; text-transform:uppercase; letter-spacing:.12em; color:var(--ink-3); margin:0 0 14px; font-weight:600; }
+.foot-col a{ display:block; color:var(--ink-2); font-size:15px; margin-bottom:11px; transition:color .2s; }
+.foot-col a:hover{ color:var(--brand-ink); }
+.foot-bottom{ margin-top:48px; padding-top:24px; border-top:1px solid var(--line); display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; color:var(--ink-3); font-size:13.5px; }
+
+/* ---------- reveal animation ---------- */
+.js .reveal{ opacity:0; transform:translateY(22px); transition:opacity .7s cubic-bezier(.22,.61,.36,1), transform .7s cubic-bezier(.22,.61,.36,1); }
+.reveal.in{ opacity:1; transform:none; }
+/* hero staggered load */
+.load{ opacity:0; transform:translateY(16px); animation:rise .8s cubic-bezier(.22,.61,.36,1) forwards; }
+.load.d1{ animation-delay:.05s; } .load.d2{ animation-delay:.16s; } .load.d3{ animation-delay:.27s; }
+.load.d4{ animation-delay:.38s; } .load.d5{ animation-delay:.5s; }
+@keyframes rise{ to{ opacity:1; transform:none; } }
+
+/* ---------- responsive ---------- */
+@media (max-width:960px){
+  .hero-grid{ grid-template-columns:1fr; gap:48px; text-align:center; }
+  .hero-sub{ margin-left:auto; margin-right:auto; }
+  .hero-actions, .hero-note{ justify-content:center; }
+  .hero-art{ margin-top:8px; }
+  .bento{ grid-template-columns:repeat(2,1fr); }
+  .card.col-3, .card.col-2{ grid-column:span 1; }
+  .show{ grid-template-columns:1fr; gap:34px; }
+  .show.flip .show-art{ order:0; }
+  .show-copy{ text-align:center; }
+  .show-list{ display:inline-grid; text-align:left; }
+  .priv-grid{ grid-template-columns:1fr; }
+  .split{ grid-template-columns:1fr; }
+}
+@media (max-width:680px){
+  .nav-links{ display:none; }
+  section{ padding:72px 0; }
+  .bento{ grid-template-columns:1fr; }
+  .hero-art .phone.back{ display:none; }
+  .panel{ padding:30px; }
+}
+@media (prefers-reduced-motion:reduce){
+  *{ animation:none !important; transition:none !important; }
+  .js .reveal{ opacity:1; transform:none; }
+  html{ scroll-behavior:auto; }
+}
+</style>
+</head>
+<body>
+
+<!-- ================= NAV ================= -->
+<header class="nav" id="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top" aria-label="mDone home">
+      <span class="glyph" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.5l4.2 4.2L19.5 6" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      mDone
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#features">Features</a>
+      <a href="#showcase">Screens</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#opensource">Open source</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn-primary" href="REPLACE_WITH_APP_STORE_URL">Get mDone</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ================= HERO ================= -->
+<section class="hero">
+  <div class="glow" aria-hidden="true"></div>
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <span class="pill load d1"><span class="dot"></span> Native iOS &amp; macOS · Privacy-first</span>
+      <h1 class="hero-title load d2">Your tasks. Your server.<br><em>Beautifully done.</em></h1>
+      <p class="hero-sub load d3">mDone is a polished, native app for your self-hosted <strong>Vikunja</strong> server: smart lists, widgets, a focus timer and offline sync, with absolutely zero tracking.</p>
+      <div class="hero-actions load d4">
+        <a class="badge-apple" href="REPLACE_WITH_APP_STORE_URL" aria-label="Download mDone on the App Store">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.36 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.02-1.5-2.62-1.71-3.19-1.73-1.36-.14-2.65.8-3.34.8-.68 0-1.75-.78-2.87-.76-1.48.02-2.84.86-3.6 2.18-1.53 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.25 2.74 2.21 1.1-.04 1.51-.71 2.85-.71 1.33 0 1.71.71 2.87.69 1.18-.02 1.94-1.08 2.66-2.14.84-1.23 1.19-2.42 1.21-2.48-.03-.01-2.32-.89-2.34-3.53zM14.2 5.83c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.55 1.31-.56.64-1.05 1.67-.92 2.66.97.07 1.96-.49 2.57-1.21z"/></svg>
+          <span class="b-txt"><small>Download on the</small><strong>App Store</strong></span>
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/marco308/mdone">
+          <svg width="19" height="19" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          View on GitHub
+        </a>
+      </div>
+      <div class="hero-note load d5">
+        <span><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Open source (MIT)</span>
+        <span><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> No analytics, ever</span>
+        <span><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Works offline</span>
+      </div>
+    </div>
+
+    <div class="hero-art">
+      <div class="phone back" aria-hidden="true">
+        <span class="island"></span>
+        <div class="screen"><img src="assets/shot-calendar.png" alt="" loading="lazy" /></div>
+      </div>
+      <div class="phone main">
+        <span class="island"></span>
+        <div class="screen"><img src="assets/shot-inbox.png" alt="mDone inbox showing today and upcoming tasks" /></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TRUST STRIP ================= -->
+<div class="strip">
+  <div class="wrap">
+    <span class="item"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg> Talks only to your server</span>
+    <span class="item"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="2"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> iOS 18 &amp; macOS 15</span>
+    <span class="item"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Smart lists &amp; widgets</span>
+    <span class="item"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Focus timer + Live Activities</span>
+    <span class="item"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0114-5m2 5a8 8 0 01-14 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 3v4h-4M6 21v-4h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Offline sync</span>
+  </div>
+</div>
+
+<!-- ================= FEATURES (bento) ================= -->
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Everything you need</span>
+      <h2 class="serif">A focused home for the work that matters.</h2>
+      <p>mDone brings your Vikunja tasks to life with the native iOS and macOS touches you'd expect, and nothing you wouldn't.</p>
+    </div>
+
+    <div class="bento">
+      <div class="card col-3 reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h10M4 12h16M4 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 5l1.4 1.4L22 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3>Smart Lists</h3>
+        <p>Today, Upcoming, and Overdue views organise everything automatically, so you always know what to focus on next.</p>
+      </div>
+      <div class="card col-3 reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 11l1.2 2.4 2.6.3-1.9 1.8.5 2.6L12 17l-2.4 1.1.5-2.6-1.9-1.8 2.6-.3L12 11z" fill="currentColor"/></svg></div>
+        <h3>Projects &amp; Favorites</h3>
+        <p>Organise tasks into projects and pin the ones you live in to the sidebar for one-tap access.</p>
+      </div>
+      <div class="card col-2 reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/></svg></div>
+        <h3>Home &amp; Lock Screen Widgets</h3>
+        <p>Today's agenda, upcoming, and overdue, right on your home or lock screen. Customise size and content.</p>
+      </div>
+      <div class="card col-2 reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="13" r="7" stroke="currentColor" stroke-width="2"/><path d="M12 10v3l2 1.5M9 3h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <h3>Focus Timer</h3>
+        <p>Work through tasks with purpose. Live Activities keep the timer on your lock screen and Dynamic Island.</p>
+      </div>
+      <div class="card col-2 reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0114-5m2 5a8 8 0 01-14 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 3v4h-4M6 21v-4h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3>Repeating Tasks</h3>
+        <p>Daily, weekly, monthly or custom intervals. Completed repeats generate their next occurrence automatically.</p>
+      </div>
+      <div class="card col-2 reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="16" rx="2.5" stroke="currentColor" stroke-width="2"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <h3>Calendar View</h3>
+        <p>See your tasks across days and weeks. Spot the gaps, plan ahead, and keep your week in balance.</p>
+      </div>
+      <div class="card col-2 reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M7 18a4 4 0 01-.5-7.97A6 6 0 0118 9.5a3.5 3.5 0 011 6.86" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 12v8m0 0l-2.5-2.5M12 20l2.5-2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3>Offline Support</h3>
+        <p>Tasks are cached locally so you can keep working without a connection. Changes sync when you're back online.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SHOWCASE ================= -->
+<section id="showcase" style="background:var(--bg-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line);">
+  <div class="wrap">
+
+    <div class="show">
+      <div class="show-art reveal">
+        <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-inbox.png" alt="mDone inbox with smart lists" loading="lazy" /></div></div>
+      </div>
+      <div class="show-copy reveal">
+        <span class="eyebrow">Stay on top of it</span>
+        <h2 class="serif">Today, front and centre.</h2>
+        <p>Open mDone and the right things are already in front of you. Smart lists pull your day together so nothing slips.</p>
+        <ul class="show-list">
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Quick-add a task without leaving the list</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Swipe to complete, postpone, or reschedule</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Shake to undo an accidental completion</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="show flip">
+      <div class="show-art reveal">
+        <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-calendar.png" alt="mDone calendar view" loading="lazy" /></div></div>
+      </div>
+      <div class="show-copy reveal">
+        <span class="eyebrow">See the week</span>
+        <h2 class="serif">The shape of your time.</h2>
+        <p>An integrated calendar lays your tasks out across days and weeks, and folds in your device calendar events so you see the whole picture.</p>
+        <ul class="show-list">
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Tasks and calendar events, side by side</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Choose which calendars contribute</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Start the week on any day you like</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="show">
+      <div class="show-art reveal">
+        <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-detail.png" alt="mDone task detail editor" loading="lazy" /></div></div>
+      </div>
+      <div class="show-copy reveal">
+        <span class="eyebrow">Every detail</span>
+        <h2 class="serif">Rich tasks, one tap away.</h2>
+        <p>Set due dates, priorities, repeats, estimates, and Markdown notes in a detail view that feels native on every screen.</p>
+        <ul class="show-list">
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Markdown descriptions render beautifully</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Add a focus session right from a task</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Estimate how long it'll take</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="macwrap reveal" style="text-align:center;">
+      <span class="eyebrow">Right at home on the Mac</span>
+      <h2 class="serif" style="margin-top:14px;">A real macOS app, not a port.</h2>
+      <p class="muted" style="max-width:46ch;margin:16px auto 0;">A proper sidebar layout, keyboard-friendly navigation, and the same data, synced through your own server.</p>
+      <div class="macframe">
+        <div class="macbar"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+        <img src="assets/shot-mac.png" alt="mDone running on macOS with a sidebar and today's tasks" loading="lazy" />
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ================= FOCUS & WIDGETS ================= -->
+<section id="focus">
+  <div class="wrap">
+
+    <div class="show">
+      <div class="show-art reveal">
+        <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-focus.png" alt="mDone Focus Timer counting up on a task" loading="lazy" /></div></div>
+      </div>
+      <div class="show-copy reveal">
+        <span class="eyebrow">Focus</span>
+        <h2 class="serif">One task. The clock. Nothing else.</h2>
+        <p>Start a focus session on any task and the rest fades away. A Live Activity keeps the timer on your Lock Screen and in the Dynamic Island, so you can set the phone down and keep going.</p>
+        <ul class="show-list">
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Pause, resume, or finish without unlocking</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Live Activity on the Lock Screen and Dynamic Island</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Focus time and session counts saved per task</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="widgets-block">
+      <div class="sec-head reveal" style="margin-bottom:44px;">
+        <span class="eyebrow">Home &amp; Lock Screen</span>
+        <h2 class="serif">Your day, before you open the app.</h2>
+        <p>Today, upcoming, and overdue right where you glance. Long-press to choose the size, what it shows, and the text scale.</p>
+      </div>
+      <div class="widget-stage reveal">
+        <figure class="widget-tile">
+          <img src="assets/shot-widget-today-medium.png" alt="mDone Today's Tasks widget showing an overdue task and tasks due today" loading="lazy" />
+          <figcaption>Today's Tasks</figcaption>
+        </figure>
+        <figure class="widget-tile">
+          <img src="assets/shot-widget-upcoming.png" alt="mDone Upcoming widget showing the next few days of tasks" loading="lazy" />
+          <figcaption>Upcoming</figcaption>
+        </figure>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ================= PRIVACY ================= -->
+<section class="privacy" id="privacy">
+  <div class="wrap">
+    <span class="eyebrow reveal">Privacy isn't a feature</span>
+    <h2 class="serif reveal" style="margin-top:14px;">It's the whole point.</h2>
+    <p class="lead reveal">Self-hosting means your data is yours. mDone respects that completely. It talks only to the Vikunja server you choose, and nothing else.</p>
+    <div class="priv-grid">
+      <div class="priv-card reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3>Zero analytics</h3>
+        <p>No telemetry, no usage tracking, no "anonymous" data collection. None.</p>
+      </div>
+      <div class="priv-card reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="10" width="16" height="10" rx="2" stroke="currentColor" stroke-width="2"/><path d="M8 10V8a4 4 0 018 0v2" stroke="currentColor" stroke-width="2"/></svg></div>
+        <h3>No third-party SDKs</h3>
+        <p>Nothing bundled to phone home. Just your device and your server.</p>
+      </div>
+      <div class="priv-card reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/></svg></div>
+        <h3>Credentials in the Keychain</h3>
+        <p>Your token is stored securely on-device, never sent anywhere else.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= OPEN SOURCE + SUPPORT ================= -->
+<section id="opensource">
+  <div class="wrap split">
+    <div class="panel reveal">
+      <span class="eyebrow">Open source</span>
+      <h2 class="serif" style="margin-top:12px;">Built in the open, MIT-licensed.</h2>
+      <p>Pure Swift and SwiftUI, no external dependencies. Read the code, file an issue, or send a pull request. It's all on GitHub.</p>
+      <div class="codeline"><span class="c"># clone &amp; build it yourself</span><br>git clone https://github.com/marco308/mdone</div>
+      <div class="actions">
+        <a class="btn btn-ghost" href="https://github.com/marco308/mdone">View the source</a>
+        <a class="btn btn-ghost" href="https://github.com/marco308/mdone/issues/new/choose">Report an issue</a>
+      </div>
+    </div>
+    <div class="panel tint reveal">
+      <span class="eyebrow">Support development</span>
+      <h2 class="serif" style="margin-top:12px;">Made by one person.</h2>
+      <p>mDone is built and maintained by a single developer. If it earns a place on your home screen, a tip or sponsorship helps keep it going.</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="https://github.com/sponsors/marco308">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7-4.35-9.5-8.5C1 9.5 2.5 6 6 6c2 0 3 1.2 4 2.5C11 7.2 12 6 14 6c3.5 0 5 3.5 3.5 6.5C19 16.65 12 21 12 21z"/></svg>
+          Sponsor on GitHub
+        </a>
+        <a class="btn btn-ghost" href="https://www.buymeacoffee.com/losperdidos">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 8h11v5a4 4 0 01-4 4H9a4 4 0 01-4-4V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M16 9h2.5a2.5 2.5 0 010 5H16" stroke="currentColor" stroke-width="2"/><path d="M7 3c0 1-1 1.5-1 2.5M11 3c0 1-1 1.5-1 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Buy me a coffee
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FINAL CTA ================= -->
+<section class="final">
+  <div class="wrap">
+    <div class="box reveal">
+      <h2 class="serif">Bring your Vikunja to life.</h2>
+      <p>Download mDone and connect to your server in seconds.</p>
+      <div class="actions">
+        <a class="badge-apple" href="REPLACE_WITH_APP_STORE_URL" aria-label="Download mDone on the App Store">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.36 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.02-1.5-2.62-1.71-3.19-1.73-1.36-.14-2.65.8-3.34.8-.68 0-1.75-.78-2.87-.76-1.48.02-2.84.86-3.6 2.18-1.53 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.25 2.74 2.21 1.1-.04 1.51-.71 2.85-.71 1.33 0 1.71.71 2.87.69 1.18-.02 1.94-1.08 2.66-2.14.84-1.23 1.19-2.42 1.21-2.48-.03-.01-2.32-.89-2.34-3.53zM14.2 5.83c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.55 1.31-.56.64-1.05 1.67-.92 2.66.97.07 1.96-.49 2.57-1.21z"/></svg>
+          <span class="b-txt"><small>Download on the</small><strong>App Store</strong></span>
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/marco308/mdone">View on GitHub</a>
+      </div>
+      <p class="req">Requires iOS 18 / macOS 15 and your own <a href="https://vikunja.io" style="color:#fff;text-decoration:underline;">Vikunja</a> server.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ================= FOOTER ================= -->
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="brand" href="#top" aria-label="mDone home">
+          <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.5l4.2 4.2L19.5 6" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          mDone
+        </a>
+        <p>A native task manager for your self-hosted Vikunja server. Beautifully done, privacy first.</p>
+      </div>
+      <div class="foot-cols">
+        <div class="foot-col">
+          <h4>App</h4>
+          <a href="#features">Features</a>
+          <a href="#showcase">Screens</a>
+          <a href="#privacy">Privacy</a>
+          <a href="REPLACE_WITH_APP_STORE_URL">App Store</a>
+        </div>
+        <div class="foot-col">
+          <h4>Project</h4>
+          <a href="https://github.com/marco308/mdone">GitHub</a>
+          <a href="https://github.com/marco308/mdone/issues/new/choose">Report a bug</a>
+          <a href="https://vikunja.io">Vikunja</a>
+        </div>
+        <div class="foot-col">
+          <h4>Support</h4>
+          <a href="https://github.com/sponsors/marco308">GitHub Sponsors</a>
+          <a href="https://www.buymeacoffee.com/losperdidos">Buy me a coffee</a>
+        </div>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 mDone. Released under the MIT License.</span>
+      <span>Not affiliated with the Vikunja project.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Sticky-nav hairline on scroll
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
+  onScroll();
+  window.addEventListener('scroll', onScroll, { passive:true });
+
+  // Scroll-reveal
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const els = document.querySelectorAll('.reveal');
+  if (reduce || !('IntersectionObserver' in window)) {
+    els.forEach(el => el.classList.add('in'));
+  } else {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e, i) => {
+        if (e.isIntersecting) {
+          // gentle stagger within a viewport batch
+          e.target.style.transitionDelay = Math.min(i * 60, 240) + 'ms';
+          e.target.classList.add('in');
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.14, rootMargin: '0px 0px -8% 0px' });
+    els.forEach(el => io.observe(el));
+  }
+</script>
+</body>
+</html>
