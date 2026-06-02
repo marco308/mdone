@@ -116,6 +116,29 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(appState.tasks.map(\.id), [2], "Only the deleted project's tasks are removed locally")
     }
 
+    func testDeleteProjectCascadesToDescendantSubprojects() async {
+        let appState = await makeProjectMockedAppState()
+        // 3 (parent) -> 4 (child) -> 5 (grandchild); 9 is unrelated.
+        appState.projects = [
+            Project(id: 3, title: "Parent"),
+            Project(id: 4, title: "Child", parentProjectId: 3),
+            Project(id: 5, title: "Grandchild", parentProjectId: 4),
+            Project(id: 9, title: "Unrelated"),
+        ]
+        appState.tasks = [
+            VTask(id: 1, title: "t-parent", done: false, priority: 0, projectId: 3),
+            VTask(id: 2, title: "t-grandchild", done: false, priority: 0, projectId: 5),
+            VTask(id: 3, title: "t-unrelated", done: false, priority: 0, projectId: 9),
+        ]
+        MockURLProtocol.requestHandler = { request in
+            (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), #"{"message":"ok"}"#.data(using: .utf8)!)
+        }
+
+        await appState.deleteProject(appState.projects[0]) // delete Parent (3)
+        XCTAssertEqual(appState.projects.map(\.id).sorted(), [9], "Parent and all descendants are removed; unrelated kept")
+        XCTAssertEqual(appState.tasks.map(\.id).sorted(), [3], "Tasks of the parent and its descendants are removed")
+    }
+
     func testDeleteProjectGuardsPseudoProject() async {
         let appState = await makeProjectMockedAppState()
         let pseudo = Project(id: -1, title: "Favorites")

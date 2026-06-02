@@ -45,13 +45,13 @@ struct ProjectEditSheet: View {
                         .lineLimit(2 ... 5)
                 }
 
-                Section("Colour") {
+                Section("Color") {
                     ColorSwatchPicker(selectedHex: $colorHex)
                 }
 
                 Section {
                     Toggle(isOn: $isFavorite) {
-                        Label("Add to Favourites", systemImage: "star")
+                        Label("Add to Favorites", systemImage: "star")
                     }
                 }
             }

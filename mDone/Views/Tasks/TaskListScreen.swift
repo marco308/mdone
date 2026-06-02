@@ -52,11 +52,17 @@ struct TaskListScreen: View {
                             }
                         } else {
                             Section {
-                                ForEach(projectTasks) { task in
-                                    TaskRow(task: task)
-                                }
-                                .onMove { source, destination in
-                                    handleMove(tasks: projectTasks, from: source, to: destination)
+                                if readOnly {
+                                    ForEach(projectTasks) { task in
+                                        TaskRow(task: task, readOnly: true)
+                                    }
+                                } else {
+                                    ForEach(projectTasks) { task in
+                                        TaskRow(task: task)
+                                    }
+                                    .onMove { source, destination in
+                                        handleMove(tasks: projectTasks, from: source, to: destination)
+                                    }
                                 }
                             }
                         }

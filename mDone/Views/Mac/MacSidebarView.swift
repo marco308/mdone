@@ -259,7 +259,7 @@ struct MacSidebarView: View {
             }
         } label: {
             Label(
-                project.isFavorite == true ? "Remove from Favourites" : "Add to Favourites",
+                project.isFavorite == true ? "Remove from Favorites" : "Add to Favorites",
                 systemImage: project.isFavorite == true ? "star.slash" : "star"
             )
         }

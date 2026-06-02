@@ -755,16 +755,24 @@ final class AppState {
     /// referenced the project so no ghost rows or stale selection remain.
     @MainActor
     func deleteProject(_ project: Project) async {
-        guard project.id > 0 else { return } // never delete pseudo-projects (e.g. Favourites, id -1)
+        guard project.id > 0 else { return } // never delete pseudo-projects (e.g. Favorites, id -1)
         let projectId = project.id
         do {
             try await projectService.deleteProject(id: projectId)
-            projects.removeAll { $0.id == projectId }
-            archivedProjects.removeAll { $0.id == projectId }
-            tasks.removeAll { $0.projectId == projectId }
-            projectTaskCache[projectId] = nil
-            if selectedProject?.id == projectId { selectedProject = nil }
-            syncService?.deleteCachedProject(id: projectId)
+            // Vikunja cascades the delete to descendant sub-projects and all their
+            // tasks; mirror that locally so no orphaned rows linger until the next
+            // full refresh.
+            let removedIds = descendantProjectIds(of: projectId)
+            projects.removeAll { removedIds.contains($0.id) }
+            archivedProjects.removeAll { removedIds.contains($0.id) }
+            tasks.removeAll { removedIds.contains($0.projectId) }
+            for id in removedIds {
+                projectTaskCache[id] = nil
+                syncService?.deleteCachedProject(id: id)
+            }
+            if let selectedId = selectedProject?.id, removedIds.contains(selectedId) {
+                selectedProject = nil
+            }
             #if os(iOS)
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
             #endif
@@ -772,6 +780,22 @@ final class AppState {
         } catch {
             handleError(error)
         }
+    }
+
+    /// Returns `root` plus the IDs of every known descendant project (transitive
+    /// closure over `parentProjectId`), matching Vikunja's recursive delete cascade.
+    private func descendantProjectIds(of root: Int64) -> Set<Int64> {
+        var ids: Set<Int64> = [root]
+        let all = projects + archivedProjects
+        var changed = true
+        while changed {
+            changed = false
+            for project in all where project.parentProjectId.map({ ids.contains($0) }) == true && !ids.contains(project.id) {
+                ids.insert(project.id)
+                changed = true
+            }
+        }
+        return ids
     }
 
     /// Loads archived projects for the Archived view. Vikunja's include-archived fetch

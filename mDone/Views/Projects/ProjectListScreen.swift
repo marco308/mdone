@@ -25,13 +25,11 @@ struct ProjectListScreen: View {
                 }
             }
 
-            if !appState.archivedProjects.isEmpty {
-                Section {
-                    NavigationLink {
-                        ArchivedProjectsScreen()
-                    } label: {
-                        Label("Archived", systemImage: "archivebox")
-                    }
+            Section {
+                NavigationLink {
+                    ArchivedProjectsScreen()
+                } label: {
+                    Label("Archived", systemImage: "archivebox")
                 }
             }
 
@@ -41,7 +39,7 @@ struct ProjectListScreen: View {
                         EmptyStateView(
                             icon: "folder",
                             title: "No projects",
-                            subtitle: "Create your first project to organise your tasks"
+                            subtitle: "Create your first project to organize your tasks"
                         )
                         Button {
                             showingCreate = true
@@ -140,7 +138,7 @@ struct ProjectListScreen: View {
                 toggleFavorite(project)
             } label: {
                 Label(
-                    project.isFavorite == true ? "Remove from Favourites" : "Add to Favourites",
+                    project.isFavorite == true ? "Remove from Favorites" : "Add to Favorites",
                     systemImage: project.isFavorite == true ? "star.slash" : "star"
                 )
             }
