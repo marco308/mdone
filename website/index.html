@@ -275,7 +275,7 @@ section{ padding:96px 0; }
 
 /* ---------- privacy (dark) ---------- */
 .privacy{ background:var(--night); color:#fff; position:relative; overflow:hidden; }
-.privacy::before{ content:""; position:absolute; width:600px; height:600px; border-radius:50%;
+.privacy::before{ content:""; position:absolute; width:600px; height:600px; border-radius:50%; pointer-events:none;
   background:radial-gradient(circle, rgba(82,122,250,.35), transparent 70%); filter:blur(70px);
   top:-200px; right:-120px; }
 .privacy .wrap{ position:relative; }
@@ -308,7 +308,7 @@ section{ padding:96px 0; }
   background:linear-gradient(160deg,#5d83fb,#3f5fe6); color:#fff; position:relative; overflow:hidden;
   box-shadow:var(--shadow-lg);
 }
-.final .box::after{ content:""; position:absolute; inset:0;
+.final .box::after{ content:""; position:absolute; inset:0; pointer-events:none;
   background:radial-gradient(circle at 70% -10%, rgba(255,255,255,.28), transparent 55%); }
 .final .box > *{ position:relative; }
 .final h2{ color:#fff; font-size:clamp(30px,4.4vw,44px); }
