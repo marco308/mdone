@@ -21,6 +21,155 @@ final class AppStateTests: XCTestCase {
         return AppState(taskService: TaskService(apiClient: client))
     }
 
+    /// Builds an `AppState` whose `ProjectService` talks to `MockURLProtocol`,
+    /// so project create/edit/archive/delete paths can be driven deterministically.
+    private func makeProjectMockedAppState() async -> AppState {
+        let client = APIClient(session: MockURLProtocol.mockSession())
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+        return AppState(projectService: ProjectService(apiClient: client))
+    }
+
+    // MARK: - Project Mutations
+
+    func testCreateProjectAppendsToProjects() async {
+        let appState = await makeProjectMockedAppState()
+        MockURLProtocol.requestHandler = { request in
+            let json = #"{"id": 100, "title": "New", "is_archived": false, "is_favorite": false}"#.data(using: .utf8)!
+            return (MockURLProtocol.makeResponse(statusCode: 201, url: request.url), json)
+        }
+
+        await appState.createProject(title: "New")
+        XCTAssertEqual(appState.projects.map(\.id), [100])
+        XCTAssertEqual(appState.projects.first?.title, "New")
+    }
+
+    func testCreateProjectIgnoresBlankTitle() async {
+        let appState = await makeProjectMockedAppState()
+        MockURLProtocol.requestHandler = { request in
+            XCTFail("Blank title must not hit the network")
+            return (MockURLProtocol.makeResponse(statusCode: 201, url: request.url), Data())
+        }
+
+        await appState.createProject(title: "   ")
+        XCTAssertTrue(appState.projects.isEmpty)
+        XCTAssertTrue(MockURLProtocol.capturedRequests.isEmpty)
+    }
+
+    func testUpdateProjectReplacesInPlace() async {
+        let appState = await makeProjectMockedAppState()
+        appState.projects = [Project(id: 5, title: "Old", isArchived: false, isFavorite: false)]
+        MockURLProtocol.requestHandler = { request in
+            let json = #"{"id": 5, "title": "Updated", "is_archived": false, "is_favorite": true}"#.data(using: .utf8)!
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), json)
+        }
+
+        await appState.updateProject(
+            appState.projects[0], title: "Updated", description: "", hexColor: "", isFavorite: true
+        )
+        XCTAssertEqual(appState.projects.count, 1)
+        XCTAssertEqual(appState.projects.first?.title, "Updated")
+        XCTAssertEqual(appState.projects.first?.isFavorite, true)
+    }
+
+    func testArchiveProjectMovesToArchivedList() async {
+        let appState = await makeProjectMockedAppState()
+        appState.projects = [Project(id: 8, title: "ToArchive", isArchived: false, isFavorite: false)]
+        MockURLProtocol.requestHandler = { request in
+            let json = #"{"id": 8, "title": "ToArchive", "is_archived": true, "is_favorite": false}"#
+                .data(using: .utf8)!
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), json)
+        }
+
+        await appState.archiveProject(appState.projects[0])
+        XCTAssertTrue(appState.projects.isEmpty, "Archived project should leave the active list")
+        XCTAssertEqual(appState.archivedProjects.map(\.id), [8])
+    }
+
+    func testUnarchiveProjectMovesToActiveList() async {
+        let appState = await makeProjectMockedAppState()
+        appState.archivedProjects = [Project(id: 8, title: "Archived", isArchived: true, isFavorite: false)]
+        // Server may echo is_archived inconsistently; AppState trusts the requested state.
+        MockURLProtocol.requestHandler = { request in
+            let json = #"{"id": 8, "title": "Archived", "is_archived": false, "is_favorite": false}"#
+                .data(using: .utf8)!
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), json)
+        }
+
+        await appState.unarchiveProject(appState.archivedProjects[0])
+        XCTAssertTrue(appState.archivedProjects.isEmpty)
+        XCTAssertEqual(appState.projects.map(\.id), [8])
+    }
+
+    func testDeleteProjectRemovesProjectAndItsTasks() async {
+        let appState = await makeProjectMockedAppState()
+        appState.projects = [Project(id: 3, title: "Doomed", isArchived: false, isFavorite: false)]
+        appState.tasks = [
+            VTask(id: 1, title: "T1", done: false, priority: 0, projectId: 3),
+            VTask(id: 2, title: "T2", done: false, priority: 0, projectId: 99),
+        ]
+        MockURLProtocol.requestHandler = { request in
+            (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), #"{"message":"ok"}"#.data(using: .utf8)!)
+        }
+
+        await appState.deleteProject(appState.projects[0])
+        XCTAssertTrue(appState.projects.isEmpty)
+        XCTAssertEqual(appState.tasks.map(\.id), [2], "Only the deleted project's tasks are removed locally")
+    }
+
+    func testDeleteProjectCascadesToDescendantSubprojects() async {
+        let appState = await makeProjectMockedAppState()
+        // 3 (parent) -> 4 (child) -> 5 (grandchild); 9 is unrelated.
+        appState.projects = [
+            Project(id: 3, title: "Parent"),
+            Project(id: 4, title: "Child", parentProjectId: 3),
+            Project(id: 5, title: "Grandchild", parentProjectId: 4),
+            Project(id: 9, title: "Unrelated"),
+        ]
+        appState.tasks = [
+            VTask(id: 1, title: "t-parent", done: false, priority: 0, projectId: 3),
+            VTask(id: 2, title: "t-grandchild", done: false, priority: 0, projectId: 5),
+            VTask(id: 3, title: "t-unrelated", done: false, priority: 0, projectId: 9),
+        ]
+        MockURLProtocol.requestHandler = { request in
+            (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), #"{"message":"ok"}"#.data(using: .utf8)!)
+        }
+
+        await appState.deleteProject(appState.projects[0]) // delete Parent (3)
+        XCTAssertEqual(appState.projects.map(\.id).sorted(), [9], "Parent and all descendants are removed; unrelated kept")
+        XCTAssertEqual(appState.tasks.map(\.id).sorted(), [3], "Tasks of the parent and its descendants are removed")
+    }
+
+    func testDeleteProjectGuardsPseudoProject() async {
+        let appState = await makeProjectMockedAppState()
+        let pseudo = Project(id: -1, title: "Favorites")
+        appState.projects = [pseudo]
+        MockURLProtocol.requestHandler = { request in
+            XCTFail("Pseudo-projects (id <= 0) must never hit the delete endpoint")
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), Data())
+        }
+
+        await appState.deleteProject(pseudo)
+        XCTAssertEqual(appState.projects.count, 1, "Pseudo-project should remain")
+        XCTAssertTrue(MockURLProtocol.capturedRequests.isEmpty)
+    }
+
+    func testFetchArchivedProjectsKeepsOnlyArchived() async {
+        let appState = await makeProjectMockedAppState()
+        MockURLProtocol.requestHandler = { request in
+            // Vikunja returns active AND archived projects when include-archived is set.
+            let json = """
+            [
+                {"id": 1, "title": "Active", "is_archived": false},
+                {"id": 2, "title": "Archived", "is_archived": true}
+            ]
+            """.data(using: .utf8)!
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), json)
+        }
+
+        await appState.fetchArchivedProjects()
+        XCTAssertEqual(appState.archivedProjects.map(\.id), [2])
+    }
+
     // MARK: - uniquedById
 
     func testUniquedByIdRemovesDuplicates() {
@@ -28,7 +177,7 @@ final class AppStateTests: XCTestCase {
             VTask(id: 1, title: "First", done: false, priority: 0, projectId: 10),
             VTask(id: 2, title: "Second", done: false, priority: 0, projectId: 10),
             VTask(id: 1, title: "First (dup)", done: false, priority: 0, projectId: 10),
-            VTask(id: 3, title: "Third", done: false, priority: 0, projectId: 10)
+            VTask(id: 3, title: "Third", done: false, priority: 0, projectId: 10),
         ]
 
         let unique = AppState.uniquedById(tasks)
@@ -41,7 +190,7 @@ final class AppStateTests: XCTestCase {
         let tasks = [
             VTask(id: 5, title: "A", done: false, priority: 0, projectId: 10),
             VTask(id: 3, title: "B", done: false, priority: 0, projectId: 10),
-            VTask(id: 7, title: "C", done: false, priority: 0, projectId: 10)
+            VTask(id: 7, title: "C", done: false, priority: 0, projectId: 10),
         ]
 
         let unique = AppState.uniquedById(tasks)
@@ -88,7 +237,7 @@ final class AppStateTests: XCTestCase {
         appState.tasks = [
             VTask(id: 1, title: "A", done: false, priority: 0, projectId: projectId),
             VTask(id: 2, title: "B", done: false, priority: 0, projectId: projectId),
-            VTask(id: 3, title: "C", done: false, priority: 0, projectId: projectId)
+            VTask(id: 3, title: "C", done: false, priority: 0, projectId: projectId),
         ]
 
         // Simulate the bad cache state Vikunja can produce: id 1 appears twice.
@@ -96,7 +245,7 @@ final class AppStateTests: XCTestCase {
             VTask(id: 1, title: "A", done: false, priority: 0, projectId: projectId),
             VTask(id: 2, title: "B", done: false, priority: 0, projectId: projectId),
             VTask(id: 3, title: "C", done: false, priority: 0, projectId: projectId),
-            VTask(id: 1, title: "A (dup row)", done: false, priority: 0, projectId: projectId)
+            VTask(id: 1, title: "A (dup row)", done: false, priority: 0, projectId: projectId),
         ]
 
         // Before the fix this call traps. After the fix it returns the three tasks
@@ -113,14 +262,14 @@ final class AppStateTests: XCTestCase {
         appState.tasks = [
             VTask(id: 10, title: "A", done: false, priority: 0, projectId: projectId),
             VTask(id: 20, title: "B", done: false, priority: 0, projectId: projectId),
-            VTask(id: 30, title: "C", done: false, priority: 0, projectId: projectId)
+            VTask(id: 30, title: "C", done: false, priority: 0, projectId: projectId),
         ]
 
         // Cache order is reversed compared to the canonical tasks array.
         appState.projectTaskCache[projectId] = [
             VTask(id: 30, title: "C", done: false, priority: 0, projectId: projectId),
             VTask(id: 20, title: "B", done: false, priority: 0, projectId: projectId),
-            VTask(id: 10, title: "A", done: false, priority: 0, projectId: projectId)
+            VTask(id: 10, title: "A", done: false, priority: 0, projectId: projectId),
         ]
 
         XCTAssertEqual(appState.tasksForProject(projectId).map(\.id), [30, 20, 10])
@@ -133,7 +282,7 @@ final class AppStateTests: XCTestCase {
         appState.tasks = [
             VTask(id: 1, title: "Open", done: false, priority: 0, projectId: projectId),
             VTask(id: 2, title: "Done", done: true, priority: 0, projectId: projectId),
-            VTask(id: 3, title: "Other project", done: false, priority: 0, projectId: 999)
+            VTask(id: 3, title: "Other project", done: false, priority: 0, projectId: 999),
         ]
 
         XCTAssertEqual(appState.tasksForProject(projectId).map(\.id), [1])
@@ -158,8 +307,11 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertFalse(appState.isAuthenticated, "Session expiry must flip auth state back to logged-out")
         XCTAssertTrue(appState.tasks.isEmpty, "Session expiry should wipe in-memory data")
-        XCTAssertEqual(auth.getServerURL(), "https://vikunja.example.com",
-                       "Server URL must survive session expiry so the login screen can prefill it (issue #80)")
+        XCTAssertEqual(
+            auth.getServerURL(),
+            "https://vikunja.example.com",
+            "Server URL must survive session expiry so the login screen can prefill it (issue #80)"
+        )
         XCTAssertNil(auth.getToken(), "Stale access token must be removed")
         XCTAssertNil(auth.getRefreshToken(), "Stale refresh token must be removed")
     }
@@ -189,8 +341,10 @@ final class AppStateTests: XCTestCase {
         await appState.logout()
 
         XCTAssertFalse(appState.isAuthenticated)
-        XCTAssertNil(auth.getServerURL(),
-                     "Explicit logout is a deliberate sign-out: server URL goes too")
+        XCTAssertNil(
+            auth.getServerURL(),
+            "Explicit logout is a deliberate sign-out: server URL goes too"
+        )
         XCTAssertNil(auth.getToken())
         XCTAssertNil(auth.getRefreshToken())
     }
@@ -219,8 +373,11 @@ final class AppStateTests: XCTestCase {
         appState.recordCompletionForUndo(VTask(id: 1, title: "First", done: false, priority: 0, projectId: 10))
         appState.recordCompletionForUndo(VTask(id: 2, title: "Second", done: false, priority: 0, projectId: 10))
 
-        XCTAssertEqual(appState.undoableCompletion?.id, 2,
-                       "Only the most recent completion is undoable")
+        XCTAssertEqual(
+            appState.undoableCompletion?.id,
+            2,
+            "Only the most recent completion is undoable"
+        )
         XCTAssertEqual(appState.undoableCompletionTitle, "Second")
     }
 
@@ -230,8 +387,10 @@ final class AppStateTests: XCTestCase {
 
         appState.clearUndoIfMatches(id: 5)
 
-        XCTAssertFalse(appState.canUndoLastCompletion,
-                       "Un-completing the same task by other means clears the undo target")
+        XCTAssertFalse(
+            appState.canUndoLastCompletion,
+            "Un-completing the same task by other means clears the undo target"
+        )
     }
 
     func testClearUndoNonMatchingIdKeepsTarget() {
@@ -240,8 +399,10 @@ final class AppStateTests: XCTestCase {
 
         appState.clearUndoIfMatches(id: 99)
 
-        XCTAssertTrue(appState.canUndoLastCompletion,
-                      "A different task changing state must not clear the pending undo")
+        XCTAssertTrue(
+            appState.canUndoLastCompletion,
+            "A different task changing state must not clear the pending undo"
+        )
         XCTAssertEqual(appState.undoableCompletion?.id, 5)
     }
 
@@ -311,8 +472,11 @@ final class AppStateTests: XCTestCase {
 
         await appState.undoLastCompletion()
 
-        XCTAssertEqual(appState.tasks.first?.effectiveDueDate, due,
-                       "Undo must preserve the original due date so the task returns to its Inbox section")
+        XCTAssertEqual(
+            appState.tasks.first?.effectiveDueDate,
+            due,
+            "Undo must preserve the original due date so the task returns to its Inbox section"
+        )
     }
 
     func testUndoKeepsTargetWhenRequestFails() async {
@@ -329,8 +493,10 @@ final class AppStateTests: XCTestCase {
 
         await appState.undoLastCompletion()
 
-        XCTAssertTrue(appState.canUndoLastCompletion,
-                      "A failed undo must keep the pending target so the user can retry")
+        XCTAssertTrue(
+            appState.canUndoLastCompletion,
+            "A failed undo must keep the pending target so the user can retry"
+        )
         XCTAssertEqual(appState.undoableCompletion?.id, 11)
     }
 }

@@ -16,8 +16,8 @@ settings:
     # not feature-related — see PR "decisions".
     PRODUCT_NAME: "$(TARGET_NAME)"
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "1.4.0"
-    CURRENT_PROJECT_VERSION: "39"
+    MARKETING_VERSION: "1.5.0"
+    CURRENT_PROJECT_VERSION: "41"
     DEVELOPMENT_TEAM: "Z62E7MGREE"
     CODE_SIGN_IDENTITY: "Apple Development"
     CODE_SIGN_STYLE: Automatic

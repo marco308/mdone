@@ -219,4 +219,133 @@ final class ProjectServiceTests: XCTestCase {
 
         XCTAssertEqual(set.count, 1, "Projects with same ID should hash equally")
     }
+
+    // MARK: - Project Mutations
+
+    func testCreateProjectSendsPutRequest() async throws {
+        let (service, client) = makeTestService()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+
+        let responseJSON = """
+        {"id": 42, "title": "Marketing", "hex_color": "#4772FA", "is_archived": false, "is_favorite": false}
+        """.data(using: .utf8)!
+
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertTrue(request.url?.path.hasSuffix("/api/v1/projects") == true)
+            return (MockURLProtocol.makeResponse(statusCode: 201, url: request.url), responseJSON)
+        }
+
+        let project = try await service.createProject(
+            ProjectCreateRequest(title: "Marketing", description: nil, hexColor: "#4772FA", isFavorite: false)
+        )
+        XCTAssertEqual(project.id, 42)
+        XCTAssertEqual(project.title, "Marketing")
+    }
+
+    func testUpdateProjectSendsPostRequest() async throws {
+        let (service, client) = makeTestService()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+
+        let responseJSON = """
+        {"id": 7, "title": "Renamed", "is_archived": true, "is_favorite": false}
+        """.data(using: .utf8)!
+
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertTrue(request.url?.path.hasSuffix("/api/v1/projects/7") == true)
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), responseJSON)
+        }
+
+        let request = ProjectUpdateRequest(
+            title: "Renamed", description: "", hexColor: "", isFavorite: false, isArchived: true
+        )
+        let project = try await service.updateProject(id: 7, request: request)
+        XCTAssertEqual(project.id, 7)
+        XCTAssertEqual(project.title, "Renamed")
+        XCTAssertEqual(project.isArchived, true)
+    }
+
+    func testDeleteProjectSendsDeleteRequest() async throws {
+        let (service, client) = makeTestService()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.httpMethod, "DELETE")
+            XCTAssertTrue(request.url?.path.hasSuffix("/api/v1/projects/9") == true)
+            return (
+                MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
+                #"{"message":"deleted"}"#.data(using: .utf8)!
+            )
+        }
+
+        try await service.deleteProject(id: 9)
+        XCTAssertEqual(MockURLProtocol.capturedRequests.last?.httpMethod, "DELETE")
+    }
+
+    func testFetchProjectsIncludeArchivedAddsQueryParam() async throws {
+        let (service, client) = makeTestService()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.url?.query?.contains("is_archived=true"), true)
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), "[]".data(using: .utf8)!)
+        }
+
+        _ = try await service.fetchProjects(includeArchived: true)
+    }
+
+    func testFetchProjectsDefaultOmitsArchivedParam() async throws {
+        let (service, client) = makeTestService()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertFalse(request.url?.query?.contains("is_archived") ?? false)
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), "[]".data(using: .utf8)!)
+        }
+
+        _ = try await service.fetchProjects()
+    }
+
+    // MARK: - Request Encoding
+
+    func testProjectCreateRequestEncoding() throws {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let request = ProjectCreateRequest(title: "Work", description: "Stuff", hexColor: "#FF0000", isFavorite: true)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(request)) as? [String: Any])
+        XCTAssertEqual(json["title"] as? String, "Work")
+        XCTAssertEqual(json["description"] as? String, "Stuff")
+        XCTAssertEqual(json["hex_color"] as? String, "#FF0000")
+        XCTAssertEqual(json["is_favorite"] as? Bool, true)
+    }
+
+    func testProjectCreateRequestOmitsNilFields() throws {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let request = ProjectCreateRequest(title: "Bare", description: nil, hexColor: nil, isFavorite: nil)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(request)) as? [String: Any])
+        XCTAssertEqual(json["title"] as? String, "Bare")
+        XCTAssertNil(json["description"])
+        XCTAssertNil(json["hex_color"])
+        XCTAssertNil(json["is_favorite"])
+    }
+
+    func testProjectUpdateRequestFromProjectSendsFullFieldSet() throws {
+        let project = Project(id: 3, title: "Keep", description: "Desc", hexColor: "#00FF00", isFavorite: true)
+        let request = ProjectUpdateRequest(from: project, isArchived: true)
+        XCTAssertEqual(request.title, "Keep")
+        XCTAssertEqual(request.description, "Desc")
+        XCTAssertEqual(request.hexColor, "#00FF00")
+        XCTAssertEqual(request.isFavorite, true)
+        XCTAssertEqual(request.isArchived, true)
+
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(request)) as? [String: Any])
+        // The full field set is always present so unarchive (is_archived=false) is honoured.
+        XCTAssertEqual(json["is_archived"] as? Bool, true)
+        XCTAssertEqual(json["title"] as? String, "Keep")
+        XCTAssertEqual(json["hex_color"] as? String, "#00FF00")
+    }
 }

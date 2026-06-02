@@ -8,6 +8,7 @@ struct MacContentView: View {
     enum SidebarSection: Hashable {
         case inbox, today, tomorrow, thisWeek, upcoming, overdue, noDate
         case project(Project)
+        case archived
         case notifications, calendar, settings
     }
 
@@ -17,7 +18,7 @@ struct MacContentView: View {
         switch selectedSection {
         case .inbox, .today, .tomorrow, .thisWeek, .upcoming, .overdue, .noDate, .project:
             return true
-        case .notifications, .calendar, .settings:
+        case .archived, .notifications, .calendar, .settings:
             return false
         }
     }
@@ -26,7 +27,11 @@ struct MacContentView: View {
         NavigationSplitView {
             MacSidebarView(selection: $selectedSection)
         } content: {
-            MacTaskListView(section: selectedSection, selectedTask: $selectedTask)
+            if selectedSection == .archived {
+                MacArchivedProjectsView()
+            } else {
+                MacTaskListView(section: selectedSection, selectedTask: $selectedTask)
+            }
         } detail: {
             if sectionShowsTaskList, let task = selectedTask {
                 MacTaskDetailView(task: task)
@@ -46,7 +51,7 @@ struct MacContentView: View {
             // Clear task selection when switching to a non-task-list section
             if let newSection {
                 switch newSection {
-                case .notifications, .calendar, .settings:
+                case .archived, .notifications, .calendar, .settings:
                     selectedTask = nil
                 default:
                     break

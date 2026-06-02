@@ -4,6 +4,10 @@ struct MacSidebarView: View {
     @Environment(AppState.self) private var appState
     @Binding var selection: MacContentView.SidebarSection?
 
+    @State private var showingCreate = false
+    @State private var editingProject: Project?
+    @State private var projectPendingDelete: Project?
+
     var body: some View {
         List(selection: $selection) {
             Section("Smart Lists") {
@@ -119,7 +123,7 @@ struct MacSidebarView: View {
                 .tag(MacContentView.SidebarSection.noDate)
             }
 
-            Section("Projects") {
+            Section {
                 ForEach(appState.projects) { project in
                     Label {
                         HStack {
@@ -139,6 +143,21 @@ struct MacSidebarView: View {
                             .accessibilityHidden(true)
                     }
                     .tag(MacContentView.SidebarSection.project(project))
+                    .contextMenu { projectContextMenu(project) }
+                }
+            } header: {
+                HStack {
+                    Text("Projects")
+                    Spacer()
+                    Button {
+                        showingCreate = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .buttonStyle(.plain)
+                    .help("New Project")
+                    .keyboardShortcut("n", modifiers: [.command, .shift])
+                    .accessibilityLabel("New Project")
                 }
             }
 
@@ -180,6 +199,9 @@ struct MacSidebarView: View {
                 }
                 .tag(MacContentView.SidebarSection.calendar)
 
+                Label("Archived", systemImage: "archivebox")
+                    .tag(MacContentView.SidebarSection.archived)
+
                 Label("Settings", systemImage: "gear")
                     .tag(MacContentView.SidebarSection.settings)
             }
@@ -187,6 +209,71 @@ struct MacSidebarView: View {
         .listStyle(.sidebar)
         .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
         .navigationTitle("mDone")
+        .sheet(isPresented: $showingCreate) {
+            ProjectEditSheet()
+        }
+        .sheet(item: $editingProject) { project in
+            ProjectEditSheet(project: project)
+        }
+        .confirmationDialog(
+            "Delete \(projectPendingDelete?.title ?? "")?",
+            isPresented: Binding(
+                get: { projectPendingDelete != nil },
+                set: { if !$0 { projectPendingDelete = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: projectPendingDelete
+        ) { project in
+            Button("Delete Project", role: .destructive) {
+                Task { await appState.deleteProject(project) }
+            }
+            Button("Archive Instead") {
+                Task { await appState.archiveProject(project) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { project in
+            let count = appState.tasksForProject(project.id).count
+            Text(
+                "This permanently deletes the project and all \(count) task\(count == 1 ? "" : "s") in it, "
+                    + "including any sub-projects. This can't be undone."
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func projectContextMenu(_ project: Project) -> some View {
+        Button {
+            editingProject = project
+        } label: {
+            Label("Edit…", systemImage: "pencil")
+        }
+        Button {
+            Task {
+                await appState.updateProject(
+                    project,
+                    title: project.title,
+                    description: project.description ?? "",
+                    hexColor: project.hexColor ?? "",
+                    isFavorite: !(project.isFavorite ?? false)
+                )
+            }
+        } label: {
+            Label(
+                project.isFavorite == true ? "Remove from Favorites" : "Add to Favorites",
+                systemImage: project.isFavorite == true ? "star.slash" : "star"
+            )
+        }
+        Button {
+            Task { await appState.archiveProject(project) }
+        } label: {
+            Label("Archive", systemImage: "archivebox")
+        }
+        Divider()
+        Button(role: .destructive) {
+            projectPendingDelete = project
+        } label: {
+            Label("Delete", systemImage: "trash")
+        }
     }
 
     private func projectColor(_ project: Project) -> Color {

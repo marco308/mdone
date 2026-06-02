@@ -166,6 +166,7 @@ struct MacTaskListView: View {
         case .overdue: return "Overdue"
         case .noDate: return "No Date"
         case let .project(project): return project.title
+        case .archived: return "Archived"
         case .notifications: return "Notifications"
         case .calendar: return "Calendar"
         case .settings: return "Settings"
@@ -183,7 +184,7 @@ struct MacTaskListView: View {
         case .overdue: return appState.overdueTasks
         case .noDate: return appState.noDateTasks
         case let .project(project): return appState.tasksForProject(project.id)
-        case .notifications, .calendar, .settings: return []
+        case .archived, .notifications, .calendar, .settings: return []
         }
     }
 
@@ -229,14 +230,13 @@ struct MacTaskListView: View {
         }
 
         tasks.sort { a, b in
-            let result: Bool
-            switch sortOrder {
+            let result: Bool = switch sortOrder {
             case .dueDate:
-                result = (a.effectiveDueDate ?? .distantFuture) < (b.effectiveDueDate ?? .distantFuture)
+                (a.effectiveDueDate ?? .distantFuture) < (b.effectiveDueDate ?? .distantFuture)
             case .priority:
-                result = a.priority > b.priority
+                a.priority > b.priority
             case .title:
-                result = a.title.localizedCompare(b.title) == .orderedAscending
+                a.title.localizedCompare(b.title) == .orderedAscending
             }
             return sortAscending ? result : !result
         }
@@ -256,7 +256,7 @@ struct MacTaskListView: View {
         case .inbox: return "tray"
         case .project: return "folder"
         case .notifications: return "bell"
-        case .calendar, .settings: return "tray"
+        case .archived, .calendar, .settings: return "tray"
         }
     }
 
@@ -272,7 +272,7 @@ struct MacTaskListView: View {
         case .inbox: return "No Active Tasks"
         case .project: return "No Tasks in Project"
         case .notifications: return "No Notifications"
-        case .calendar, .settings: return "No Tasks"
+        case .archived, .calendar, .settings: return "No Tasks"
         }
     }
 
@@ -288,7 +288,7 @@ struct MacTaskListView: View {
         case .inbox: return "Create a task to get started."
         case .project: return "Add a task to this project."
         case .notifications: return "You're all caught up!"
-        case .calendar, .settings: return ""
+        case .archived, .calendar, .settings: return ""
         }
     }
 }

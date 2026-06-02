@@ -208,4 +208,31 @@ actor SyncService {
             try? context.save()
         }
     }
+
+    @MainActor
+    func updateCachedProject(_ project: Project) {
+        let context = modelContainer.mainContext
+        let projectId = project.id
+        let descriptor = FetchDescriptor<CachedProject>(
+            predicate: #Predicate { $0.id == projectId }
+        )
+        if let cached = try? context.fetch(descriptor).first {
+            cached.update(from: project)
+        } else {
+            context.insert(CachedProject(from: project))
+        }
+        try? context.save()
+    }
+
+    @MainActor
+    func deleteCachedProject(id: Int64) {
+        let context = modelContainer.mainContext
+        let descriptor = FetchDescriptor<CachedProject>(
+            predicate: #Predicate { $0.id == id }
+        )
+        if let cached = try? context.fetch(descriptor).first {
+            context.delete(cached)
+            try? context.save()
+        }
+    }
 }

@@ -6,6 +6,9 @@ struct TaskRow: View {
     @Environment(FocusManager.self) private var focusManager
     #endif
     let task: VTask
+    /// When true, the row is display-only: no completion toggle, swipe actions,
+    /// context menu, or tap-to-edit. Used for archived (read-only) projects.
+    var readOnly: Bool = false
     @State private var showDetail = false
 
     #if os(iOS)
@@ -18,61 +21,67 @@ struct TaskRow: View {
         rowContent
         #if os(iOS)
         .contentShape(Rectangle())
-        .onTapGesture { showDetail = true }
+        .onTapGesture { if !readOnly { showDetail = true } }
         .listRowBackground(isFocused ? Color.orange.opacity(0.08) : nil)
         #endif
         .swipeActions(edge: .leading) {
-            #if os(iOS)
-            if !task.done {
+            if !readOnly {
+                #if os(iOS)
+                if !task.done {
+                    Button {
+                        Task { await appState.postponeTask(task, byHours: 24) }
+                    } label: {
+                        Label("+24h", systemImage: "clock.arrow.circlepath")
+                    }
+                    .tint(.blue)
+                }
+
                 Button {
-                    Task { await appState.postponeTask(task, byHours: 24) }
+                    if isFocused {
+                        focusManager.endFocus()
+                    } else {
+                        let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
+                        focusManager.switchFocus(task: task, projectName: projectName)
+                    }
                 } label: {
-                    Label("+24h", systemImage: "clock.arrow.circlepath")
+                    Label(isFocused ? "End Focus" : "Focus", systemImage: "scope")
                 }
-                .tint(.blue)
-            }
+                .tint(.orange)
+                #endif
 
-            Button {
-                if isFocused {
-                    focusManager.endFocus()
-                } else {
-                    let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
-                    focusManager.switchFocus(task: task, projectName: projectName)
+                Button {
+                    Task { await appState.toggleTaskDone(task) }
+                } label: {
+                    Label(task.done ? "Undo" : "Done", systemImage: task.done ? "arrow.uturn.backward" : "checkmark")
                 }
-            } label: {
-                Label(isFocused ? "End Focus" : "Focus", systemImage: "scope")
+                .tint(.green)
             }
-            .tint(.orange)
-            #endif
-
-            Button {
-                Task { await appState.toggleTaskDone(task) }
-            } label: {
-                Label(task.done ? "Undo" : "Done", systemImage: task.done ? "arrow.uturn.backward" : "checkmark")
-            }
-            .tint(.green)
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button(role: .destructive) {
-                Task { await appState.deleteTask(task) }
-            } label: {
-                Label("Delete", systemImage: "trash")
+            if !readOnly {
+                Button(role: .destructive) {
+                    Task { await appState.deleteTask(task) }
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
             }
         }
         #if os(iOS)
         .contextMenu {
-            if isFocused {
-                Button {
-                    focusManager.endFocus()
-                } label: {
-                    Label("End Focus", systemImage: "scope")
-                }
-            } else {
-                Button {
-                    let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
-                    focusManager.switchFocus(task: task, projectName: projectName)
-                } label: {
-                    Label("Start Focus", systemImage: "scope")
+            if !readOnly {
+                if isFocused {
+                    Button {
+                        focusManager.endFocus()
+                    } label: {
+                        Label("End Focus", systemImage: "scope")
+                    }
+                } else {
+                    Button {
+                        let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
+                        focusManager.switchFocus(task: task, projectName: projectName)
+                    } label: {
+                        Label("Start Focus", systemImage: "scope")
+                    }
                 }
             }
         }
@@ -100,6 +109,7 @@ struct TaskRow: View {
                     .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(.plain)
+            .disabled(readOnly)
             .accessibilityLabel(task.done ? "Mark \(task.title) as incomplete" : "Mark \(task.title) as complete")
             .accessibilityAddTraits(.isToggle)
 
