@@ -7,6 +7,7 @@ struct SettingsScreen: View {
     @AppStorage(WeekStartPreference.storageKey) private var firstWeekday = WeekStartPreference.system.rawValue
     @AppStorage(DefaultDueTimePreference.storageKey) private var defaultDueTime = DefaultDueTimePreference.defaultRawValue
     @State private var showLogoutConfirm = false
+    @State private var showAbout = false
 
     private var serverURL: String {
         AuthService.shared.getServerURL() ?? "Not configured"
@@ -92,25 +93,41 @@ struct SettingsScreen: View {
             #endif
 
             Section {
+                Button {
+                    showAbout = true
+                } label: {
+                    Label("About mDone", systemImage: "info.circle")
+                }
+            }
+
+            Section {
                 Button("Disconnect", role: .destructive) {
                     showLogoutConfirm = true
                 }
             }
 
             Section {
-                HStack {
-                    Spacer()
-                    VStack(spacing: 4) {
-                        Text("mDone")
-                            .font(.caption.bold())
-                        Text(Self.versionString)
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
+                Button {
+                    showAbout = true
+                } label: {
+                    HStack {
+                        Spacer()
+                        VStack(spacing: 4) {
+                            Text("mDone")
+                                .font(.caption.bold())
+                            Text(Self.versionString)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                        Spacer()
                     }
-                    Spacer()
                 }
+                .buttonStyle(.plain)
             }
             .listRowBackground(Color.clear)
+        }
+        .sheet(isPresented: $showAbout) {
+            AboutScreen()
         }
         #if os(iOS)
         .listStyle(.insetGrouped)

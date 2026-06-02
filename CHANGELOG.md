@@ -11,6 +11,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - Create, edit, archive, and delete projects directly in mDone — no more switching to the Vikunja web app. Tap **+** on the Projects tab (iOS) or next to "Projects" in the sidebar (macOS, ⌘⇧N) to add a project with a title, description, colour, and favourite flag. Swipe or right-click any project to edit, archive, or delete it. Deleting warns that it permanently removes the project and all of its tasks (and any sub-projects) and offers to archive instead; archived projects move to a new **Archived** view where you can restore or permanently delete them (#92).
 
+## [1.4.1] - 2026-06-01
+
+### Added
+- Settings → "About mDone" opens an About screen (iPhone and Mac) with the app version, a link to report bugs or request features, a link to the source on GitHub, and ways to support development (GitHub Sponsors and Buy Me a Coffee).
+
 ## [1.4.0] - 2026-05-29
 
 ### Added
