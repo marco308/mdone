@@ -499,4 +499,69 @@ final class AppStateTests: XCTestCase {
         )
         XCTAssertEqual(appState.undoableCompletion?.id, 11)
     }
+
+    // MARK: - Calm Mode (#68)
+
+    /// Seeds a deterministic spread of due dates: overdue, due-today,
+    /// upcoming, no-date, and a done-but-overdue task.
+    private func seedCalmModeTasks(_ appState: AppState) throws {
+        let now = Date()
+        let cal = Calendar.current
+        let todayEndOfDay = try XCTUnwrap(cal.date(bySettingHour: 23, minute: 59, second: 59, of: now))
+        appState.tasks = [
+            VTask(id: 1, title: "Overdue", done: false,
+                  dueDate: cal.date(byAdding: .day, value: -2, to: now), priority: 0, projectId: 1),
+            VTask(id: 2, title: "Today", done: false,
+                  dueDate: todayEndOfDay, priority: 0, projectId: 1),
+            VTask(id: 3, title: "Upcoming", done: false,
+                  dueDate: cal.date(byAdding: .day, value: 3, to: now), priority: 0, projectId: 1),
+            VTask(id: 4, title: "No date", done: false, priority: 0, projectId: 1),
+            VTask(id: 5, title: "Done overdue", done: true,
+                  dueDate: cal.date(byAdding: .day, value: -3, to: now), priority: 0, projectId: 1),
+        ]
+    }
+
+    func testCalmModeTodayTasksUnionsOverdueAndToday() async throws {
+        let appState = await makeMockedAppState()
+        try seedCalmModeTasks(appState)
+
+        let ids = appState.calmModeTodayTasks.map(\.id)
+        XCTAssertEqual(ids, [1, 2], "Calm Mode's Today list is overdue + today, overdue first")
+    }
+
+    func testCalmModeTodayTasksExcludesUpcomingNoDateAndDone() async throws {
+        let appState = await makeMockedAppState()
+        try seedCalmModeTasks(appState)
+
+        let ids = Set(appState.calmModeTodayTasks.map(\.id))
+        XCTAssertFalse(ids.contains(3), "Upcoming tasks stay out of Today")
+        XCTAssertFalse(ids.contains(4), "No-date tasks stay out of Today")
+        XCTAssertFalse(ids.contains(5), "Completed tasks are never overdue/today")
+    }
+
+    func testOverdueAndTodayAreDisjointSoCalmModeHasNoDuplicates() async throws {
+        let appState = await makeMockedAppState()
+        try seedCalmModeTasks(appState)
+
+        // The union relies on these two sets never overlapping.
+        let overdue = Set(appState.overdueTasks.map(\.id))
+        let today = Set(appState.todayTasks.map(\.id))
+        XCTAssertTrue(overdue.isDisjoint(with: today), "Overdue and Today must not overlap")
+
+        let calmIds = appState.calmModeTodayTasks.map(\.id)
+        XCTAssertEqual(calmIds.count, Set(calmIds).count, "Calm Mode list has no duplicates")
+        XCTAssertEqual(calmIds.count, appState.overdueTasks.count + appState.todayTasks.count)
+    }
+
+    func testCalmModeKeyDefaultsOff() {
+        // Default OFF is the contract the widget extension relies on.
+        SharedKeys.sharedDefaults.removeObject(forKey: SharedKeys.calmModeKey)
+        XCTAssertFalse(SharedKeys.sharedDefaults.bool(forKey: SharedKeys.calmModeKey))
+    }
+
+    func testCalmModeKeyRoundTripsThroughAppGroup() {
+        SharedKeys.sharedDefaults.set(true, forKey: SharedKeys.calmModeKey)
+        XCTAssertTrue(SharedKeys.sharedDefaults.bool(forKey: SharedKeys.calmModeKey))
+        SharedKeys.sharedDefaults.removeObject(forKey: SharedKeys.calmModeKey)
+    }
 }

@@ -163,6 +163,13 @@ final class AppState {
         tasks.filter(\.isDueToday).sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
     }
 
+    /// Today's list when Calm Mode is on: overdue tasks fold in alongside
+    /// today's, so they aren't singled out. `overdueTasks` and `todayTasks`
+    /// are disjoint by construction, so this is a simple union (overdue first).
+    var calmModeTodayTasks: [VTask] {
+        overdueTasks + todayTasks
+    }
+
     var tomorrowTasks: [VTask] {
         tasks.filter(\.isDueTomorrow).sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
     }

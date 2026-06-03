@@ -57,7 +57,7 @@ struct MacTaskListView: View {
             } else if section == .inbox {
                 List(selection: $selectedTask) {
                     if calmMode {
-                        let todayAndOverdue = appState.overdueTasks + appState.todayTasks
+                        let todayAndOverdue = appState.calmModeTodayTasks
                         if !todayAndOverdue.isEmpty {
                             SmartListSection(title: "Today", tasks: todayAndOverdue, accentColor: Color.accentColor)
                         }

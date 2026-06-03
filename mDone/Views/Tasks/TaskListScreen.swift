@@ -194,7 +194,7 @@ struct TaskListScreen: View {
     private var smartListSections: some View {
         if calmMode {
             // Calm Mode: overdue tasks aren't singled out — they fold into Today.
-            let todayAndOverdue = appState.overdueTasks + appState.todayTasks
+            let todayAndOverdue = appState.calmModeTodayTasks
             if !todayAndOverdue.isEmpty {
                 SmartListSection(
                     title: "Today",
