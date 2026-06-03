@@ -12,6 +12,7 @@ struct TaskListScreen: View {
     @State private var showAdvancedFilter = false
     @State private var sortOrder: SortOrder = .dueDate
     @State private var sortAscending: Bool = true
+    @AppStorage("calmMode") private var calmMode = false
 
     enum SortOrder: String, CaseIterable {
         case dueDate = "Due Date"
@@ -191,20 +192,32 @@ struct TaskListScreen: View {
 
     @ViewBuilder
     private var smartListSections: some View {
-        if !appState.overdueTasks.isEmpty {
-            SmartListSection(
-                title: "Overdue",
-                tasks: sorted(appState.overdueTasks),
-                accentColor: .red
-            )
-        }
+        if calmMode {
+            // Calm Mode: overdue tasks aren't singled out — they fold into Today.
+            let todayAndOverdue = appState.overdueTasks + appState.todayTasks
+            if !todayAndOverdue.isEmpty {
+                SmartListSection(
+                    title: "Today",
+                    tasks: sorted(todayAndOverdue),
+                    accentColor: Color.accentColor
+                )
+            }
+        } else {
+            if !appState.overdueTasks.isEmpty {
+                SmartListSection(
+                    title: "Overdue",
+                    tasks: sorted(appState.overdueTasks),
+                    accentColor: .red
+                )
+            }
 
-        if !appState.todayTasks.isEmpty {
-            SmartListSection(
-                title: "Today",
-                tasks: sorted(appState.todayTasks),
-                accentColor: Color.accentColor
-            )
+            if !appState.todayTasks.isEmpty {
+                SmartListSection(
+                    title: "Today",
+                    tasks: sorted(appState.todayTasks),
+                    accentColor: Color.accentColor
+                )
+            }
         }
 
         if appState.calendarAccessGranted, !appState.todayCalendarEvents.isEmpty {

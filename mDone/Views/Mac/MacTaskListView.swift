@@ -7,6 +7,7 @@ struct MacTaskListView: View {
     @State private var sortOrder: SortOrder = .dueDate
     @State private var sortAscending: Bool = true
     @State private var showAdvancedFilter = false
+    @AppStorage("calmMode") private var calmMode = false
 
     enum SortOrder: String, CaseIterable {
         case dueDate = "Due Date"
@@ -55,11 +56,18 @@ struct MacTaskListView: View {
                     .frame(maxHeight: .infinity)
             } else if section == .inbox {
                 List(selection: $selectedTask) {
-                    if !appState.overdueTasks.isEmpty {
-                        SmartListSection(title: "Overdue", tasks: appState.overdueTasks, accentColor: .red)
-                    }
-                    if !appState.todayTasks.isEmpty {
-                        SmartListSection(title: "Today", tasks: appState.todayTasks, accentColor: Color.accentColor)
+                    if calmMode {
+                        let todayAndOverdue = appState.overdueTasks + appState.todayTasks
+                        if !todayAndOverdue.isEmpty {
+                            SmartListSection(title: "Today", tasks: todayAndOverdue, accentColor: Color.accentColor)
+                        }
+                    } else {
+                        if !appState.overdueTasks.isEmpty {
+                            SmartListSection(title: "Overdue", tasks: appState.overdueTasks, accentColor: .red)
+                        }
+                        if !appState.todayTasks.isEmpty {
+                            SmartListSection(title: "Today", tasks: appState.todayTasks, accentColor: Color.accentColor)
+                        }
                     }
                     if !appState.tomorrowTasks.isEmpty {
                         SmartListSection(title: "Tomorrow", tasks: appState.tomorrowTasks, accentColor: .orange)

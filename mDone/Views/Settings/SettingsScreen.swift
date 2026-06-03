@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 
 struct SettingsScreen: View {
     @Environment(AppState.self) private var appState
@@ -6,6 +7,7 @@ struct SettingsScreen: View {
     @AppStorage("reminderOffset") private var reminderOffset = 30
     @AppStorage(WeekStartPreference.storageKey) private var firstWeekday = WeekStartPreference.system.rawValue
     @AppStorage(DefaultDueTimePreference.storageKey) private var defaultDueTime = DefaultDueTimePreference.defaultRawValue
+    @AppStorage("calmMode") private var calmMode = false
     @State private var showLogoutConfirm = false
     @State private var showAbout = false
 
@@ -47,6 +49,16 @@ struct SettingsScreen: View {
                 Text("Tasks")
             } footer: {
                 Text("Time of day applied to tasks you add to Today without picking a time. Pick a time later in the day to avoid the task showing as overdue right away.")
+            }
+
+            Section {
+                Toggle("Calm Mode", isOn: $calmMode)
+                    .onChange(of: calmMode) { _, newValue in
+                        SharedKeys.sharedDefaults.set(newValue, forKey: SharedKeys.calmModeKey)
+                        WidgetCenter.shared.reloadAllTimelines()
+                    }
+            } footer: {
+                Text("Overdue tasks appear like any other — no red, no separate Overdue list or counts. They still show in your lists and widgets.")
             }
 
             Section("Calendar") {
