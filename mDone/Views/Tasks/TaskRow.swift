@@ -10,6 +10,7 @@ struct TaskRow: View {
     /// context menu, or tap-to-edit. Used for archived (read-only) projects.
     var readOnly: Bool = false
     @State private var showDetail = false
+    @AppStorage("calmMode") private var calmMode = false
 
     #if os(iOS)
     private var isFocused: Bool {
@@ -131,7 +132,7 @@ struct TaskRow: View {
                             }
                         }
                         .font(.caption)
-                        .foregroundStyle(task.isOverdue ? .red : .secondary)
+                        .foregroundStyle(task.isOverdue && !calmMode ? .red : .secondary)
                     }
 
                     if task.isRepeating {

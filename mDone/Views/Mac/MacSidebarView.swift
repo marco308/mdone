@@ -3,6 +3,7 @@ import SwiftUI
 struct MacSidebarView: View {
     @Environment(AppState.self) private var appState
     @Binding var selection: MacContentView.SidebarSection?
+    @AppStorage("calmMode") private var calmMode = false
 
     @State private var showingCreate = false
     @State private var editingProject: Project?
@@ -99,7 +100,7 @@ struct MacSidebarView: View {
                     HStack {
                         Text("Overdue")
                         Spacer()
-                        if !appState.overdueTasks.isEmpty {
+                        if !calmMode, !appState.overdueTasks.isEmpty {
                             Text("\(appState.overdueTasks.count)")
                                 .font(.caption2)
                                 .foregroundStyle(.white)

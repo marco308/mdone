@@ -91,6 +91,10 @@ struct TodayTasksWidgetView: View {
     private var fontSize: WidgetFontSize { entry.configuration.fontSize }
     private var filterMode: TodayTaskFilterMode { entry.configuration.filterMode }
 
+    /// Calm Mode (set in the app, mirrored to the App Group): when on, overdue
+    /// tasks are shown without any red highlight or separate grouping.
+    private var calmMode: Bool { SharedKeys.sharedDefaults.bool(forKey: SharedKeys.calmModeKey) }
+
     private var visibleTodayTasks: [WidgetTask] {
         filterMode == .overdueOnly ? [] : entry.tasks
     }
@@ -202,7 +206,14 @@ struct TodayTasksWidgetView: View {
             let visibleToday = Array(visibleTodayTasks.prefix(todayLimit))
 
             if !visibleOverdue.isEmpty {
-                overdueSection(tasks: visibleOverdue)
+                if calmMode {
+                    // Calm Mode: overdue rows look like any other task — no red box.
+                    ForEach(visibleOverdue) { task in
+                        taskRow(task: task)
+                    }
+                } else {
+                    overdueSection(tasks: visibleOverdue)
+                }
             }
 
             ForEach(visibleToday) { task in
@@ -241,7 +252,7 @@ struct TodayTasksWidgetView: View {
                     .padding(.vertical, 2)
                     .background(
                         Capsule()
-                            .fill(visibleOverdueTasks.isEmpty ? Color.blue : Color.red)
+                            .fill(visibleOverdueTasks.isEmpty || calmMode ? Color.blue : Color.red)
                     )
                     .layoutPriority(1)
             }

@@ -100,6 +100,8 @@ struct LockScreenEntry: TimelineEntry {
 struct LockScreenCircularView: View {
     let entry: LockScreenEntry
 
+    private var calmMode: Bool { SharedKeys.sharedDefaults.bool(forKey: SharedKeys.calmModeKey) }
+
     var body: some View {
         if !entry.isAuthenticated {
             Image(systemName: "person.crop.circle.badge.questionmark")
@@ -115,7 +117,7 @@ struct LockScreenCircularView: View {
                     .font(.system(.title2, design: .rounded, weight: .bold))
             }
             .gaugeStyle(.accessoryCircular)
-            .tint(entry.overdueCount > 0 ? .red : .blue)
+            .tint(entry.overdueCount > 0 && !calmMode ? .red : .blue)
         }
     }
 }
