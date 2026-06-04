@@ -91,8 +91,8 @@ struct UpcomingWidgetView: View {
         case (.systemSmall, .compact): 3
         case (.systemSmall, .standard): 2
         case (.systemSmall, .large): 2
-        case (.systemMedium, .compact): 4
-        case (.systemMedium, .standard): 3
+        case (.systemMedium, .compact): 3
+        case (.systemMedium, .standard): 2
         case (.systemMedium, .large): 2
         case (.systemLarge, .compact): 9
         case (.systemLarge, .standard): 7
@@ -118,6 +118,10 @@ struct UpcomingWidgetView: View {
                         taskListView
                     }
                 }
+                // Pin content to the top so the header always stays put; any row
+                // overflow clips from the bottom rather than centring the stack
+                // and pushing the header off the top of the widget.
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
         .dynamicTypeSize(...DynamicTypeSize.xLarge)

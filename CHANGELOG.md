@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - Settings → Tasks → "Calm Mode" (off by default). When on, overdue tasks aren't singled out: no red due dates, no separate "Overdue" list or counts, and no red highlight in the widgets. Overdue tasks simply appear in Today alongside everything else, in the app and on widgets (#68).
 
+### Fixed
+- Home screen widgets no longer push their header off the top when there are several tasks. The "Today"/"Upcoming" header now stays pinned at the top and any tasks beyond what fits are summarised by the "+N more" line at the bottom (#99).
+
 ## [1.5.0] - 2026-06-01
 
 ### Added

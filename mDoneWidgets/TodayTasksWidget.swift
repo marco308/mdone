@@ -109,8 +109,8 @@ struct TodayTasksWidgetView: View {
         case (.systemSmall, .compact): 3
         case (.systemSmall, .standard): 2
         case (.systemSmall, .large): 2
-        case (.systemMedium, .compact): 4
-        case (.systemMedium, .standard): 3
+        case (.systemMedium, .compact): 3
+        case (.systemMedium, .standard): 2
         case (.systemMedium, .large): 2
         case (.systemLarge, .compact): 9
         case (.systemLarge, .standard): 7
@@ -146,6 +146,11 @@ struct TodayTasksWidgetView: View {
                         taskListView
                     }
                 }
+                // Pin content to the top so the header always stays put. If the
+                // task rows ever exceed the widget height, the overflow is
+                // clipped from the bottom (where "+N more" already lives) rather
+                // than centring the stack and pushing the header off the top.
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
         .dynamicTypeSize(...DynamicTypeSize.xLarge)
