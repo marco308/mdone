@@ -811,4 +811,65 @@ final class APIClientTests: XCTestCase {
             XCTFail("Unexpected error type: \(error)")
         }
     }
+
+    // MARK: - OIDC / fetchServerInfo() Tests
+
+    func testFetchServerInfoSucceeds() async throws {
+        let client = makeTestClient()
+        let infoJSON = """
+        {
+            "auth": {
+                "openid_connect": {
+                    "enabled": true,
+                    "providers": [
+                        {
+                            "name": "Keycloak",
+                            "key": "keycloak",
+                            "auth_url": "https://sso.example.com/auth",
+                            "client_id": "client123",
+                            "scope": "openid email"
+                        }
+                    ]
+                }
+            }
+        }
+        """.data(using: .utf8)!
+
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.url?.absoluteString, "https://mock.vikunja.io/api/v1/info")
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
+            return (response, infoJSON)
+        }
+
+        let info = try await client.fetchServerInfo(from: "mock.vikunja.io")
+        XCTAssertTrue(info.auth?.openidConnect?.enabled ?? false)
+        XCTAssertEqual(info.auth?.openidConnect?.providers?.count, 1)
+        let provider = info.auth?.openidConnect?.providers?.first
+        XCTAssertEqual(provider?.name, "Keycloak")
+        XCTAssertEqual(provider?.key, "keycloak")
+        XCTAssertEqual(provider?.authUrl, "https://sso.example.com/auth")
+        XCTAssertEqual(provider?.clientId, "client123")
+        XCTAssertEqual(provider?.scope, "openid email")
+    }
+
+    func testFetchServerInfoFailsWithUnreachable() async {
+        let client = makeTestClient()
+        MockURLProtocol.requestHandler = { _ in
+            throw URLError(.cannotConnectToHost)
+        }
+
+        do {
+            _ = try await client.fetchServerInfo(from: "mock.vikunja.io")
+            XCTFail("Expected error to be thrown")
+        } catch let error as NetworkError {
+            if case .serverUnreachable = error {
+                // Expected
+            } else {
+                XCTFail("Expected .serverUnreachable, got \(error)")
+            }
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
 }
+

@@ -7,7 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- OpenID Connect (OIDC) authentication support. The app now dynamically detects OIDC availability on your self-hosted server, lists active providers, and allows secure authentication via an in-app browser sheet.
 - Settings → Tasks → "Calm Mode" (off by default). When on, overdue tasks aren't singled out: no red due dates, no separate "Overdue" list or counts, and no red highlight in the widgets. Overdue tasks simply appear in Today alongside everything else, in the app and on widgets (#68).
+
 
 ### Fixed
 - Widget: the Today's Tasks and Upcoming widgets no longer let their header drift off the top (or clip the bottom rows) when there are more tasks than fit. This was most noticeable with larger text sizes. The header now stays pinned in place, the visible rows always fit the widget, and a "+N more" count fills the last line (#99).

@@ -302,6 +302,45 @@ final class AppState {
         print("[mDone] Validation OK - got \(projects.count) projects")
         #endif
 
+        authService.saveToken(loginResponse.token)
+        if let capturedRefreshToken {
+            authService.saveRefreshToken(capturedRefreshToken)
+        }
+        isAuthenticated = true
+    }
+
+    @MainActor
+    func loginWithOIDC(serverURL: String, providerKey: String, code: String, redirectURL: String) async throws {
+        #if DEBUG
+        print("[mDone] loginWithOIDC() called")
+        #endif
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        await registerAPIClientHandlers()
+        let url = serverURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        await APIClient.shared.configure(serverURL: url, token: "")
+
+        let callbackRequest = OIDCCallbackRequest(code: code, redirectUrl: redirectURL)
+        let endpoint = Endpoint(path: "/api/v1/auth/openid/\(providerKey)/callback", method: .POST)
+        let loginResponse: LoginResponse = try await APIClient.shared.send(endpoint, body: callbackRequest)
+        let capturedRefreshToken = await APIClient.shared.currentRefreshToken()
+
+        // Configure with the JWT token + refresh cookie so subsequent requests
+        // (and the 401 retry path) have everything they need.
+        await APIClient.shared.configure(
+            serverURL: url,
+            token: loginResponse.token,
+            refreshToken: capturedRefreshToken
+        )
+
+        // Validate
+        let projects: [Project] = try await APIClient.shared.fetch(Endpoint.projects())
+        #if DEBUG
+        print("[mDone] OIDC Validation OK - got \(projects.count) projects")
+        #endif
+
         authService.saveServerURL(url)
         authService.saveToken(loginResponse.token)
         if let capturedRefreshToken {
@@ -309,6 +348,7 @@ final class AppState {
         }
         isAuthenticated = true
     }
+
 
     @MainActor
     func logout() async {

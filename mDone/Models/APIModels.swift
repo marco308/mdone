@@ -143,3 +143,37 @@ struct PaginationInfo {
     var totalPages: Int
     var resultCount: Int
 }
+
+// MARK: - OIDC & Server Info Models
+
+struct InfoResponse: Codable {
+    struct Auth: Codable {
+        struct OpenID: Codable {
+            struct Provider: Codable, Identifiable {
+                var id: String { key }
+                var name: String
+                var key: String
+                var authUrl: String
+                var logoutUrl: String?
+                var clientId: String
+                var scope: String?
+            }
+            var enabled: Bool
+            var providers: [Provider]?
+        }
+        struct Local: Codable {
+            var enabled: Bool
+        }
+        var local: Local?
+        var openidConnect: OpenID?
+    }
+    var auth: Auth?
+}
+
+struct OIDCCallbackRequest: Encodable {
+    var code: String
+    var redirectUrl: String
+    var scope: String?
+    var totpPasscode: String?
+}
+

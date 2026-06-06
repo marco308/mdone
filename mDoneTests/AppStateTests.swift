@@ -564,4 +564,96 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(SharedKeys.sharedDefaults.bool(forKey: SharedKeys.calmModeKey))
         SharedKeys.sharedDefaults.removeObject(forKey: SharedKeys.calmModeKey)
     }
+
+    // MARK: - OIDC Login Tests
+
+    func testLoginWithOIDCSucceeds() async throws {
+        let auth = AuthService.shared
+        auth.clearAll()
+        defer { auth.clearAll() }
+
+        // Configure the shared APIClient to use our mock session
+        let mockSession = MockURLProtocol.mockSession()
+        await APIClient.shared.setSessionForTesting(mockSession)
+        defer {
+            Task {
+                await APIClient.shared.setSessionForTesting(.shared)
+            }
+        }
+
+        let appState = AppState()
+        XCTAssertFalse(appState.isAuthenticated)
+
+        let loginResponseJSON = """
+        {
+            "token": "oidc-jwt-token"
+        }
+        """.data(using: .utf8)!
+
+        let projectsJSON = "[]".data(using: .utf8)!
+
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+            if request.url?.path == "/api/v1/auth/openid/keycloak/callback" {
+                XCTAssertEqual(request.httpMethod, "POST")
+                return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), loginResponseJSON)
+            } else if request.url?.path == "/api/v1/projects" {
+                XCTAssertEqual(request.httpMethod, "GET")
+                return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), projectsJSON)
+            } else {
+                XCTFail("Unexpected request: \(request)")
+                return (MockURLProtocol.makeResponse(statusCode: 500, url: request.url), Data())
+            }
+        }
+
+        try await appState.loginWithOIDC(
+            serverURL: "https://mock.vikunja.io",
+            providerKey: "keycloak",
+            code: "auth-code-123",
+            redirectURL: "https://mock.vikunja.io/auth/openid/keycloak"
+        )
+
+        XCTAssertTrue(appState.isAuthenticated)
+        XCTAssertEqual(auth.getServerURL(), "https://mock.vikunja.io")
+        XCTAssertEqual(auth.getToken(), "oidc-jwt-token")
+        XCTAssertEqual(requestCount, 2)
+    }
+
+    func testLoginWithOIDCFailsOnNetworkError() async {
+        let auth = AuthService.shared
+        auth.clearAll()
+        defer { auth.clearAll() }
+
+        let mockSession = MockURLProtocol.mockSession()
+        await APIClient.shared.setSessionForTesting(mockSession)
+        defer {
+            Task {
+                await APIClient.shared.setSessionForTesting(.shared)
+            }
+        }
+
+        let appState = AppState()
+        XCTAssertFalse(appState.isAuthenticated)
+
+        MockURLProtocol.requestHandler = { _ in
+            throw URLError(.cannotConnectToHost)
+        }
+
+        do {
+            try await appState.loginWithOIDC(
+                serverURL: "https://mock.vikunja.io",
+                providerKey: "keycloak",
+                code: "auth-code-123",
+                redirectURL: "https://mock.vikunja.io/auth/openid/keycloak"
+            )
+            XCTFail("Expected network error to be thrown")
+        } catch {
+            // Expected
+        }
+
+        XCTAssertFalse(appState.isAuthenticated)
+        XCTAssertNil(auth.getToken())
+    }
 }
+
