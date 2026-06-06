@@ -9,7 +9,7 @@ struct AboutScreen: View {
     private static let repoURL = URL(string: "https://github.com/marco308/mdone")!
     private static let issuesURL = URL(string: "https://github.com/marco308/mdone/issues/new/choose")!
     private static let sponsorURL = URL(string: "https://github.com/sponsors/marco308")!
-    private static let coffeeURL = URL(string: "https://www.buymeacoffee.com/losperdidos")!
+    private static let coffeeURL = URL(string: "https://buymeacoffee.com/marcuslab")!
 
     var body: some View {
         NavigationStack {
