@@ -146,6 +146,10 @@ struct TodayTasksWidgetView: View {
                         taskListView
                     }
                 }
+                // Pin to the top so that if the rows ever exceed the canvas the
+                // overflow spills off the bottom (where the "+N more" hint lives)
+                // instead of centering and pushing the header off the top (#99).
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
         .dynamicTypeSize(...DynamicTypeSize.xLarge)
@@ -197,11 +201,16 @@ struct TodayTasksWidgetView: View {
 
     private var taskListView: some View {
         VStack(alignment: .leading, spacing: 0) {
+            let totalAvailable = visibleOverdueTasks.count + visibleTodayTasks.count
+            // Reserve one line for the "+N more" footer when not everything fits,
+            // so the footer never pushes the list one row past maxRows and over
+            // the edge of the widget (#99).
+            let rowBudget = totalAvailable > maxRows ? max(maxRows - 1, 1) : maxRows
             // When only one bucket is shown (overdue-only or today-only), let it
             // claim all available rows instead of capping at maxOverdueRows.
-            let overdueCap = visibleTodayTasks.isEmpty ? maxRows : maxOverdueRows
+            let overdueCap = visibleTodayTasks.isEmpty ? rowBudget : maxOverdueRows
             let overdueLimit = min(visibleOverdueTasks.count, overdueCap)
-            let todayLimit = max(maxRows - overdueLimit, 0)
+            let todayLimit = max(rowBudget - overdueLimit, 0)
             let visibleOverdue = Array(visibleOverdueTasks.prefix(overdueLimit))
             let visibleToday = Array(visibleTodayTasks.prefix(todayLimit))
 
@@ -221,7 +230,6 @@ struct TodayTasksWidgetView: View {
             }
 
             let totalShown = visibleOverdue.count + visibleToday.count
-            let totalAvailable = visibleOverdueTasks.count + visibleTodayTasks.count
             if totalAvailable > totalShown {
                 Text("+\(totalAvailable - totalShown) more")
                     .font(.caption2)

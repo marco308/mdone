@@ -118,6 +118,9 @@ struct UpcomingWidgetView: View {
                         taskListView
                     }
                 }
+                // Pin to the top so overflow spills off the bottom rather than
+                // centering and pushing the header off the top (#99).
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
         .dynamicTypeSize(...DynamicTypeSize.xLarge)
@@ -158,7 +161,11 @@ struct UpcomingWidgetView: View {
 
     private var taskListView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            let visibleTasks = Array(entry.tasks.prefix(maxRows))
+            // Reserve one line for the "+N more" footer when not everything fits,
+            // so the footer never pushes the list past maxRows and over the edge
+            // of the widget (#99).
+            let rowBudget = entry.tasks.count > maxRows ? max(maxRows - 1, 1) : maxRows
+            let visibleTasks = Array(entry.tasks.prefix(rowBudget))
             ForEach(visibleTasks) { task in
                 taskRow(task: task)
             }
