@@ -1,8 +1,9 @@
 import Foundation
 
 actor APIClient {
-    private let session: URLSession
+    private var session: URLSession
     private let decoder: JSONDecoder
+
     private let encoder: JSONEncoder
     private var serverURL: String?
     private var apiToken: String?
@@ -76,6 +77,13 @@ actor APIClient {
         refreshToken = nil
         isJWTSession = false
     }
+
+    #if DEBUG
+    func setSessionForTesting(_ session: URLSession) {
+        self.session = session
+    }
+    #endif
+
 
     func setOnTokensUpdated(_ handler: @Sendable @escaping (_ token: String, _ refreshToken: String?) -> Void) {
         onTokensUpdated = handler
@@ -519,4 +527,42 @@ actor APIClient {
         let (data, httpResponse) = try await executeWithRefresh { try self.buildRequest(for: endpoint) }
         _ = try handleResponse(data: data, httpResponse: httpResponse)
     }
+
+    func fetchServerInfo(from urlString: String) async throws -> InfoResponse {
+        var cleanURL = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !cleanURL.hasPrefix("http://") && !cleanURL.hasPrefix("https://") {
+            cleanURL = "https://" + cleanURL
+        }
+        cleanURL = cleanURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+        guard let url = URL(string: cleanURL + "/api/v1/info") else {
+            throw NetworkError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            throw NetworkError.serverUnreachable
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.unknown(URLError(.badServerResponse))
+        }
+
+        guard (200 ... 299).contains(httpResponse.statusCode) else {
+            throw NetworkError.serverError(statusCode: httpResponse.statusCode, message: nil)
+        }
+
+        do {
+            return try decoder.decode(InfoResponse.self, from: data)
+        } catch {
+            throw NetworkError.decodingError(error)
+        }
+    }
 }
+
