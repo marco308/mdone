@@ -6,11 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Added
-- Settings → Tasks → "Calm Mode" (off by default). When on, overdue tasks aren't singled out: no red due dates, no separate "Overdue" list or counts, and no red highlight in the widgets. Overdue tasks simply appear in Today alongside everything else, in the app and on widgets (#68).
+## [1.6.2] - 2026-06-08
+
+### Fixed
+- The in-app "Buy Me a Coffee" support link now opens the correct page. The previous link pointed to a page that no longer exists.
+
+## [1.6.1] - 2026-06-06
 
 ### Fixed
 - Widget: the Today's Tasks and Upcoming widgets no longer let their header drift off the top (or clip the bottom rows) when there are more tasks than fit. This was most noticeable with larger text sizes. The header now stays pinned in place, the visible rows always fit the widget, and a "+N more" count fills the last line (#99).
+
+## [1.6.0] - 2026-06-03
+
+### Added
+- Settings → Tasks → "Calm Mode" (off by default). When on, overdue tasks aren't singled out: no red due dates, no separate "Overdue" list or counts, and no red highlight in the widgets. Overdue tasks simply appear in Today alongside everything else, in the app and on widgets (#68).
 
 ## [1.5.0] - 2026-06-01
 
