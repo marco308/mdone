@@ -70,6 +70,20 @@ struct TaskRow: View {
         #if os(iOS)
         .contextMenu {
             if !readOnly {
+                if !task.done {
+                    Menu {
+                        ForEach(ScheduleOption.allCases) { option in
+                            Button {
+                                Task { await appState.rescheduleTask(task, to: option) }
+                            } label: {
+                                Label(option.label, systemImage: option.systemImage)
+                            }
+                        }
+                    } label: {
+                        Label("Schedule", systemImage: "calendar")
+                    }
+                }
+
                 if isFocused {
                     Button {
                         focusManager.endFocus()
