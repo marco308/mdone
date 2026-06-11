@@ -603,6 +603,35 @@ final class AppState {
         }
     }
 
+    /// Reschedules a task to an absolute due date from a quick-action preset
+    /// (issue #67). Ignores the task's current due date, unlike `postponeTask`.
+    @MainActor
+    func rescheduleTask(_ task: VTask, to option: ScheduleOption) async {
+        let newDate = option.date()
+
+        let originalDueDate: Date?
+        if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+            originalDueDate = tasks[index].dueDate
+            tasks[index].dueDate = newDate
+        } else {
+            originalDueDate = nil
+        }
+
+        do {
+            let updated = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(dueDate: newDate))
+            if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
+                tasks[index] = updated
+            }
+            syncService?.updateCachedTask(updated)
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+                tasks[index].dueDate = originalDueDate
+            }
+            handleError(error)
+        }
+    }
+
     @MainActor
     func updateTask(id: Int64, request: TaskUpdateRequest) async {
         do {
@@ -797,7 +826,9 @@ final class AppState {
         var changed = true
         while changed {
             changed = false
-            for project in all where project.parentProjectId.map({ ids.contains($0) }) == true && !ids.contains(project.id) {
+            for project in all
+                where project.parentProjectId.map({ ids.contains($0) }) == true && !ids.contains(project.id)
+            {
                 ids.insert(project.id)
                 changed = true
             }

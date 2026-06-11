@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Long-press a task and pick **Schedule** for one-tap rescheduling to Today, Tomorrow, This Weekend, Next Week, or Next Month. These set an absolute due date (ignoring the task's current date, unlike the "+24h" swipe), and Next Week respects your "Start week on" preference (#67).
+
 ## [1.6.2] - 2026-06-08
 
 ### Fixed
