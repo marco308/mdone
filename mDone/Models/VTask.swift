@@ -161,6 +161,8 @@ struct TaskUpdateRequest: Encodable {
     var labels: [LabelRef]?
     var repeatAfter: Int64?
     var reminders: [TaskReminder]?
+    /// Completion progress, 0...1. Drives the Current section's progress bar.
+    var percentDone: Double?
     var clearDueDate: Bool?
 
     struct LabelRef: Encodable {
@@ -168,7 +170,7 @@ struct TaskUpdateRequest: Encodable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case title, description, done, dueDate, priority, projectId, labels, repeatAfter, reminders
+        case title, description, done, dueDate, priority, projectId, labels, repeatAfter, reminders, percentDone
     }
 
     func encode(to encoder: Encoder) throws {
@@ -186,5 +188,6 @@ struct TaskUpdateRequest: Encodable {
         try container.encodeIfPresent(labels, forKey: .labels)
         try container.encodeIfPresent(repeatAfter, forKey: .repeatAfter)
         try container.encodeIfPresent(reminders, forKey: .reminders)
+        try container.encodeIfPresent(percentDone, forKey: .percentDone)
     }
 }

@@ -5,11 +5,13 @@ struct SmartListSection: View {
     let title: String
     let tasks: [VTask]
     let accentColor: Color
+    /// Forwarded to each `TaskRow` so the Current section can show progress bars.
+    var showsProgress: Bool = false
 
     var body: some View {
         Section {
             ForEach(tasks) { task in
-                TaskRow(task: task)
+                TaskRow(task: task, showsProgress: showsProgress)
                     .tag(task)
             }
             .onMove { source, destination in
