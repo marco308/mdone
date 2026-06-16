@@ -9,8 +9,15 @@ struct TaskRow: View {
     /// When true, the row is display-only: no completion toggle, swipe actions,
     /// context menu, or tap-to-edit. Used for archived (read-only) projects.
     var readOnly: Bool = false
+    /// When true, the row shows a progress bar and (when stalled) an idle badge.
+    /// Used by the "Current" section.
+    var showsProgress: Bool = false
     @State private var showDetail = false
     @AppStorage("calmMode") private var calmMode = false
+    @AppStorage("currentStallDays") private var stallDays = 7
+
+    /// Quick-set progress percentages offered in the context menu.
+    private static let progressSteps = [0, 25, 50, 75, 100]
 
     #if os(iOS)
     private var isFocused: Bool {
@@ -67,9 +74,9 @@ struct TaskRow: View {
                 }
             }
         }
-        #if os(iOS)
         .contextMenu {
             if !readOnly {
+                #if os(iOS)
                 if isFocused {
                     Button {
                         focusManager.endFocus()
@@ -84,8 +91,31 @@ struct TaskRow: View {
                         Label("Start Focus", systemImage: "scope")
                     }
                 }
+                #endif
+
+                Button {
+                    Task { await appState.toggleCurrent(task) }
+                } label: {
+                    Label(
+                        appState.isCurrent(task) ? "Remove from Current" : "Mark as Current",
+                        systemImage: appState.isCurrent(task) ? "pin.slash" : "pin"
+                    )
+                }
+
+                if appState.isCurrent(task) {
+                    Menu {
+                        ForEach(Self.progressSteps, id: \.self) { pct in
+                            Button("\(pct)%") {
+                                Task { await appState.setProgress(task, percent: Double(pct) / 100) }
+                            }
+                        }
+                    } label: {
+                        Label("Set Progress", systemImage: "chart.bar")
+                    }
+                }
             }
         }
+        #if os(iOS)
         .sheet(isPresented: $showDetail) {
             TaskDetailSheet(task: task)
         }
@@ -154,6 +184,10 @@ struct TaskRow: View {
                         }
                     }
                 }
+
+                if showsProgress {
+                    CurrentProgressIndicator(percent: task.percentDone ?? 0, stalledDays: stalledDays)
+                }
             }
 
             Spacer()
@@ -203,6 +237,15 @@ struct TaskRow: View {
         return parts.joined(separator: ", ")
     }
 
+    /// Days since the task was last touched, but only once it exceeds the
+    /// configured stall threshold, so the idle badge appears only for tasks
+    /// that have genuinely gone quiet. `nil` otherwise.
+    private var stalledDays: Int? {
+        guard let updated = task.updated else { return nil }
+        let days = Calendar.current.dateComponents([.day], from: updated, to: Date()).day ?? 0
+        return days >= stallDays ? days : nil
+    }
+
     private var priorityColor: Color {
         switch task.priorityLevel {
         case .critical, .urgent: .red
@@ -215,5 +258,47 @@ struct TaskRow: View {
 
     private var checkboxColor: Color {
         task.priorityLevel == .none ? .gray : priorityColor
+    }
+}
+
+/// A thin progress bar with a percentage and, when the task has gone idle past
+/// the stall threshold, an "Idle Nd" badge. Shown on rows in the Current section.
+struct CurrentProgressIndicator: View {
+    let percent: Double
+    let stalledDays: Int?
+
+    private var percentText: String {
+        "\(Int((percent * 100).rounded()))%"
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView(value: min(max(percent, 0), 1))
+                .progressViewStyle(.linear)
+                .tint(.accentColor)
+
+            Text(percentText)
+                .font(.caption2)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+
+            if let stalledDays {
+                Label("Idle \(stalledDays)d", systemImage: "zzz")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .labelStyle(.titleAndIcon)
+            }
+        }
+        .padding(.top, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var accessibilityText: String {
+        var parts = ["\(Int((percent * 100).rounded())) percent complete"]
+        if let stalledDays {
+            parts.append("idle \(stalledDays) days")
+        }
+        return parts.joined(separator: ", ")
     }
 }

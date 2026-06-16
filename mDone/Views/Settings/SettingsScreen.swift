@@ -6,8 +6,10 @@ struct SettingsScreen: View {
     @AppStorage("notificationsEnabled") private var notificationsEnabled = false
     @AppStorage("reminderOffset") private var reminderOffset = 30
     @AppStorage(WeekStartPreference.storageKey) private var firstWeekday = WeekStartPreference.system.rawValue
-    @AppStorage(DefaultDueTimePreference.storageKey) private var defaultDueTime = DefaultDueTimePreference.defaultRawValue
+    @AppStorage(DefaultDueTimePreference.storageKey) private var defaultDueTime = DefaultDueTimePreference
+        .defaultRawValue
     @AppStorage("calmMode") private var calmMode = false
+    @AppStorage("currentStallDays") private var currentStallDays = 7
     @State private var showLogoutConfirm = false
     @State private var showAbout = false
 
@@ -48,7 +50,9 @@ struct SettingsScreen: View {
             } header: {
                 Text("Tasks")
             } footer: {
-                Text("Time of day applied to tasks you add to Today without picking a time. Pick a time later in the day to avoid the task showing as overdue right away.")
+                Text(
+                    "Time of day applied to tasks you add to Today without picking a time. Pick a time later in the day to avoid the task showing as overdue right away."
+                )
             }
 
             Section {
@@ -58,7 +62,23 @@ struct SettingsScreen: View {
                         WidgetCenter.shared.reloadAllTimelines()
                     }
             } footer: {
-                Text("Overdue tasks appear like any other — no red, no separate Overdue list or counts. They still show in your lists and widgets.")
+                Text(
+                    "Overdue tasks appear like any other — no red, no separate Overdue list or counts. They still show in your lists and widgets."
+                )
+            }
+
+            Section {
+                Stepper(
+                    "Idle badge after \(currentStallDays) day\(currentStallDays == 1 ? "" : "s")",
+                    value: $currentStallDays,
+                    in: 1 ... 60
+                )
+            } header: {
+                Text("Current Tasks")
+            } footer: {
+                Text(
+                    "Tasks you mark as Current sit at the top of your list with a progress bar. An idle badge appears when one hasn't been touched for this many days."
+                )
             }
 
             Section("Calendar") {

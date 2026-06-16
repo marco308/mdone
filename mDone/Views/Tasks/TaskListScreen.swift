@@ -192,9 +192,21 @@ struct TaskListScreen: View {
 
     @ViewBuilder
     private var smartListSections: some View {
+        let currentTasks = appState.currentTasks
+        let currentIds = Set(currentTasks.map(\.id))
+
+        if !currentTasks.isEmpty {
+            SmartListSection(
+                title: "Current",
+                tasks: currentTasks,
+                accentColor: Color.accentColor,
+                showsProgress: true
+            )
+        }
+
         if calmMode {
-            // Calm Mode: overdue tasks aren't singled out — they fold into Today.
-            let todayAndOverdue = appState.calmModeTodayTasks
+            // Calm Mode: overdue tasks aren't singled out, they fold into Today.
+            let todayAndOverdue = excludingCurrent(appState.calmModeTodayTasks, currentIds: currentIds)
             if !todayAndOverdue.isEmpty {
                 SmartListSection(
                     title: "Today",
@@ -203,18 +215,20 @@ struct TaskListScreen: View {
                 )
             }
         } else {
-            if !appState.overdueTasks.isEmpty {
+            let overdue = excludingCurrent(appState.overdueTasks, currentIds: currentIds)
+            if !overdue.isEmpty {
                 SmartListSection(
                     title: "Overdue",
-                    tasks: sorted(appState.overdueTasks),
+                    tasks: sorted(overdue),
                     accentColor: .red
                 )
             }
 
-            if !appState.todayTasks.isEmpty {
+            let today = excludingCurrent(appState.todayTasks, currentIds: currentIds)
+            if !today.isEmpty {
                 SmartListSection(
                     title: "Today",
-                    tasks: sorted(appState.todayTasks),
+                    tasks: sorted(today),
                     accentColor: Color.accentColor
                 )
             }
@@ -243,34 +257,38 @@ struct TaskListScreen: View {
             }
         }
 
-        if !appState.tomorrowTasks.isEmpty {
+        let tomorrow = excludingCurrent(appState.tomorrowTasks, currentIds: currentIds)
+        if !tomorrow.isEmpty {
             SmartListSection(
                 title: "Tomorrow",
-                tasks: sorted(appState.tomorrowTasks),
+                tasks: sorted(tomorrow),
                 accentColor: .orange
             )
         }
 
-        if !appState.thisWeekTasks.isEmpty {
+        let thisWeek = excludingCurrent(appState.thisWeekTasks, currentIds: currentIds)
+        if !thisWeek.isEmpty {
             SmartListSection(
                 title: "This Week",
-                tasks: sorted(appState.thisWeekTasks),
+                tasks: sorted(thisWeek),
                 accentColor: .blue
             )
         }
 
-        if !appState.upcomingTasks.isEmpty {
+        let upcoming = excludingCurrent(appState.upcomingTasks, currentIds: currentIds)
+        if !upcoming.isEmpty {
             SmartListSection(
                 title: "Upcoming",
-                tasks: sorted(appState.upcomingTasks),
+                tasks: sorted(upcoming),
                 accentColor: .purple
             )
         }
 
-        if !appState.noDateTasks.isEmpty {
+        let noDate = excludingCurrent(appState.noDateTasks, currentIds: currentIds)
+        if !noDate.isEmpty {
             SmartListSection(
                 title: "No Date",
-                tasks: sorted(appState.noDateTasks),
+                tasks: sorted(noDate),
                 accentColor: .secondary
             )
         }
@@ -284,6 +302,12 @@ struct TaskListScreen: View {
                 )
             }
         }
+    }
+
+    /// Removes tasks already shown in the Current section so they don't appear
+    /// twice in the date-based sections below it.
+    private func excludingCurrent(_ tasks: [VTask], currentIds: Set<Int64>) -> [VTask] {
+        currentIds.isEmpty ? tasks : tasks.filter { !currentIds.contains($0.id) }
     }
 
     private func sorted(_ tasks: [VTask]) -> [VTask] {

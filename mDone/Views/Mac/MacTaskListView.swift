@@ -55,31 +55,47 @@ struct MacTaskListView: View {
                 ContentUnavailableView.search(text: appState.searchQuery)
                     .frame(maxHeight: .infinity)
             } else if section == .inbox {
+                let currentTasks = appState.currentTasks
+                let currentIds = Set(currentTasks.map(\.id))
                 List(selection: $selectedTask) {
+                    if !currentTasks.isEmpty {
+                        SmartListSection(
+                            title: "Current",
+                            tasks: currentTasks,
+                            accentColor: Color.accentColor,
+                            showsProgress: true
+                        )
+                    }
                     if calmMode {
-                        let todayAndOverdue = appState.calmModeTodayTasks
+                        let todayAndOverdue = excludingCurrent(appState.calmModeTodayTasks, currentIds: currentIds)
                         if !todayAndOverdue.isEmpty {
                             SmartListSection(title: "Today", tasks: todayAndOverdue, accentColor: Color.accentColor)
                         }
                     } else {
-                        if !appState.overdueTasks.isEmpty {
-                            SmartListSection(title: "Overdue", tasks: appState.overdueTasks, accentColor: .red)
+                        let overdue = excludingCurrent(appState.overdueTasks, currentIds: currentIds)
+                        if !overdue.isEmpty {
+                            SmartListSection(title: "Overdue", tasks: overdue, accentColor: .red)
                         }
-                        if !appState.todayTasks.isEmpty {
-                            SmartListSection(title: "Today", tasks: appState.todayTasks, accentColor: Color.accentColor)
+                        let today = excludingCurrent(appState.todayTasks, currentIds: currentIds)
+                        if !today.isEmpty {
+                            SmartListSection(title: "Today", tasks: today, accentColor: Color.accentColor)
                         }
                     }
-                    if !appState.tomorrowTasks.isEmpty {
-                        SmartListSection(title: "Tomorrow", tasks: appState.tomorrowTasks, accentColor: .orange)
+                    let tomorrow = excludingCurrent(appState.tomorrowTasks, currentIds: currentIds)
+                    if !tomorrow.isEmpty {
+                        SmartListSection(title: "Tomorrow", tasks: tomorrow, accentColor: .orange)
                     }
-                    if !appState.thisWeekTasks.isEmpty {
-                        SmartListSection(title: "This Week", tasks: appState.thisWeekTasks, accentColor: .blue)
+                    let thisWeek = excludingCurrent(appState.thisWeekTasks, currentIds: currentIds)
+                    if !thisWeek.isEmpty {
+                        SmartListSection(title: "This Week", tasks: thisWeek, accentColor: .blue)
                     }
-                    if !appState.upcomingTasks.isEmpty {
-                        SmartListSection(title: "Upcoming", tasks: appState.upcomingTasks, accentColor: .purple)
+                    let upcoming = excludingCurrent(appState.upcomingTasks, currentIds: currentIds)
+                    if !upcoming.isEmpty {
+                        SmartListSection(title: "Upcoming", tasks: upcoming, accentColor: .purple)
                     }
-                    if !appState.noDateTasks.isEmpty {
-                        SmartListSection(title: "No Date", tasks: appState.noDateTasks, accentColor: .secondary)
+                    let noDate = excludingCurrent(appState.noDateTasks, currentIds: currentIds)
+                    if !noDate.isEmpty {
+                        SmartListSection(title: "No Date", tasks: noDate, accentColor: .secondary)
                     }
                 }
                 .listStyle(.inset)
@@ -194,6 +210,12 @@ struct MacTaskListView: View {
         case let .project(project): return appState.tasksForProject(project.id)
         case .archived, .notifications, .calendar, .settings: return []
         }
+    }
+
+    /// Removes tasks already shown in the Current section so they don't appear
+    /// twice in the date-based sections below it.
+    private func excludingCurrent(_ tasks: [VTask], currentIds: Set<Int64>) -> [VTask] {
+        currentIds.isEmpty ? tasks : tasks.filter { !currentIds.contains($0.id) }
     }
 
     private func handleDrop(taskId: Int64, in tasks: [VTask], at location: CGPoint) {

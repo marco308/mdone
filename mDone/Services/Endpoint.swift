@@ -127,6 +127,21 @@ struct Endpoint {
         ])
     }
 
+    /// Creates a label. Vikunja uses PUT (not POST) for creation.
+    static func createLabel() -> Endpoint {
+        Endpoint(path: "/api/v1/labels", method: .PUT)
+    }
+
+    /// Associates a label with a task. Body: `{ "label_id": <id> }`.
+    static func addLabelToTask(taskId: Int64) -> Endpoint {
+        Endpoint(path: "/api/v1/tasks/\(taskId)/labels", method: .PUT)
+    }
+
+    /// Removes a label association from a task.
+    static func removeLabelFromTask(taskId: Int64, labelId: Int64) -> Endpoint {
+        Endpoint(path: "/api/v1/tasks/\(taskId)/labels/\(labelId)", method: .DELETE)
+    }
+
     // MARK: - Notifications
 
     static func notifications(page: Int = 1) -> Endpoint {

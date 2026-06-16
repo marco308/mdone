@@ -15,6 +15,7 @@ struct MacTaskDetailView: View {
     @State private var showDeleteConfirm = false
     @State private var isShowingDescriptionPreview: Bool
     @State private var estimateSeconds: TimeInterval?
+    @State private var percentDone: Double
 
     init(task: VTask) {
         self.task = task
@@ -29,6 +30,13 @@ struct MacTaskDetailView: View {
         _reminders = State(initialValue: task.reminders ?? [])
         _isShowingDescriptionPreview = State(initialValue: !initialDescription.isEmpty)
         _estimateSeconds = State(initialValue: task.estimatedSeconds)
+        _percentDone = State(initialValue: task.percentDone ?? 0)
+    }
+
+    /// The live "Current" state from `AppState`, so the toggle label reflects
+    /// changes made while the detail view is open.
+    private var isCurrentNow: Bool {
+        appState.isCurrent(appState.tasks.first(where: { $0.id == task.id }) ?? task)
     }
 
     var body: some View {
@@ -79,6 +87,30 @@ struct MacTaskDetailView: View {
                             .frame(minHeight: 100, maxHeight: 200)
                             .scrollContentBackground(.hidden)
                     }
+                }
+            }
+
+            Section("Current") {
+                Button {
+                    Task { await appState.toggleCurrent(task) }
+                } label: {
+                    Label(
+                        isCurrentNow ? "Remove from Current" : "Mark as Current",
+                        systemImage: isCurrentNow ? "pin.slash" : "pin"
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Progress")
+                        Spacer()
+                        Text("\(Int((percentDone * 100).rounded()))%")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                    Slider(value: $percentDone, in: 0 ... 1, step: 0.05)
+                        .accessibilityLabel("Progress")
+                        .accessibilityValue("\(Int((percentDone * 100).rounded())) percent")
                 }
             }
 
@@ -207,6 +239,7 @@ struct MacTaskDetailView: View {
             reminders = newTask.reminders ?? []
             isShowingDescriptionPreview = !newDescription.isEmpty
             estimateSeconds = newTask.estimatedSeconds
+            percentDone = newTask.percentDone ?? 0
         }
     }
 
@@ -221,6 +254,7 @@ struct MacTaskDetailView: View {
             projectId: selectedProjectId,
             repeatAfter: repeatInterval,
             reminders: reminders,
+            percentDone: percentDone,
             clearDueDate: !hasDueDate
         )
         Task {

@@ -19,6 +19,9 @@ KEY FEATURES
 Smart Lists
 Stay on top of what matters. mDone organizes your tasks into smart views — Today, Upcoming, and Overdue — so you always know what to focus on next.
 
+Current Tasks
+Keep long-running work top of mind. Mark a task as Current and it stays pinned to its own section at the top of your list, above Today, with a progress bar you can update and a gentle idle nudge when it has sat untouched for too long. Perfect for slow-burn projects that would otherwise slip out of sight.
+
 Projects & Favorites
 Organize tasks into projects and mark the ones you use most as favorites for quick access from the sidebar.
 
@@ -74,10 +77,20 @@ Steps to test:
    - Swipe a task to complete or delete it.
    - Use the sidebar to navigate between projects and smart lists (Today, Upcoming, Overdue).
    - Open a task to edit its details, set a due date, or configure repeating.
+   - Long-press a task (or open it) and choose "Mark as Current" to pin it to the new Current section at the top of the list, then update its progress from the task's detail view.
    - Try the focus timer from a task's detail view.
    - Add a widget from the home screen (long press > Edit Home Screen > tap +).
 
 This is a private test server maintained by the developer for App Store review purposes.
+
+## What's New (v1.7.0)
+
+Current tasks: keep long-running work from slipping out of sight.
+
+- Mark any task as Current to pin it to a dedicated section at the top of your list, above Today.
+- Track momentum with a progress bar you can update from the task's detail view or a quick menu.
+- An idle badge appears when a Current task has not been touched for a while, so slow-burn projects do not stall silently. Set the idle threshold in Settings.
+- Available on both iPhone and Mac.
 
 ## What's New (v1.0.0)
 

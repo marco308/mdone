@@ -69,13 +69,19 @@ final class AppState {
 
     /// `taskService` is injectable so tests can drive the network paths
     /// (e.g. `undoLastCompletion`) through a mocked `APIClient`.
-    init(taskService: TaskService = TaskService(), projectService: ProjectService = ProjectService()) {
+    init(
+        taskService: TaskService = TaskService(),
+        projectService: ProjectService = ProjectService(),
+        labelService: LabelService = LabelService()
+    ) {
         self.taskService = taskService
         self.projectService = projectService
+        self.labelService = labelService
     }
 
     private let taskService: TaskService
     private let projectService: ProjectService
+    private let labelService: LabelService
     private let authService = AuthService.shared
     private let notificationService = NotificationService.shared
 
@@ -211,6 +217,51 @@ final class AppState {
         }
 
         return result
+    }
+
+    // MARK: - Current (long-running) tasks
+
+    /// Title of the dedicated Vikunja label that marks a task as "Current".
+    static let currentLabelTitle = "Current"
+
+    private static let currentLabelIdKey = "currentLabelId"
+
+    /// The persisted id of the "Current" label, if one has been resolved
+    /// before. Stored so renaming the label on the server (or another client)
+    /// doesn't orphan the marker.
+    private var storedCurrentLabelId: Int64? {
+        get { (UserDefaults.standard.object(forKey: Self.currentLabelIdKey) as? NSNumber)?.int64Value }
+        set {
+            if let newValue {
+                UserDefaults.standard.set(NSNumber(value: newValue), forKey: Self.currentLabelIdKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: Self.currentLabelIdKey)
+            }
+        }
+    }
+
+    /// The "Current" label, resolved from the loaded labels by stored id first,
+    /// then by title. `nil` until one exists; it's created lazily the first
+    /// time a task is marked Current.
+    var currentLabel: VLabel? {
+        if let id = storedCurrentLabelId, let match = labels.first(where: { $0.id == id }) {
+            return match
+        }
+        return labels.first { $0.title.caseInsensitiveCompare(Self.currentLabelTitle) == .orderedSame }
+    }
+
+    /// Whether `task` carries the "Current" label.
+    func isCurrent(_ task: VTask) -> Bool {
+        guard let currentLabel else { return false }
+        return task.labels?.contains { $0.id == currentLabel.id } ?? false
+    }
+
+    /// Active (not done) tasks marked "Current", most recently touched first.
+    var currentTasks: [VTask] {
+        guard let currentLabel else { return [] }
+        return tasks
+            .filter { !$0.done && ($0.labels?.contains { $0.id == currentLabel.id } ?? false) }
+            .sorted { ($0.updated ?? .distantPast) > ($1.updated ?? .distantPast) }
     }
 
     func checkAuth() async {
@@ -473,10 +524,28 @@ final class AppState {
         }
     }
 
+    /// Vikunja's task-update/toggle response returns `labels: null` (it doesn't
+    /// echo the task's labels). Replacing the local task wholesale with that
+    /// response would drop its labels until the next full refresh, which made a
+    /// Current task vanish from its section the moment you edited it (e.g.
+    /// changed its progress). Carry the existing labels forward when the
+    /// response omits them. Only labels are preserved: they're never edited via
+    /// the task-update endpoint (the Current label is toggled through the
+    /// dedicated label endpoints), so this can't mask a user edit. Other
+    /// relations like reminders *are* sent in the update request, so we let the
+    /// response drive them.
+    static func preservingRelations(existing: VTask, response: VTask) -> VTask {
+        var result = response
+        if result.labels == nil { result.labels = existing.labels }
+        return result
+    }
+
     @MainActor
     func toggleTaskDone(_ task: VTask) async {
         do {
-            let updated = try await taskService.toggleDone(task: task)
+            let response = try await taskService.toggleDone(task: task)
+            let updated = tasks.first(where: { $0.id == response.id })
+                .map { Self.preservingRelations(existing: $0, response: response) } ?? response
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
@@ -589,7 +658,9 @@ final class AppState {
         }
 
         do {
-            let updated = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(dueDate: newDate))
+            let response = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(dueDate: newDate))
+            let updated = tasks.first(where: { $0.id == response.id })
+                .map { Self.preservingRelations(existing: $0, response: response) } ?? response
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
@@ -606,13 +677,107 @@ final class AppState {
     @MainActor
     func updateTask(id: Int64, request: TaskUpdateRequest) async {
         do {
-            let updated = try await taskService.updateTask(id: id, request: request)
+            let response = try await taskService.updateTask(id: id, request: request)
+            let updated = tasks.first(where: { $0.id == response.id })
+                .map { Self.preservingRelations(existing: $0, response: response) } ?? response
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
             syncService?.updateCachedTask(updated)
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
+            handleError(error)
+        }
+    }
+
+    // MARK: - Current task mutations
+
+    /// Resolves the "Current" label, creating it on the server if it doesn't
+    /// exist yet. Persists the id so it survives a later rename.
+    @MainActor
+    private func ensureCurrentLabel() async throws -> VLabel {
+        if let existing = currentLabel { return existing }
+        let created = try await labelService.createLabel(
+            LabelCreateRequest(title: Self.currentLabelTitle, hexColor: "1a8cff")
+        )
+        if !labels.contains(where: { $0.id == created.id }) {
+            labels.append(created)
+        }
+        storedCurrentLabelId = created.id
+        return created
+    }
+
+    /// Toggles the "Current" label on `task`, surfacing it in (or removing it
+    /// from) the Current section at the top of the task list. Optimistic: the
+    /// local copy updates immediately and reverts if the network call fails.
+    @MainActor
+    func toggleCurrent(_ task: VTask) async {
+        let label: VLabel
+        do {
+            label = try await ensureCurrentLabel()
+        } catch {
+            handleError(error)
+            return
+        }
+
+        let wasCurrent = isCurrent(task)
+        setCurrentLabelLocally(taskId: task.id, label: label, present: !wasCurrent)
+
+        do {
+            if wasCurrent {
+                try await labelService.removeLabel(taskId: task.id, labelId: label.id)
+            } else {
+                try await labelService.addLabel(taskId: task.id, labelId: label.id)
+            }
+            #if os(iOS)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            setCurrentLabelLocally(taskId: task.id, label: label, present: wasCurrent)
+            handleError(error)
+        }
+    }
+
+    /// Adds or removes `label` from the locally cached copy of a task, and
+    /// bumps its `updated` timestamp so the stall indicator resets. The
+    /// `tasks` array is the source of truth.
+    @MainActor
+    private func setCurrentLabelLocally(taskId: Int64, label: VLabel, present: Bool) {
+        guard let index = tasks.firstIndex(where: { $0.id == taskId }) else { return }
+        var labelList = tasks[index].labels ?? []
+        if present {
+            if !labelList.contains(where: { $0.id == label.id }) {
+                labelList.append(label)
+            }
+        } else {
+            labelList.removeAll { $0.id == label.id }
+        }
+        tasks[index].labels = labelList
+        tasks[index].updated = Date()
+        syncService?.updateCachedTask(tasks[index])
+    }
+
+    /// Sets a task's completion progress (clamped to 0...1) and persists it.
+    /// Optimistic, and intentionally does not overwrite the local task with the
+    /// server response so an update that omits labels can't drop the Current
+    /// marker.
+    @MainActor
+    func setProgress(_ task: VTask, percent: Double) async {
+        let clamped = min(max(percent, 0), 1)
+        let original = tasks.first(where: { $0.id == task.id })?.percentDone
+        if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+            tasks[index].percentDone = clamped
+            tasks[index].updated = Date()
+            syncService?.updateCachedTask(tasks[index])
+        }
+        do {
+            _ = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(percentDone: clamped))
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+                tasks[index].percentDone = original
+            }
             handleError(error)
         }
     }
@@ -797,7 +962,9 @@ final class AppState {
         var changed = true
         while changed {
             changed = false
-            for project in all where project.parentProjectId.map({ ids.contains($0) }) == true && !ids.contains(project.id) {
+            for project in all
+                where project.parentProjectId.map({ ids.contains($0) }) == true && !ids.contains(project.id)
+            {
                 ids.insert(project.id)
                 changed = true
             }
