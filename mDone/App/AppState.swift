@@ -524,10 +524,28 @@ final class AppState {
         }
     }
 
+    /// Vikunja's task-update/toggle response returns `labels: null` (it doesn't
+    /// echo the task's labels). Replacing the local task wholesale with that
+    /// response would drop its labels until the next full refresh, which made a
+    /// Current task vanish from its section the moment you edited it (e.g.
+    /// changed its progress). Carry the existing labels forward when the
+    /// response omits them. Only labels are preserved: they're never edited via
+    /// the task-update endpoint (the Current label is toggled through the
+    /// dedicated label endpoints), so this can't mask a user edit. Other
+    /// relations like reminders *are* sent in the update request, so we let the
+    /// response drive them.
+    static func preservingRelations(existing: VTask, response: VTask) -> VTask {
+        var result = response
+        if result.labels == nil { result.labels = existing.labels }
+        return result
+    }
+
     @MainActor
     func toggleTaskDone(_ task: VTask) async {
         do {
-            let updated = try await taskService.toggleDone(task: task)
+            let response = try await taskService.toggleDone(task: task)
+            let updated = tasks.first(where: { $0.id == response.id })
+                .map { Self.preservingRelations(existing: $0, response: response) } ?? response
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
@@ -640,7 +658,9 @@ final class AppState {
         }
 
         do {
-            let updated = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(dueDate: newDate))
+            let response = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(dueDate: newDate))
+            let updated = tasks.first(where: { $0.id == response.id })
+                .map { Self.preservingRelations(existing: $0, response: response) } ?? response
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
@@ -657,7 +677,9 @@ final class AppState {
     @MainActor
     func updateTask(id: Int64, request: TaskUpdateRequest) async {
         do {
-            let updated = try await taskService.updateTask(id: id, request: request)
+            let response = try await taskService.updateTask(id: id, request: request)
+            let updated = tasks.first(where: { $0.id == response.id })
+                .map { Self.preservingRelations(existing: $0, response: response) } ?? response
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }

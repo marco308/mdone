@@ -236,4 +236,50 @@ final class CurrentTasksTests: XCTestCase {
         XCTAssertTrue(json.contains("\"percent_done\":0.5"), "percentDone encodes as percent_done")
         XCTAssertFalse(json.contains("\"title\""), "Unset fields stay omitted")
     }
+
+    // MARK: - Label-drop regression (edit makes a Current task vanish)
+
+    func testPreservingRelationsCarriesLabelsForwardWhenResponseNil() {
+        var existing = VTask(id: 1, title: "x", done: false, priority: 0, projectId: 1)
+        existing.labels = [currentLabel()]
+        var response = VTask(id: 1, title: "x", done: false, priority: 0, projectId: 1)
+        response.labels = nil
+
+        let merged = AppState.preservingRelations(existing: existing, response: response)
+        XCTAssertEqual(merged.labels?.map(\.id), [3], "Nil response labels are filled from the existing task")
+    }
+
+    func testPreservingRelationsKeepsNonNilResponseLabels() {
+        var existing = VTask(id: 1, title: "x", done: false, priority: 0, projectId: 1)
+        existing.labels = [currentLabel()]
+        var response = VTask(id: 1, title: "x", done: false, priority: 0, projectId: 1)
+        response.labels = []
+
+        let merged = AppState.preservingRelations(existing: existing, response: response)
+        XCTAssertEqual(merged.labels?.count, 0, "A non-nil response value is authoritative")
+    }
+
+    /// Regression: Vikunja's update response returns labels:null, so editing a
+    /// Current task (e.g. its progress) used to drop the Current label locally,
+    /// making the task vanish from the Current section until the next refresh.
+    func testUpdateTaskKeepsTaskInCurrentSection() async {
+        let appState = await makeAppState()
+        appState.labels = [currentLabel()]
+        var task = VTask(id: 1, title: "Roadmap", done: false, priority: 0, projectId: 1)
+        task.labels = [currentLabel()]
+        appState.tasks = [task]
+
+        MockURLProtocol.requestHandler = { request in
+            // Vikunja echoes percent_done but returns labels: null.
+            let json = #"{"id": 1, "title": "Roadmap", "done": false, "priority": 0, "project_id": 1, "percent_done": 0.5, "labels": null}"#
+                .data(using: .utf8)!
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), json)
+        }
+
+        await appState.updateTask(id: 1, request: TaskUpdateRequest(percentDone: 0.5))
+
+        XCTAssertEqual(appState.tasks[0].percentDone, 0.5, "Progress is applied")
+        XCTAssertTrue(appState.isCurrent(appState.tasks[0]), "The Current label survives the edit")
+        XCTAssertEqual(appState.currentTasks.map(\.id), [1], "Task stays in the Current section after editing")
+    }
 }
