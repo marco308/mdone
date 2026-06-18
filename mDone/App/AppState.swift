@@ -674,6 +674,33 @@ final class AppState {
         }
     }
 
+    /// Reschedules a task to an absolute due date, ignoring its current date.
+    /// Backs the quick-schedule long-press options (Today, Tomorrow, Next Week, …).
+    @MainActor
+    func rescheduleTask(_ task: VTask, to newDate: Date) async {
+        let originalDueDate: Date?
+        if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+            originalDueDate = tasks[index].dueDate
+            tasks[index].dueDate = newDate
+        } else {
+            originalDueDate = nil
+        }
+
+        do {
+            let updated = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(dueDate: newDate))
+            if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
+                tasks[index] = updated
+            }
+            syncService?.updateCachedTask(updated)
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+                tasks[index].dueDate = originalDueDate
+            }
+            handleError(error)
+        }
+    }
+
     @MainActor
     func updateTask(id: Int64, request: TaskUpdateRequest) async {
         do {
