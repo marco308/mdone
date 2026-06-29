@@ -76,6 +76,21 @@ struct TaskRow: View {
         }
         .contextMenu {
             if !readOnly {
+                if !task.done {
+                    Menu {
+                        ForEach(QuickSchedule.options()) { option in
+                            Button {
+                                guard let date = option.resolvedDate() else { return }
+                                Task { await appState.rescheduleTask(task, to: date) }
+                            } label: {
+                                Label(option.label, systemImage: option.systemImage)
+                            }
+                        }
+                    } label: {
+                        Label("Schedule", systemImage: "calendar")
+                    }
+                }
+
                 #if os(iOS)
                 if isFocused {
                     Button {

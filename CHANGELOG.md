@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - **Current tasks**: mark a long-running task as "Current" to pin it to a dedicated section at the top of your Inbox, above Today, so slow-burn projects stay top of mind instead of sinking out of view. Each Current task shows a progress bar you can update (from its detail view, or quickly via the right-click / long-press menu), and an "Idle" badge appears when a Current task hasn't been touched for a while. Set how many idle days trigger the badge in Settings under "Current Tasks". Mark or unmark a task as Current from its context menu or detail view, on both iPhone and Mac.
+- Long-press (or right-click) a task and pick "Schedule" to reschedule it to Today, Tomorrow, Later This Week, Next Week, or Next Month. These set an absolute due date (they ignore the task's current date, unlike the +24h swipe), and "Next Week" follows your "Start week on" preference (#67).
 
 ## [1.6.2] - 2026-06-08
 

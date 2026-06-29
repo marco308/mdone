@@ -135,7 +135,11 @@ final class AppStateTests: XCTestCase {
         }
 
         await appState.deleteProject(appState.projects[0]) // delete Parent (3)
-        XCTAssertEqual(appState.projects.map(\.id).sorted(), [9], "Parent and all descendants are removed; unrelated kept")
+        XCTAssertEqual(
+            appState.projects.map(\.id).sorted(),
+            [9],
+            "Parent and all descendants are removed; unrelated kept"
+        )
         XCTAssertEqual(appState.tasks.map(\.id).sorted(), [3], "Tasks of the parent and its descendants are removed")
     }
 
@@ -500,6 +504,62 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(appState.undoableCompletion?.id, 11)
     }
 
+    // MARK: - Reschedule (#67)
+
+    func testRescheduleTaskUpdatesDueDateOnSuccess() async throws {
+        let appState = await makeMockedAppState()
+        var task = VTask(id: 50, title: "Renew passport", done: false, priority: 1, projectId: 4)
+        task.dueDate = Date(timeIntervalSince1970: 1_700_000_000)
+        appState.tasks = [task]
+        let newDate = Date(timeIntervalSince1970: 1_760_000_000)
+
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url!)
+            // Vikunja echoes the new due date back as ISO8601.
+            let iso = ISO8601DateFormatter().string(from: newDate)
+            let json = """
+            {"id": 50, "title": "Renew passport", "done": false, "priority": 1, \
+            "project_id": 4, "due_date": "\(iso)"}
+            """
+            return (response, Data(json.utf8))
+        }
+
+        await appState.rescheduleTask(task, to: newDate)
+
+        XCTAssertEqual(appState.tasks.count, 1, "Reschedule must not duplicate the task")
+        XCTAssertEqual(appState.tasks.first?.id, 50)
+        let resolved = try XCTUnwrap(appState.tasks.first?.effectiveDueDate)
+        XCTAssertEqual(
+            resolved.timeIntervalSince1970,
+            newDate.timeIntervalSince1970,
+            accuracy: 1,
+            "Reschedule must adopt the new due date returned by the server"
+        )
+    }
+
+    func testRescheduleTaskRollsBackOnFailure() async {
+        let appState = await makeMockedAppState()
+        let original = Date(timeIntervalSince1970: 1_700_000_000)
+        var task = VTask(id: 51, title: "Book dentist", done: false, priority: 0, projectId: 2)
+        task.dueDate = original
+        appState.tasks = [task]
+        let newDate = Date(timeIntervalSince1970: 1_760_000_000)
+
+        // 400 (not 5xx) so APIClient fails fast instead of retrying with backoff.
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 400, url: request.url!)
+            return (response, Data("{\"message\": \"bad request\"}".utf8))
+        }
+
+        await appState.rescheduleTask(task, to: newDate)
+
+        XCTAssertEqual(
+            appState.tasks.first?.dueDate,
+            original,
+            "A failed reschedule must restore the original due date"
+        )
+    }
+
     // MARK: - Calm Mode (#68)
 
     /// Seeds a deterministic spread of due dates: overdue, due-today,
@@ -509,15 +569,39 @@ final class AppStateTests: XCTestCase {
         let cal = Calendar.current
         let todayEndOfDay = try XCTUnwrap(cal.date(bySettingHour: 23, minute: 59, second: 59, of: now))
         appState.tasks = [
-            VTask(id: 1, title: "Overdue", done: false,
-                  dueDate: cal.date(byAdding: .day, value: -2, to: now), priority: 0, projectId: 1),
-            VTask(id: 2, title: "Today", done: false,
-                  dueDate: todayEndOfDay, priority: 0, projectId: 1),
-            VTask(id: 3, title: "Upcoming", done: false,
-                  dueDate: cal.date(byAdding: .day, value: 3, to: now), priority: 0, projectId: 1),
+            VTask(
+                id: 1,
+                title: "Overdue",
+                done: false,
+                dueDate: cal.date(byAdding: .day, value: -2, to: now),
+                priority: 0,
+                projectId: 1
+            ),
+            VTask(
+                id: 2,
+                title: "Today",
+                done: false,
+                dueDate: todayEndOfDay,
+                priority: 0,
+                projectId: 1
+            ),
+            VTask(
+                id: 3,
+                title: "Upcoming",
+                done: false,
+                dueDate: cal.date(byAdding: .day, value: 3, to: now),
+                priority: 0,
+                projectId: 1
+            ),
             VTask(id: 4, title: "No date", done: false, priority: 0, projectId: 1),
-            VTask(id: 5, title: "Done overdue", done: true,
-                  dueDate: cal.date(byAdding: .day, value: -3, to: now), priority: 0, projectId: 1),
+            VTask(
+                id: 5,
+                title: "Done overdue",
+                done: true,
+                dueDate: cal.date(byAdding: .day, value: -3, to: now),
+                priority: 0,
+                projectId: 1
+            ),
         ]
     }
 
