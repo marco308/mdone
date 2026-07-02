@@ -42,6 +42,15 @@ actor TaskService {
         let request = TaskPositionRequest(position: position, projectViewId: viewId)
         try await apiClient.sendExpectingEmpty(Endpoint.updateTaskPosition(taskId: taskId), body: request)
     }
+
+    /// Moves a task into a kanban bucket (column) within a project view.
+    func moveTaskToBucket(taskId: Int64, projectId: Int64, viewId: Int64, bucketId: Int64) async throws {
+        let request = TaskBucketRequest(taskId: taskId)
+        try await apiClient.sendExpectingEmpty(
+            Endpoint.moveTaskToBucket(projectId: projectId, viewId: viewId, bucketId: bucketId),
+            body: request
+        )
+    }
 }
 
 struct TaskPositionRequest: Encodable {
