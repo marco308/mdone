@@ -269,12 +269,14 @@ final class AppState {
         let authenticated = authService.isAuthenticated()
         if authenticated {
             await configureAPIClient()
-            // Sync credentials to shared App Group UserDefaults so widgets can access them
+            // Sync credentials to the widget extension: server URL via the App
+            // Group UserDefaults (non-sensitive), token via the shared keychain
+            // item — never the defaults, which are cleartext on disk.
             if let serverURL = authService.getServerURL(),
                let token = authService.getToken()
             {
                 SharedKeys.sharedDefaults.set(serverURL, forKey: SharedKeys.serverURLKey)
-                SharedKeys.sharedDefaults.set(token, forKey: SharedKeys.apiTokenKey)
+                SharedTokenStore.save(token)
             }
         }
         isAuthenticated = authenticated
