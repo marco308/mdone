@@ -28,8 +28,20 @@ final class SharedTokenStoreTests: XCTestCase {
     }
 
     func testSaveThenGetRoundTrip() {
-        SharedTokenStore.save("tk_test_roundtrip")
+        XCTAssertTrue(SharedTokenStore.save("tk_test_roundtrip"), "Keychain write should succeed")
         XCTAssertEqual(SharedTokenStore.get(), "tk_test_roundtrip")
+    }
+
+    func testSaveScrubsLegacyDefaultsCopyOnSuccess() {
+        SharedKeys.sharedDefaults.set("tk_old", forKey: SharedKeys.apiTokenKey)
+
+        XCTAssertTrue(SharedTokenStore.save("tk_new"))
+
+        XCTAssertNil(
+            SharedKeys.sharedDefaults.string(forKey: SharedKeys.apiTokenKey),
+            "A successful keychain write should remove the cleartext copy"
+        )
+        XCTAssertEqual(SharedTokenStore.get(), "tk_new")
     }
 
     func testSaveOverwritesPreviousToken() {
