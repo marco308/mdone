@@ -31,6 +31,6 @@ jobs:
             -project mDone.xcodeproj \
             -scheme mDone \
             -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
             -only-testing:mDoneTests \
             test
