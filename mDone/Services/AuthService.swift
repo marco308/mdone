@@ -32,12 +32,12 @@ actor AuthService {
 
     nonisolated func saveToken(_ token: String) {
         writeKeychain(account: tokenKeychainKey, value: token)
-        SharedKeys.sharedDefaults.set(token, forKey: SharedKeys.apiTokenKey)
+        SharedTokenStore.save(token)
     }
 
     nonisolated func deleteToken() {
         deleteKeychain(account: tokenKeychainKey)
-        SharedKeys.sharedDefaults.removeObject(forKey: SharedKeys.apiTokenKey)
+        SharedTokenStore.delete()
     }
 
     // MARK: - Refresh Token (Keychain)

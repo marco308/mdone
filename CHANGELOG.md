@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- The Vikunja API token shared with the widgets is now stored in the Keychain instead of the app group preferences, where it sat in cleartext on disk. Existing installs migrate automatically the next time the app or a widget runs, and the old cleartext copy is removed.
 - A task no longer briefly disappears from the **Current** section when you change its progress (or otherwise edit it). The task stayed gone until the next refresh because the server's update response omits labels; the app now keeps the task's labels through an edit.
 
 ### Added
