@@ -51,6 +51,25 @@ struct Endpoint {
         Endpoint(path: "/api/v1/projects/\(projectId)/views")
     }
 
+    // MARK: - Kanban Buckets
+
+    /// Lists the buckets (columns) of a project's kanban view, with each
+    /// bucket's tasks embedded.
+    static func projectBuckets(projectId: Int64, viewId: Int64, page: Int = 1, perPage: Int = 100) -> Endpoint {
+        Endpoint(path: "/api/v1/projects/\(projectId)/views/\(viewId)/buckets", queryItems: [
+            URLQueryItem(name: "page", value: "\(page)"),
+            URLQueryItem(name: "per_page", value: "\(perPage)"),
+        ])
+    }
+
+    /// Moves a task into a bucket. Vikunja uses POST with a body of `{ "task_id": <id> }`.
+    static func moveTaskToBucket(projectId: Int64, viewId: Int64, bucketId: Int64) -> Endpoint {
+        Endpoint(
+            path: "/api/v1/projects/\(projectId)/views/\(viewId)/buckets/\(bucketId)/tasks",
+            method: .POST
+        )
+    }
+
     /// Creates a project. Vikunja uses PUT (not POST) for creation.
     static func createProject() -> Endpoint {
         Endpoint(path: "/api/v1/projects", method: .PUT)
