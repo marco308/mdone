@@ -38,25 +38,33 @@ actor APIClient {
         self.session = session
 
         decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let fallbackFormatter = ISO8601DateFormatter()
-        fallbackFormatter.formatOptions = [.withInternetDateTime]
-        decoder.dateDecodingStrategy = .custom { decoder in
-            let container = try decoder.singleValueContainer()
-            let dateString = try container.decode(String.self)
-            if dateString == "0001-01-01T00:00:00Z" {
-                return Date.distantPast
-            }
-            if let date = dateFormatter.date(from: dateString) {
-                return date
-            }
-            if let date = fallbackFormatter.date(from: dateString) {
-                return date
-            }
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date: \(dateString)")
-        }
+                decoder.keyDecodingStrategy = .convertFromSnakeCase
+                
+                decoder.dateDecodingStrategy = .custom { decoder in
+                    let container = try decoder.singleValueContainer()
+                    let dateString = try container.decode(String.self)
+                    
+                    if dateString == "0001-01-01T00:00:00Z" {
+                        return Date.distantPast
+                    }
+                    
+                    // Instanciamos los formateadores dentro del closure para evitar la advertencia de "non-Sendable"
+                    let dateFormatter = ISO8601DateFormatter()
+                    dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                    
+                    if let date = dateFormatter.date(from: dateString) {
+                        return date
+                    }
+                    
+                    let fallbackFormatter = ISO8601DateFormatter()
+                    fallbackFormatter.formatOptions = [.withInternetDateTime]
+                    
+                    if let date = fallbackFormatter.date(from: dateString) {
+                        return date
+                    }
+                    
+                    throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date: \(dateString)")
+                }
 
         encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase

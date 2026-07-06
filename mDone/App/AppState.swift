@@ -157,7 +157,7 @@ final class AppState {
 
     @MainActor
     private func updatePendingCount() {
-        pendingOperationsCount = (try? syncService?.pendingOperationCount()) ?? 0
+        pendingOperationsCount = syncService?.pendingOperationCount() ?? 0
     }
 
     var overdueTasks: [VTask] {
