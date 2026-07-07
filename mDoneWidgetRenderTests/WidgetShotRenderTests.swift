@@ -72,21 +72,25 @@ final class WidgetShotRenderTests: XCTestCase {
                 WidgetTask(
                     id: 1,
                     title: "Finalize Q1 report",
+                    description: "",
                     done: false,
                     dueDate: at(17),
                     priority: 3,
                     projectId: 1,
                     projectTitle: work,
+                    hexColor: nil,
                     isOverdue: false
                 ),
                 WidgetTask(
                     id: 2,
                     title: "Prepare slide deck",
+                    description: "",
                     done: false,
                     dueDate: at(14),
                     priority: 2,
                     projectId: 1,
                     projectTitle: work,
+                    hexColor: nil,
                     isOverdue: false
                 ),
             ],
@@ -94,11 +98,13 @@ final class WidgetShotRenderTests: XCTestCase {
                 WidgetTask(
                     id: 5,
                     title: "Reply to landlord",
+                    description: "",
                     done: false,
                     dueDate: at(9),
                     priority: 4,
                     projectId: 2,
                     projectTitle: home,
+                    hexColor: nil,
                     isOverdue: true
                 ),
             ],
@@ -117,31 +123,37 @@ final class WidgetShotRenderTests: XCTestCase {
                 WidgetTask(
                     id: 11,
                     title: "Dentist appointment",
+                    description: "",
                     done: false,
                     dueDate: daysOut(1, 10),
                     priority: 2,
                     projectId: 2,
                     projectTitle: home,
+                    hexColor: nil,
                     isOverdue: false
                 ),
                 WidgetTask(
                     id: 12,
                     title: "Renew passport",
+                    description: "",
                     done: false,
                     dueDate: daysOut(3, 9),
                     priority: 4,
                     projectId: 2,
                     projectTitle: home,
+                    hexColor: nil,
                     isOverdue: false
                 ),
                 WidgetTask(
                     id: 13,
                     title: "Team offsite prep",
+                    description: "",
                     done: false,
                     dueDate: daysOut(4, 15),
                     priority: 3,
                     projectId: 1,
                     projectTitle: work,
+                    hexColor: nil,
                     isOverdue: false
                 ),
             ],
