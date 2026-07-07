@@ -308,7 +308,7 @@ final class AppState {
         await registerAPIClientHandlers()
         await APIClient.shared.configure(serverURL: serverURL, token: token)
 
-        let projects: [Project] = try await APIClient.shared.fetch(Endpoint.projects())
+        _ = try await APIClient.shared.fetch(Endpoint.projects()) as [Project]
 
         authService.saveServerURL(serverURL)
         authService.saveToken(token)
@@ -335,7 +335,7 @@ final class AppState {
             refreshToken: capturedRefreshToken
         )
 
-        let projects: [Project] = try await APIClient.shared.fetch(Endpoint.projects())
+        _ = try await APIClient.shared.fetch(Endpoint.projects()) as [Project]
 
         authService.saveServerURL(url)
         authService.saveToken(loginResponse.token)

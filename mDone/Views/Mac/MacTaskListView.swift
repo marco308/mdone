@@ -19,7 +19,11 @@ struct MacTaskListView: View {
         Group {
             switch section {
             case .calendar:
+                #if os(macOS)
                 CalendarScreen(selectedTask: $selectedTask)
+                #else
+                CalendarScreen()
+                #endif
             case .settings:
                 SettingsScreen()
             case .notifications:
