@@ -118,6 +118,15 @@ struct SettingsScreen: View {
                 Button("Refresh All Data") {
                     Task { await appState.refreshAll() }
                 }
+                
+                #if os(iOS)
+                Button("Sync with Apple Watch") {
+                    if let url = AuthService.shared.getServerURL(),
+                       let token = AuthService.shared.getToken() {
+                        WatchConnectivityManager.shared.syncCredentials(serverURL: url, token: token)
+                    }
+                }
+                #endif
             }
 
             #if os(iOS)
