@@ -32,7 +32,17 @@ struct AppDependencies {
         do {
             modelContainer = try ModelContainer(for: schema, configurations: [config])
         } catch {
-            fatalError("Failed to create ModelContainer: \(error)")
+            print("Failed to create ModelContainer, attempting to delete old store: \(error)")
+            let url = config.url
+            try? FileManager.default.removeItem(at: url)
+            try? FileManager.default.removeItem(at: url.deletingPathExtension().appendingPathExtension("store-shm"))
+            try? FileManager.default.removeItem(at: url.deletingPathExtension().appendingPathExtension("store-wal"))
+            
+            do {
+                modelContainer = try ModelContainer(for: schema, configurations: [config])
+            } catch {
+                fatalError("Failed to create ModelContainer after deleting store: \(error)")
+            }
         }
 
         networkMonitor = NetworkMonitor()
