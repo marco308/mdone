@@ -1,6 +1,13 @@
 import SwiftUI
 import WidgetKit
 
+// NUESTRO ENUMERADO DE ESTILOS (Visible para toda la app)
+enum TaskRowStyle: String, CaseIterable {
+    case standard = "Standard"
+    case colorCircle = "Colored Circle"
+    case fullCard = "Full Card (Vikunja Style)"
+}
+
 struct SettingsScreen: View {
     @Environment(AppState.self) private var appState
     @AppStorage("notificationsEnabled") private var notificationsEnabled = false
@@ -10,6 +17,10 @@ struct SettingsScreen: View {
         .defaultRawValue
     @AppStorage("calmMode") private var calmMode = false
     @AppStorage("currentStallDays") private var currentStallDays = 7
+    
+    // NUESTRA VARIABLE DE GUARDADO LOCAL (Por defecto arranca en Standard)
+    @AppStorage("taskRowStyle") private var taskRowStyle = TaskRowStyle.standard.rawValue
+    
     @State private var showLogoutConfirm = false
     @State private var showAbout = false
 
@@ -37,6 +48,13 @@ struct SettingsScreen: View {
                 Picker("Start week on", selection: $firstWeekday) {
                     ForEach(WeekStartPreference.allCases) { preference in
                         Text(preference.label).tag(preference.rawValue)
+                    }
+                }
+                
+                // NUESTRO PICKER DE ESTILOS
+                Picker("Task appearance", selection: $taskRowStyle) {
+                    ForEach(TaskRowStyle.allCases, id: \.rawValue) { style in
+                        Text(style.rawValue).tag(style.rawValue)
                     }
                 }
             }
