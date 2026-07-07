@@ -1,7 +1,7 @@
 import Foundation
 
 enum FocusConstants {
-    static let appGroupID = "group.com.mdone.app"
+    static let appGroupID = "group.com.ncastillo.mdone.app"
     static let focusSessionKey = "com.mdone.focusSession"
 
     static var sharedDefaults: UserDefaults {
@@ -10,7 +10,7 @@ enum FocusConstants {
 }
 
 enum SharedKeys {
-    static let appGroupID = "group.com.mdone.app"
+    static let appGroupID = "group.com.ncastillo.mdone.app"
     static let apiTokenKey = "com.mdone.shared.apiToken"
     static let serverURLKey = "com.mdone.shared.serverURL"
     static let widgetDataKey = "com.mdone.shared.widgetData"

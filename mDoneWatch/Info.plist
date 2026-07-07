@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>WKCompanionAppBundleIdentifier</key>
-	<string>com.mdone.app</string>
+	<string>com.ncastillo.mdone.app</string>
 	<key>WKRunsIndependentlyOfCompanionApp</key>
 	<true/>
 </dict>

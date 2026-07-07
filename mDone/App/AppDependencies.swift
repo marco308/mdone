@@ -16,7 +16,7 @@ struct AppDependencies {
 
         // Ensure App Group directory exists for SwiftData
         var storeURL: URL?
-        if let appGroupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.mdone.app") {
+        if let appGroupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.ncastillo.mdone.app") {
             let supportURL = appGroupURL.appendingPathComponent("Library/Application Support", isDirectory: true)
             try? FileManager.default.createDirectory(at: supportURL, withIntermediateDirectories: true)
             storeURL = supportURL.appendingPathComponent("default.store")
