@@ -480,6 +480,7 @@ actor APIClient {
     }
 
     func send<R: Decodable>(_ endpoint: Endpoint, body: some Encodable) async throws -> R {
+        
         let bodyData = try encoder.encode(body)
         let (data, httpResponse) = try await executeWithRefresh {
             var request = try self.buildRequest(for: endpoint)

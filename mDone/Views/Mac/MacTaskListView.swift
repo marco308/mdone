@@ -19,7 +19,7 @@ struct MacTaskListView: View {
         Group {
             switch section {
             case .calendar:
-                CalendarScreen()
+                CalendarScreen(selectedTask: $selectedTask)
             case .settings:
                 SettingsScreen()
             case .notifications:
