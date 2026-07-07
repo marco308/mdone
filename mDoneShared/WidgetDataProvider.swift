@@ -65,11 +65,13 @@ final class WidgetDataProvider: @unchecked Sendable {
         async let today = fetchTodayTasks()
         async let upcoming = fetchUpcomingTasks()
         async let overdue = fetchOverdueTasks()
+        async let projects = fetchProjects()
 
         let widgetData = try await WidgetData(
             todayTasks: today,
             upcomingTasks: upcoming,
             overdueTasks: overdue,
+            projects: projects,
             lastUpdated: Date()
         )
 
@@ -136,6 +138,46 @@ final class WidgetDataProvider: @unchecked Sendable {
         )
     }
 
+    // MARK: - Projects & Lists
+
+    func fetchProjects() async throws -> [WidgetProject] {
+        guard let serverURL, let apiToken else { return [] }
+
+        let baseURL = serverURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let urlString = baseURL + "/api/v1/projects"
+        guard let url = URL(string: urlString) else { throw WidgetDataError.invalidURL }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiToken)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200 ... 299).contains(httpResponse.statusCode)
+        else {
+            throw WidgetDataError.requestFailed
+        }
+
+        struct APIProject: Decodable {
+            let id: Int64
+            let title: String
+            let hexColor: String?
+        }
+
+        let apiProjects = try decoder.decode([APIProject].self, from: data)
+        return apiProjects.map { WidgetProject(id: $0.id, title: $0.title, hexColor: $0.hexColor) }
+    }
+
+    func fetchTasks(forProjectId projectId: Int64) async throws -> [WidgetTask] {
+        return try await fetchTasks(
+            filter: "project_id = \(projectId) && done = false",
+            sortBy: "due_date",
+            orderBy: "asc",
+            perPage: 50
+        )
+    }
+
     // MARK: - Complete Task
 
     /// Marks a task as done via the Vikunja API.
@@ -161,6 +203,76 @@ final class WidgetDataProvider: @unchecked Sendable {
             throw WidgetDataError.requestFailed
         }
     }
+    
+    // MARK: - Update and Delete Tasks
+    
+    func deleteTask(id: Int64) async throws {
+        guard let serverURL, let apiToken else { return }
+
+        let urlString = serverURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            + "/api/v1/tasks/\(id)"
+        guard let url = URL(string: urlString) else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(apiToken)", forHTTPHeaderField: "Authorization")
+
+        let (_, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200 ... 299).contains(httpResponse.statusCode)
+        else {
+            throw WidgetDataError.requestFailed
+        }
+    }
+    
+    func updateTask(id: Int64, request updateRequest: TaskUpdateRequest) async throws {
+        guard let serverURL, let apiToken else { return }
+
+        let urlString = serverURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            + "/api/v1/tasks/\(id)"
+        guard let url = URL(string: urlString) else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiToken)", forHTTPHeaderField: "Authorization")
+
+        request.httpBody = try encoder.encode(updateRequest)
+
+        let (_, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200 ... 299).contains(httpResponse.statusCode)
+        else {
+            throw WidgetDataError.requestFailed
+        }
+    }
+    
+    struct CreateTaskRequest: Encodable {
+        let title: String
+    }
+
+    func createTask(title: String, projectId: Int64) async throws {
+        guard let serverURL, let apiToken else { return }
+
+        let urlString = serverURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            + "/api/v1/projects/\(projectId)/tasks"
+        guard let url = URL(string: urlString) else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiToken)", forHTTPHeaderField: "Authorization")
+
+        let payload = CreateTaskRequest(title: title)
+        request.httpBody = try encoder.encode(payload)
+
+        let (_, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200 ... 299).contains(httpResponse.statusCode)
+        else {
+            throw WidgetDataError.requestFailed
+        }
+    }
 
     // MARK: - Caching
 
@@ -175,10 +287,12 @@ final class WidgetDataProvider: @unchecked Sendable {
     private struct APITask: Decodable {
         let id: Int64
         let title: String
+        let description: String?
         let done: Bool
         let dueDate: Date?
         let priority: Int64
         let projectId: Int64
+        let hexColor: String?
     }
 
     private func fetchTasks(
@@ -216,25 +330,36 @@ final class WidgetDataProvider: @unchecked Sendable {
         let apiTasks = try decoder.decode([APITask].self, from: data)
         let now = Date()
 
-        return apiTasks.map { task in
-            let effectiveDueDate = effectiveDate(task.dueDate)
-            let overdue: Bool = {
-                guard let due = effectiveDueDate, !task.done else { return false }
+        return apiTasks.map { apiTask in
+            let effectiveDueDate = effectiveDate(apiTask.dueDate)
+            let isOverdue: Bool = {
+                guard let due = effectiveDueDate, !apiTask.done else { return false }
                 return due < now
             }()
 
             return WidgetTask(
-                id: task.id,
-                title: task.title,
-                done: task.done,
-                dueDate: effectiveDueDate,
-                priority: Int(task.priority),
-                projectId: task.projectId,
-                projectTitle: nil,
-                isOverdue: overdue
+                id: apiTask.id,
+                title: apiTask.title,
+                description: apiTask.description ?? "",
+                done: apiTask.done,
+                dueDate: apiTask.dueDate,
+                priority: Int(apiTask.priority),
+                projectId: apiTask.projectId,
+                projectTitle: nil, // Add project fetching if needed later
+                hexColor: apiTask.hexColor,
+                isOverdue: isOverdue
             )
         }
     }
+
+// MARK: - Task Update Models
+
+struct TaskUpdateRequest: Encodable {
+    var title: String?
+    var description: String?
+    var dueDate: Date?
+    var priority: Int?
+}
 
     /// Returns nil for Vikunja's zero-date sentinel (year <= 1).
     private func effectiveDate(_ date: Date?) -> Date? {

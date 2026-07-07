@@ -435,11 +435,13 @@ extension WidgetTask {
             WidgetTask(
                 id: Int64(index),
                 title: "Sample Task \(index + 1)",
+                description: "",
                 done: false,
                 dueDate: Calendar.current.date(byAdding: .hour, value: index + 1, to: Date()),
                 priority: [0, 1, 2, 3][index % 4],
                 projectId: 1,
                 projectTitle: "Project",
+                hexColor: nil,
                 isOverdue: false
             )
         }
