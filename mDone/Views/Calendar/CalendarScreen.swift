@@ -7,6 +7,10 @@ struct CalendarScreen: View {
     @State private var dayCalendarEvents: [CalendarEvent] = []
     @State private var monthCalendarEvents: [Date: [CalendarEvent]] = [:]
 
+    #if os(macOS)
+    @Binding var selectedTask: VTask?
+    #endif
+
     var body: some View {
         VStack(spacing: 0) {
             // Calendar access banner
@@ -25,11 +29,20 @@ struct CalendarScreen: View {
             Divider()
                 .padding(.top, 8)
 
+            #if os(macOS)
+            DayTaskList(
+                date: selectedDate,
+                tasks: appState.tasksForDate(selectedDate),
+                calendarEvents: dayCalendarEvents,
+                selectedTask: $selectedTask
+            )
+            #else
             DayTaskList(
                 date: selectedDate,
                 tasks: appState.tasksForDate(selectedDate),
                 calendarEvents: dayCalendarEvents
             )
+            #endif
         }
         .navigationTitle("Calendar")
         .toolbar {

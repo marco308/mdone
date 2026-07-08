@@ -6,7 +6,7 @@ import Security
 /// UserDefaults — preferences are written to disk in cleartext, so the token
 /// now lives in a keychain item instead.
 ///
-/// On iOS the app group ID (`group.com.mdone.app`) doubles as a keychain
+/// On iOS the app group ID (`group.com.ncastillo.mdone.app`) doubles as a keychain
 /// access group — Apple includes `com.apple.security.application-groups`
 /// entries in an app's keychain access group list, so both the app and the
 /// widget extension can read the item without a keychain-sharing entitlement
@@ -21,7 +21,7 @@ enum SharedTokenStore {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: account,
         ]
-        #if os(iOS)
+        #if os(iOS) || os(watchOS)
         query[kSecAttrAccessGroup as String] = SharedKeys.appGroupID
         #endif
         return query

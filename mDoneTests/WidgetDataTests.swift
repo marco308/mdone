@@ -8,21 +8,25 @@ final class WidgetDataTests: XCTestCase {
     private func makeSampleTask(
         id: Int64 = 1,
         title: String = "Buy groceries",
+        description: String = "",
         done: Bool = false,
         dueDate: Date? = Date(),
         priority: Int = 3,
         projectId: Int64 = 10,
         projectTitle: String? = "Shopping",
+        hexColor: String? = nil,
         isOverdue: Bool = false
     ) -> WidgetTask {
         WidgetTask(
             id: id,
             title: title,
+            description: description,
             done: done,
             dueDate: dueDate,
             priority: priority,
             projectId: projectId,
             projectTitle: projectTitle,
+            hexColor: hexColor,
             isOverdue: isOverdue
         )
     }
@@ -31,12 +35,14 @@ final class WidgetDataTests: XCTestCase {
         todayTasks: [WidgetTask]? = nil,
         upcomingTasks: [WidgetTask]? = nil,
         overdueTasks: [WidgetTask]? = nil,
+        projects: [WidgetProject]? = nil,
         lastUpdated: Date = Date()
     ) -> WidgetData {
         WidgetData(
             todayTasks: todayTasks ?? [makeSampleTask(id: 1, title: "Morning standup", priority: 2)],
             upcomingTasks: upcomingTasks ?? [makeSampleTask(id: 2, title: "Dentist appointment", priority: 1)],
             overdueTasks: overdueTasks ?? [makeSampleTask(id: 3, title: "Submit report", priority: 4, isOverdue: true)],
+            projects: projects ?? [],
             lastUpdated: lastUpdated
         )
     }
@@ -145,6 +151,7 @@ final class WidgetDataTests: XCTestCase {
             todayTasks: todayTasks,
             upcomingTasks: upcomingTasks,
             overdueTasks: overdueTasks,
+            projects: [],
             lastUpdated: lastUpdated
         )
 
@@ -173,6 +180,7 @@ final class WidgetDataTests: XCTestCase {
             todayTasks: [],
             upcomingTasks: [],
             overdueTasks: [],
+            projects: [],
             lastUpdated: lastUpdated
         )
 
@@ -263,6 +271,7 @@ final class WidgetDataTests: XCTestCase {
                 makeSampleTask(id: 101, title: "Quarterly review", priority: 2, projectId: 3, projectTitle: "HR"),
             ],
             overdueTasks: [],
+            projects: [],
             lastUpdated: lastUpdated
         )
 

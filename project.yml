@@ -1,9 +1,10 @@
 name: mDone
 options:
-  bundleIdPrefix: com.mdone
+  bundleIdPrefix: com.ncastillo.mdone
   deploymentTarget:
     iOS: "18.0"
     macOS: "15.0"
+    watchOS: "11.0"
   xcodeVersion: "26.0"
   generateEmptyDirectories: true
 
@@ -40,11 +41,13 @@ targets:
     dependencies:
       - target: mDoneWidgets
         embed: true
+      - target: mDoneWatch
+        embed: true
     settings:
       base:
         INFOPLIST_FILE: mDone/Info.plist
         CODE_SIGN_ENTITLEMENTS: mDone/mDone.entitlements
-        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.ncastillo.mdone.app
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_EMIT_LOC_STRINGS: "YES"
         # XcodeGen 2.45.4 stopped emitting an iOS SDKROOT for app targets
@@ -80,7 +83,7 @@ targets:
       base:
         INFOPLIST_FILE: mDone/Info.plist
         CODE_SIGN_ENTITLEMENTS: mDone/mDone-macOS.entitlements
-        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.ncastillo.mdone.app
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_EMIT_LOC_STRINGS: "YES"
         SUPPORTS_MACCATALYST: "NO"
@@ -107,7 +110,7 @@ targets:
       - target: mDone-macOS
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.macuitests
+        PRODUCT_BUNDLE_IDENTIFIER: com.ncastillo.mdone.app.macuitests
         GENERATE_INFOPLIST_FILE: "YES"
         TEST_TARGET_NAME: mDone-macOS
 
@@ -127,8 +130,27 @@ targets:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: com.ncastillo.mdone.app.widgets
         CODE_SIGN_ENTITLEMENTS: mDoneWidgets/mDoneWidgets.entitlements
+    scheme: {}
+
+  mDoneWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - mDoneWatch
+      - mDoneShared
+    settings:
+      base:
+        INFOPLIST_FILE: mDoneWatch/Info.plist
+        CODE_SIGN_ENTITLEMENTS: mDoneWatch/mDoneWatch.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.ncastillo.mdone.app.watchkitapp
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SDKROOT: watchos
+        SUPPORTED_PLATFORMS: "watchos watchsimulator"
+        TARGETED_DEVICE_FAMILY: "4"
+        GENERATE_INFOPLIST_FILE: "YES"
+    scheme: {}
 
   mDoneTests:
     type: bundle.unit-test
@@ -139,7 +161,7 @@ targets:
       - target: mDone
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.ncastillo.mdone.app.tests
         GENERATE_INFOPLIST_FILE: "YES"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/mDone.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/mDone"
         BUNDLE_LOADER: "$(TEST_HOST)"
@@ -153,7 +175,7 @@ targets:
       - target: mDone
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: com.ncastillo.mdone.app.uitests
         GENERATE_INFOPLIST_FILE: "YES"
         TEST_TARGET_NAME: mDone
 
@@ -175,5 +197,5 @@ targets:
           - "*.entitlements"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.widgetrender
+        PRODUCT_BUNDLE_IDENTIFIER: com.ncastillo.mdone.app.widgetrender
         GENERATE_INFOPLIST_FILE: "YES"

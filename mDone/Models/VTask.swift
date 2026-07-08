@@ -111,6 +111,26 @@ struct VTask: Codable, Identifiable, Hashable {
         else { return false }
         return dueDate > now && dueDate <= weekEnd
     }
+
+    /// Calculates future occurrences of a repeating task up to a specific date.
+    func projectedOccurrences(through endDate: Date) -> [Date] {
+        guard isRepeating, let interval = repeatAfter, interval > 0,
+              let dueDate = effectiveDueDate else { return [] }
+        
+        var dates: [Date] = []
+        var next = dueDate.addingTimeInterval(TimeInterval(interval))
+        
+        // Safety limit to prevent infinite loops on crazy intervals
+        let maxProjections = 365
+        var count = 0
+        
+        while next <= endDate && count < maxProjections {
+            dates.append(next)
+            next = next.addingTimeInterval(TimeInterval(interval))
+            count += 1
+        }
+        return dates
+    }
 }
 
 struct TaskReminder: Codable, Hashable {
@@ -160,8 +180,8 @@ struct TaskUpdateRequest: Encodable {
     var projectId: Int64?
     var labels: [LabelRef]?
     var repeatAfter: Int64?
+    var repeatMode: Int64? // <--- AÑADE ESTA LÍNEA
     var reminders: [TaskReminder]?
-    /// Completion progress, 0...1. Drives the Current section's progress bar.
     var percentDone: Double?
     var clearDueDate: Bool?
 
@@ -170,7 +190,7 @@ struct TaskUpdateRequest: Encodable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case title, description, done, dueDate, priority, projectId, labels, repeatAfter, reminders, percentDone
+        case title, description, done, dueDate, priority, projectId, labels, repeatAfter, repeatMode, reminders, percentDone
     }
 
     func encode(to encoder: Encoder) throws {
@@ -187,6 +207,7 @@ struct TaskUpdateRequest: Encodable {
         try container.encodeIfPresent(projectId, forKey: .projectId)
         try container.encodeIfPresent(labels, forKey: .labels)
         try container.encodeIfPresent(repeatAfter, forKey: .repeatAfter)
+        try container.encodeIfPresent(repeatMode, forKey: .repeatMode) // <--- AÑADE ESTA LÍNEA
         try container.encodeIfPresent(reminders, forKey: .reminders)
         try container.encodeIfPresent(percentDone, forKey: .percentDone)
     }

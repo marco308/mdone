@@ -5,6 +5,10 @@ struct DayTaskList: View {
     let tasks: [VTask]
     var calendarEvents: [CalendarEvent] = []
 
+    #if os(macOS)
+    @Binding var selectedTask: VTask?
+    #endif
+
     private var isEmpty: Bool {
         tasks.isEmpty && calendarEvents.isEmpty
     }
@@ -27,6 +31,34 @@ struct DayTaskList: View {
                 }
                 .frame(maxWidth: .infinity)
             } else {
+                #if os(macOS)
+                List(selection: $selectedTask) {
+                    if !tasks.isEmpty {
+                        Section {
+                            ForEach(tasks) { task in
+                                TaskRow(task: task)
+                                    .tag(task)
+                            }
+                        } header: {
+                            Text(date, format: .dateTime.weekday(.wide).month(.wide).day())
+                                .font(.caption)
+                                .textCase(.uppercase)
+                        }
+                    }
+
+                    if !calendarEvents.isEmpty {
+                        Section {
+                            ForEach(calendarEvents) { event in
+                                CalendarEventRow(event: event)
+                            }
+                        } header: {
+                            Label("Calendar", systemImage: "calendar")
+                                .font(.caption)
+                                .textCase(.uppercase)
+                        }
+                    }
+                }
+                #else
                 List {
                     if !tasks.isEmpty {
                         Section {
@@ -52,7 +84,6 @@ struct DayTaskList: View {
                         }
                     }
                 }
-                #if os(iOS)
                 .listStyle(.insetGrouped)
                 #endif
             }

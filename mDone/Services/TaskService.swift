@@ -30,9 +30,13 @@ actor TaskService {
     }
 
     func toggleDone(task: VTask) async throws -> VTask {
-        let request = TaskUpdateRequest(done: !task.done)
-        return try await apiClient.send(Endpoint.updateTask(id: task.id), body: request)
-    }
+            let request = TaskUpdateRequest(
+                done: !task.done,
+                repeatAfter: task.repeatAfter,
+                repeatMode: task.repeatMode
+            )
+            return try await apiClient.send(Endpoint.updateTask(id: task.id), body: request)
+        }
 
     func deleteTask(id: Int64) async throws {
         try await apiClient.delete(Endpoint.deleteTask(id: id))

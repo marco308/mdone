@@ -15,8 +15,6 @@ final class AppState {
 
     var tasks: [VTask] = []
     var projects: [Project] = []
-    /// Archived projects, loaded on demand for the Archived view. Kept separate
-    /// from `projects`, which only ever holds active (non-archived) projects.
     var archivedProjects: [Project] = []
     var labels: [VLabel] = []
     var notifications: [VNotification] = []
@@ -27,29 +25,17 @@ final class AppState {
     var advancedFilterString: String?
     var pendingOperationsCount: Int = 0
     var isRetrying: Bool = false
-
-    /// Bumped when the user opens the app via the widget's "+ Add Task" shortcut
-    /// or the mdone://create URL. Observed by MainTabView (switch to Inbox) and
-    /// QuickAddBar (focus the text field).
     var quickAddTrigger: UUID?
 
     // Calendar integration
     var calendarEvents: [CalendarEvent] = []
     var calendarAccessGranted: Bool = false
     private let calendarService = CalendarService()
-
-    /// Changes whenever the visible-calendar selection changes. Calendar
-    /// views key their event fetch on this so toggling a calendar refreshes
-    /// the grid and day list immediately, not just the Today view.
     private(set) var calendarFilterToken = UUID()
 
     var onTaskCompleted: ((Int64) -> Void)?
     var onTaskDeleted: ((Int64) -> Void)?
 
-    /// The most recently completed task, eligible for shake-to-undo on iPhone.
-    /// Holds the task as it was *before* completion so undo can restore it.
-    /// Replaced when a newer task is completed, and cleared once undone or if
-    /// the same task is un-completed by other means.
     private(set) var undoableCompletion: VTask?
 
     var canUndoLastCompletion: Bool {
@@ -60,15 +46,12 @@ final class AppState {
         undoableCompletion?.title
     }
 
-    /// Per-project ordered task lists fetched from the view endpoint (preserves positions).
     var projectTaskCache: [Int64: [VTask]] = [:]
 
     var unreadNotificationCount: Int {
         notifications.filter { $0.read != true }.count
     }
 
-    /// `taskService` is injectable so tests can drive the network paths
-    /// (e.g. `undoLastCompletion`) through a mocked `APIClient`.
     init(
         taskService: TaskService = TaskService(),
         projectService: ProjectService = ProjectService(),
@@ -94,27 +77,13 @@ final class AppState {
         !(networkMonitor?.isConnected ?? true)
     }
 
-    /// Polls the APIClient's retry state and updates the published `isRetrying` property.
     @MainActor
     func updateRetryState() async {
         isRetrying = await APIClient.shared.isRetrying
     }
 
-    /// Tracks whether `registerAPIClientHandlers()` has installed the
-    /// refreshed-tokens and session-expired callbacks on `APIClient.shared`.
-    /// Installation is idempotent but we skip the actor hop after the first
-    /// successful pass.
     private var handlersRegistered: Bool = false
 
-    /// Installs the APIClient → AppState callbacks. Must be awaited **before**
-    /// any network traffic so refreshed tokens get persisted and unrecoverable
-    /// 401s push the user back to the login screen instead of hanging on a
-    /// stale session.
-    ///
-    /// Previously this lived in `init()` inside an unstructured `Task`, which
-    /// raced the first network call. Every public entry point that touches the
-    /// network (`checkAuth`, `login`, `loginWithCredentials`) now awaits this
-    /// up-front instead.
     @MainActor
     func registerAPIClientHandlers() async {
         guard !handlersRegistered else { return }
@@ -157,7 +126,50 @@ final class AppState {
 
     @MainActor
     private func updatePendingCount() {
-        pendingOperationsCount = (try? syncService?.pendingOperationCount()) ?? 0
+        pendingOperationsCount = (syncService?.pendingOperationCount()) ?? 0
+    }
+
+    // MARK: - Task Identity Resolution (El Escudo)
+
+    /// Traduce un ID falso (negativo) al ID real de la base de datos
+    private func realId(from id: Int64) -> Int64 {
+        return id < 0 ? (abs(id) / 10000) : id
+    }
+
+    /// Devuelve la tarea original real, incluso si le pasas un clon proyectado
+    private func resolveRealTask(from task: VTask) -> VTask {
+        guard task.id < 0 else { return task }
+        let actualId = realId(from: task.id)
+        return tasks.first(where: { $0.id == actualId }) ?? task
+    }
+
+    // MARK: - Proyecciones
+
+    private func projectedTasks(through endDate: Date) -> [VTask] {
+        var result = tasks
+        for task in tasks where !task.done && task.isRepeating {
+            let futureDates = task.projectedOccurrences(through: endDate)
+            for (index, date) in futureDates.enumerated() {
+                var virtualTask = task
+                virtualTask.dueDate = date
+                // HACK VISUAL: Generamos un ID falso y negativo para que SwiftUI
+                let fakeId = -((task.id * 10000) + Int64(index + 1))
+                
+                virtualTask = VTask(
+                    id: fakeId, title: task.title, description: task.description,
+                    done: task.done, doneAt: task.doneAt, dueDate: date,
+                    startDate: task.startDate, endDate: task.endDate, priority: task.priority,
+                    projectId: task.projectId, hexColor: task.hexColor, percentDone: task.percentDone,
+                    uid: task.uid, position: task.position, isFavorite: task.isFavorite,
+                    repeatAfter: task.repeatAfter, repeatMode: task.repeatMode, identifier: task.identifier,
+                    index: task.index, reminders: task.reminders, assignees: task.assignees,
+                    labels: task.labels, createdBy: task.createdBy, created: task.created,
+                    updated: task.updated, bucketId: task.bucketId, coverImageAttachmentId: task.coverImageAttachmentId
+                )
+                result.append(virtualTask)
+            }
+        }
+        return result
     }
 
     var overdueTasks: [VTask] {
@@ -166,34 +178,41 @@ final class AppState {
     }
 
     var todayTasks: [VTask] {
-        tasks.filter(\.isDueToday).sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
+        let endOfDay = Calendar.current.date(bySettingHour: 23, minute: 59, second: 59, of: Date()) ?? Date()
+        return projectedTasks(through: endOfDay)
+            .filter(\.isDueToday)
+            .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
     }
 
-    /// Today's list when Calm Mode is on: overdue tasks fold in alongside
-    /// today's, so they aren't singled out. `overdueTasks` and `todayTasks`
-    /// are disjoint by construction, so this is a simple union (overdue first).
     var calmModeTodayTasks: [VTask] {
         overdueTasks + todayTasks
     }
 
     var tomorrowTasks: [VTask] {
-        tasks.filter(\.isDueTomorrow).sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
+        let endOfTomorrow = Calendar.current.date(byAdding: .day, value: 2, to: Calendar.current.startOfDay(for: Date())) ?? Date()
+        return projectedTasks(through: endOfTomorrow)
+            .filter(\.isDueTomorrow)
+            .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
     }
 
     var thisWeekTasks: [VTask] {
-        tasks.filter { $0.isDueThisWeek && !$0.isDueToday && !$0.isDueTomorrow }
+        let weekEnd = Calendar.current.date(byAdding: .day, value: 7, to: Calendar.current.startOfDay(for: Date())) ?? Date()
+        return projectedTasks(through: weekEnd)
+            .filter { $0.isDueThisWeek && !$0.isDueToday && !$0.isDueTomorrow }
             .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
     }
 
     var upcomingTasks: [VTask] {
-        tasks.filter {
-            guard let dueDate = $0.effectiveDueDate, !$0.done else { return false }
-            let calendar = Calendar.current
-            guard let weekEnd = calendar.date(byAdding: .day, value: 7, to: calendar.startOfDay(for: Date()))
-            else { return false }
-            return dueDate > weekEnd
-        }
-        .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
+        let threeMonths = Calendar.current.date(byAdding: .month, value: 3, to: Date()) ?? Date()
+        return projectedTasks(through: threeMonths)
+            .filter {
+                guard let dueDate = $0.effectiveDueDate, !$0.done else { return false }
+                let calendar = Calendar.current
+                guard let weekEnd = calendar.date(byAdding: .day, value: 7, to: calendar.startOfDay(for: Date()))
+                else { return false }
+                return dueDate > weekEnd
+            }
+            .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
     }
 
     var noDateTasks: [VTask] {
@@ -221,14 +240,10 @@ final class AppState {
 
     // MARK: - Current (long-running) tasks
 
-    /// Title of the dedicated Vikunja label that marks a task as "Current".
     static let currentLabelTitle = "Current"
 
     private static let currentLabelIdKey = "currentLabelId"
 
-    /// The persisted id of the "Current" label, if one has been resolved
-    /// before. Stored so renaming the label on the server (or another client)
-    /// doesn't orphan the marker.
     private var storedCurrentLabelId: Int64? {
         get { (UserDefaults.standard.object(forKey: Self.currentLabelIdKey) as? NSNumber)?.int64Value }
         set {
@@ -240,9 +255,6 @@ final class AppState {
         }
     }
 
-    /// The "Current" label, resolved from the loaded labels by stored id first,
-    /// then by title. `nil` until one exists; it's created lazily the first
-    /// time a task is marked Current.
     var currentLabel: VLabel? {
         if let id = storedCurrentLabelId, let match = labels.first(where: { $0.id == id }) {
             return match
@@ -250,13 +262,11 @@ final class AppState {
         return labels.first { $0.title.caseInsensitiveCompare(Self.currentLabelTitle) == .orderedSame }
     }
 
-    /// Whether `task` carries the "Current" label.
     func isCurrent(_ task: VTask) -> Bool {
         guard let currentLabel else { return false }
         return task.labels?.contains { $0.id == currentLabel.id } ?? false
     }
 
-    /// Active (not done) tasks marked "Current", most recently touched first.
     var currentTasks: [VTask] {
         guard let currentLabel else { return [] }
         return tasks
@@ -269,9 +279,6 @@ final class AppState {
         let authenticated = authService.isAuthenticated()
         if authenticated {
             await configureAPIClient()
-            // Sync credentials to the widget extension: server URL via the App
-            // Group UserDefaults (non-sensitive), token via the shared keychain
-            // item — never the defaults, which are cleartext on disk.
             if let serverURL = authService.getServerURL(),
                let token = authService.getToken()
             {
@@ -294,9 +301,6 @@ final class AppState {
 
     @MainActor
     func login(serverURL: String, token: String) async throws {
-        #if DEBUG
-        print("[mDone] login() called with serverURL: \(serverURL)")
-        #endif
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -304,28 +308,21 @@ final class AppState {
         await registerAPIClientHandlers()
         await APIClient.shared.configure(serverURL: serverURL, token: token)
 
-        // Validate by fetching projects — works with both JWT and API tokens
-        #if DEBUG
-        print("[mDone] Fetching projects to validate...")
-        #endif
-        let projects: [Project] = try await APIClient.shared.fetch(Endpoint.projects())
-        #if DEBUG
-        print("[mDone] Validation OK - got \(projects.count) projects")
-        #endif
+        _ = try await APIClient.shared.fetch(Endpoint.projects()) as [Project]
 
         authService.saveServerURL(serverURL)
         authService.saveToken(token)
         #if DEBUG
         print("[mDone] Credentials saved, setting isAuthenticated = true")
         #endif
+        #if os(iOS)
+        WatchConnectivityManager.shared.syncCredentials(serverURL: serverURL, token: token)
+        #endif
         isAuthenticated = true
     }
 
     @MainActor
     func loginWithCredentials(serverURL: String, username: String, password: String) async throws {
-        #if DEBUG
-        print("[mDone] loginWithCredentials() called")
-        #endif
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -334,54 +331,37 @@ final class AppState {
         let url = serverURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         await APIClient.shared.configure(serverURL: url, token: "")
 
-        // Get JWT token via login endpoint. The Vikunja 2.0+ `Set-Cookie:
-        // vikunja_refresh_token=…` header is captured inside APIClient as part
-        // of the response — we read it back after this call to persist it.
         let loginRequest = LoginRequest(username: username, password: password)
         let loginResponse: LoginResponse = try await APIClient.shared.send(Endpoint.login, body: loginRequest)
         let capturedRefreshToken = await APIClient.shared.currentRefreshToken()
 
-        // Configure with the JWT token + refresh cookie so subsequent requests
-        // (and the 401 retry path) have everything they need.
         await APIClient.shared.configure(
             serverURL: url,
             token: loginResponse.token,
             refreshToken: capturedRefreshToken
         )
 
-        // Validate
-        let projects: [Project] = try await APIClient.shared.fetch(Endpoint.projects())
-        #if DEBUG
-        print("[mDone] Validation OK - got \(projects.count) projects")
-        #endif
+        _ = try await APIClient.shared.fetch(Endpoint.projects()) as [Project]
 
         authService.saveServerURL(url)
         authService.saveToken(loginResponse.token)
         if let capturedRefreshToken {
             authService.saveRefreshToken(capturedRefreshToken)
         }
+        #if os(iOS)
+        WatchConnectivityManager.shared.syncCredentials(serverURL: url, token: loginResponse.token)
+        #endif
         isAuthenticated = true
     }
 
     @MainActor
     func logout() async {
-        #if DEBUG
-        print("[mDone] logout() called")
-        #endif
         authService.clearAll()
         await tearDownSession()
     }
 
-    /// Called when the server stops accepting our credentials (refresh failed,
-    /// API token revoked, etc.). Drops the session creds but keeps the server
-    /// URL so the user only has to re-enter their password on the next launch.
-    /// Issue #80: previously a stale JWT triggered a full `clearAll()`, which
-    /// wiped the server URL too.
     @MainActor
     func expireSession() async {
-        #if DEBUG
-        print("[mDone] expireSession() called")
-        #endif
         authService.clearSession()
         await tearDownSession()
     }
@@ -395,25 +375,16 @@ final class AppState {
         notifications = []
         isAuthenticated = false
 
-        // Clear cached widget data and refresh widgets
         SharedKeys.sharedDefaults.removeObject(forKey: SharedKeys.widgetDataKey)
         WidgetCenter.shared.reloadAllTimelines()
     }
 
     @MainActor
     func refreshAll() async {
-        #if DEBUG
-        print("[mDone] refreshAll() called")
-        #endif
         isLoading = true
 
         #if os(iOS)
-        // Request background execution time so in-flight network requests
-        // can finish if the user switches away mid-refresh (issue #49).
-        let bgTaskId = UIApplication.shared.beginBackgroundTask {
-            // Expiration handler — nothing to clean up, the requests will
-            // be cancelled by the system after this returns.
-        }
+        let bgTaskId = UIApplication.shared.beginBackgroundTask { }
         #endif
 
         defer {
@@ -432,20 +403,12 @@ final class AppState {
 
             tasks = try await fetchedTasks
             await updateRetryState()
-            #if DEBUG
-            print("[mDone] refreshAll: got \(tasks.count) tasks")
-            #endif
+            
             projects = try await fetchedProjects
             await updateRetryState()
-            #if DEBUG
-            print("[mDone] refreshAll: got \(projects.count) projects")
-            #endif
 
             let labelsResult: [VLabel] = try await APIClient.shared.fetch(Endpoint.labels())
             labels = labelsResult
-            #if DEBUG
-            print("[mDone] refreshAll: got \(labels.count) labels")
-            #endif
 
             let notificationsEnabled = UserDefaults.standard.bool(forKey: "notificationsEnabled")
             if notificationsEnabled {
@@ -454,29 +417,17 @@ final class AppState {
 
             errorMessage = nil
             activeError = nil
-            #if DEBUG
-            print("[mDone] refreshAll: SUCCESS")
-            #endif
 
             pushWidgetData()
             WidgetCenter.shared.reloadAllTimelines()
 
             await refreshCalendarEvents()
         } catch let error as NetworkError {
-            #if DEBUG
-            print("[mDone] refreshAll: NetworkError: \(error)")
-            #endif
             if case .unauthorized = error {
-                #if DEBUG
-                print("[mDone] refreshAll: got .unauthorized, expiring session")
-                #endif
                 await expireSession()
             }
             handleError(error)
         } catch {
-            #if DEBUG
-            print("[mDone] refreshAll: other error: \(error)")
-            #endif
             handleError(error)
         }
     }
@@ -526,16 +477,6 @@ final class AppState {
         }
     }
 
-    /// Vikunja's task-update/toggle response returns `labels: null` (it doesn't
-    /// echo the task's labels). Replacing the local task wholesale with that
-    /// response would drop its labels until the next full refresh, which made a
-    /// Current task vanish from its section the moment you edited it (e.g.
-    /// changed its progress). Carry the existing labels forward when the
-    /// response omits them. Only labels are preserved: they're never edited via
-    /// the task-update endpoint (the Current label is toggled through the
-    /// dedicated label endpoints), so this can't mask a user edit. Other
-    /// relations like reminders *are* sent in the update request, so we let the
-    /// response drive them.
     static func preservingRelations(existing: VTask, response: VTask) -> VTask {
         var result = response
         if result.labels == nil { result.labels = existing.labels }
@@ -544,8 +485,9 @@ final class AppState {
 
     @MainActor
     func toggleTaskDone(_ task: VTask) async {
+        let realTask = resolveRealTask(from: task)
         do {
-            let response = try await taskService.toggleDone(task: task)
+            let response = try await taskService.toggleDone(task: realTask)
             let updated = tasks.first(where: { $0.id == response.id })
                 .map { Self.preservingRelations(existing: $0, response: response) } ?? response
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
@@ -553,7 +495,7 @@ final class AppState {
             }
             syncService?.updateCachedTask(updated)
             if updated.done {
-                recordCompletionForUndo(task)
+                recordCompletionForUndo(realTask)
                 onTaskCompleted?(updated.id)
             } else {
                 clearUndoIfMatches(id: updated.id)
@@ -567,22 +509,13 @@ final class AppState {
         }
     }
 
-    /// Restores the most recently completed task to its incomplete state.
-    /// Invoked by the iPhone shake-to-undo prompt. No-op when nothing is
-    /// pending undo. On failure the undo target is kept so the user can retry.
     @MainActor
     func undoLastCompletion() async {
         guard let target = undoableCompletion else { return }
         undoableCompletion = nil
         do {
-            _ = try await taskService.updateTask(id: target.id, request: TaskUpdateRequest(done: false))
-            // Restore the task to its exact pre-completion state. We rebuild from
-            // the stored snapshot rather than the update response because the
-            // response can omit fields like the due date, which would land the
-            // task in the wrong Inbox section (e.g. "No Date" instead of "Today").
-            // The completed task may also have been dropped from `tasks` by a
-            // refresh (the all-tasks fetch returns only undone tasks), so re-insert
-            // it when it's no longer present rather than silently doing nothing.
+            let request = preservingRepeatData(in: TaskUpdateRequest(done: false), for: target)
+            _ = try await taskService.updateTask(id: target.id, request: request)
             var restored = target
             restored.done = false
             if let index = tasks.firstIndex(where: { $0.id == restored.id }) {
@@ -596,9 +529,6 @@ final class AppState {
             #endif
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
-            // Only restore the old target if no newer completion was recorded
-            // while this request was in flight — otherwise we'd clobber the more
-            // recent undo target and break "undo the most recent completion".
             if undoableCompletion == nil {
                 undoableCompletion = target
             }
@@ -606,8 +536,6 @@ final class AppState {
         }
     }
 
-    /// Records `task` (in its pre-completion state) as the pending shake-to-undo
-    /// target. Exposed for testing the tracking logic without a network round-trip.
     func recordCompletionForUndo(_ task: VTask) {
         undoableCompletion = task
     }
@@ -618,9 +546,6 @@ final class AppState {
         }
     }
 
-    /// Creates a task and returns it on success (or `nil` on failure).
-    /// `@discardableResult` so existing call sites that don't need the new id
-    /// stay unchanged.
     @MainActor
     @discardableResult
     func createTask(
@@ -648,11 +573,12 @@ final class AppState {
 
     @MainActor
     func postponeTask(_ task: VTask, byHours hours: Int) async {
-        let baseDate = task.effectiveDueDate ?? Date()
+        let realTask = resolveRealTask(from: task)
+        let baseDate = realTask.effectiveDueDate ?? Date()
         let newDate = Calendar.current.date(byAdding: .hour, value: hours, to: baseDate) ?? baseDate
 
         let originalDueDate: Date?
-        if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+        if let index = tasks.firstIndex(where: { $0.id == realTask.id }) {
             originalDueDate = tasks[index].dueDate
             tasks[index].dueDate = newDate
         } else {
@@ -660,7 +586,8 @@ final class AppState {
         }
 
         do {
-            let response = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(dueDate: newDate))
+            let request = preservingRepeatData(in: TaskUpdateRequest(dueDate: newDate), for: realTask)
+            let response = try await taskService.updateTask(id: realTask.id, request: request)
             let updated = tasks.first(where: { $0.id == response.id })
                 .map { Self.preservingRelations(existing: $0, response: response) } ?? response
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
@@ -669,19 +596,18 @@ final class AppState {
             syncService?.updateCachedTask(updated)
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
-            if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+            if let index = tasks.firstIndex(where: { $0.id == realTask.id }) {
                 tasks[index].dueDate = originalDueDate
             }
             handleError(error)
         }
     }
 
-    /// Reschedules a task to an absolute due date, ignoring its current date.
-    /// Backs the quick-schedule long-press options (Today, Tomorrow, Next Week, …).
     @MainActor
     func rescheduleTask(_ task: VTask, to newDate: Date) async {
+        let realTask = resolveRealTask(from: task)
         let originalDueDate: Date?
-        if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+        if let index = tasks.firstIndex(where: { $0.id == realTask.id }) {
             originalDueDate = tasks[index].dueDate
             tasks[index].dueDate = newDate
         } else {
@@ -689,14 +615,15 @@ final class AppState {
         }
 
         do {
-            let updated = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(dueDate: newDate))
+            let request = preservingRepeatData(in: TaskUpdateRequest(dueDate: newDate), for: realTask)
+            let updated = try await taskService.updateTask(id: realTask.id, request: request)
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
             syncService?.updateCachedTask(updated)
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
-            if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+            if let index = tasks.firstIndex(where: { $0.id == realTask.id }) {
                 tasks[index].dueDate = originalDueDate
             }
             handleError(error)
@@ -705,8 +632,15 @@ final class AppState {
 
     @MainActor
     func updateTask(id: Int64, request: TaskUpdateRequest) async {
+        let actualId = realId(from: id)
+        let finalRequest: TaskUpdateRequest
+        if let existingTask = tasks.first(where: { $0.id == actualId }) {
+            finalRequest = preservingRepeatData(in: request, for: existingTask)
+        } else {
+            finalRequest = request
+        }
         do {
-            let response = try await taskService.updateTask(id: id, request: request)
+            let response = try await taskService.updateTask(id: actualId, request: finalRequest)
             let updated = tasks.first(where: { $0.id == response.id })
                 .map { Self.preservingRelations(existing: $0, response: response) } ?? response
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
@@ -721,8 +655,6 @@ final class AppState {
 
     // MARK: - Current task mutations
 
-    /// Resolves the "Current" label, creating it on the server if it doesn't
-    /// exist yet. Persists the id so it survives a later rename.
     @MainActor
     private func ensureCurrentLabel() async throws -> VLabel {
         if let existing = currentLabel { return existing }
@@ -736,11 +668,19 @@ final class AppState {
         return created
     }
 
-    /// Toggles the "Current" label on `task`, surfacing it in (or removing it
-    /// from) the Current section at the top of the task list. Optimistic: the
-    /// local copy updates immediately and reverts if the network call fails.
+    // MARK: - Repeating Task Helper
+
+    private func preservingRepeatData(in request: TaskUpdateRequest, for task: VTask) -> TaskUpdateRequest {
+        guard task.isRepeating else { return request }
+        var updated = request
+        if updated.repeatAfter == nil { updated.repeatAfter = task.repeatAfter }
+        if updated.repeatMode == nil { updated.repeatMode = task.repeatMode }
+        return updated
+    }
+
     @MainActor
     func toggleCurrent(_ task: VTask) async {
+        let realTask = resolveRealTask(from: task)
         let label: VLabel
         do {
             label = try await ensureCurrentLabel()
@@ -749,28 +689,25 @@ final class AppState {
             return
         }
 
-        let wasCurrent = isCurrent(task)
-        setCurrentLabelLocally(taskId: task.id, label: label, present: !wasCurrent)
+        let wasCurrent = isCurrent(realTask)
+        setCurrentLabelLocally(taskId: realTask.id, label: label, present: !wasCurrent)
 
         do {
             if wasCurrent {
-                try await labelService.removeLabel(taskId: task.id, labelId: label.id)
+                try await labelService.removeLabel(taskId: realTask.id, labelId: label.id)
             } else {
-                try await labelService.addLabel(taskId: task.id, labelId: label.id)
+                try await labelService.addLabel(taskId: realTask.id, labelId: label.id)
             }
             #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             #endif
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
-            setCurrentLabelLocally(taskId: task.id, label: label, present: wasCurrent)
+            setCurrentLabelLocally(taskId: realTask.id, label: label, present: wasCurrent)
             handleError(error)
         }
     }
 
-    /// Adds or removes `label` from the locally cached copy of a task, and
-    /// bumps its `updated` timestamp so the stall indicator resets. The
-    /// `tasks` array is the source of truth.
     @MainActor
     private func setCurrentLabelLocally(taskId: Int64, label: VLabel, present: Bool) {
         guard let index = tasks.firstIndex(where: { $0.id == taskId }) else { return }
@@ -787,24 +724,22 @@ final class AppState {
         syncService?.updateCachedTask(tasks[index])
     }
 
-    /// Sets a task's completion progress (clamped to 0...1) and persists it.
-    /// Optimistic, and intentionally does not overwrite the local task with the
-    /// server response so an update that omits labels can't drop the Current
-    /// marker.
     @MainActor
     func setProgress(_ task: VTask, percent: Double) async {
+        let realTask = resolveRealTask(from: task)
         let clamped = min(max(percent, 0), 1)
-        let original = tasks.first(where: { $0.id == task.id })?.percentDone
-        if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+        let original = tasks.first(where: { $0.id == realTask.id })?.percentDone
+        if let index = tasks.firstIndex(where: { $0.id == realTask.id }) {
             tasks[index].percentDone = clamped
             tasks[index].updated = Date()
             syncService?.updateCachedTask(tasks[index])
         }
         do {
-            _ = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(percentDone: clamped))
+            let request = preservingRepeatData(in: TaskUpdateRequest(percentDone: clamped), for: realTask)
+            _ = try await taskService.updateTask(id: realTask.id, request: request)
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
-            if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+            if let index = tasks.firstIndex(where: { $0.id == realTask.id }) {
                 tasks[index].percentDone = original
             }
             handleError(error)
@@ -813,12 +748,12 @@ final class AppState {
 
     @MainActor
     func deleteTask(_ task: VTask) async {
+        let actualId = realId(from: task.id)
         do {
-            let taskId = task.id
-            try await taskService.deleteTask(id: taskId)
-            tasks.removeAll { $0.id == taskId }
-            syncService?.deleteCachedTask(id: taskId)
-            onTaskDeleted?(taskId)
+            try await taskService.deleteTask(id: actualId)
+            tasks.removeAll { $0.id == actualId }
+            syncService?.deleteCachedTask(id: actualId)
+            onTaskDeleted?(actualId)
             #if os(iOS)
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
             #endif
@@ -829,13 +764,8 @@ final class AppState {
     }
 
     func tasksForProject(_ projectId: Int64) -> [VTask] {
-        // Always read latest task data from the tasks array (source of truth).
-        // Use the cache only for position ordering.
         let projectTasks = tasks.filter { $0.projectId == projectId && !$0.done }
         if let cached = projectTaskCache[projectId] {
-            // Keep the earliest index when an id appears twice; Vikunja can return
-            // duplicate task rows from the view endpoint if task_positions has
-            // duplicate (task_id, project_view_id) rows.
             let orderMap = Dictionary(
                 cached.enumerated().map { ($1.id, $0) },
                 uniquingKeysWith: { first, _ in first }
@@ -847,7 +777,6 @@ final class AppState {
         return projectTasks
     }
 
-    /// Fetches tasks for a specific project via the view endpoint, which returns correct positions.
     @MainActor
     func fetchProjectTasks(project: Project) async {
         guard let viewId = project.listViewId else { return }
@@ -855,11 +784,7 @@ final class AppState {
             let viewTasks: [VTask] = try await taskService.fetchProjectTasks(
                 projectId: project.id, viewId: viewId
             )
-            // Store in cache — these have correct per-view positions.
-            // Dedupe by id: Vikunja's view-tasks endpoint can return the same task
-            // more than once when task_positions has duplicate rows for the view.
             projectTaskCache[project.id] = Self.uniquedById(viewTasks)
-            // Also update the global task list with any new tasks
             for viewTask in viewTasks {
                 if let index = tasks.firstIndex(where: { $0.id == viewTask.id }) {
                     tasks[index] = viewTask
@@ -868,13 +793,9 @@ final class AppState {
                 }
             }
         } catch {
-            #if DEBUG
-            print("[mDone] fetchProjectTasks error: \(error)")
-            #endif
         }
     }
 
-    /// Returns the input with duplicate `id`s removed, preserving the first occurrence.
     static func uniquedById(_ tasks: [VTask]) -> [VTask] {
         var seen = Set<Int64>()
         return tasks.filter { seen.insert($0.id).inserted }
@@ -882,8 +803,6 @@ final class AppState {
 
     // MARK: - Project Mutations
 
-    /// Creates a project and returns it on success (or `nil` on failure).
-    /// Empty description/colour are sent as `nil` so Vikunja stores them empty.
     @MainActor
     @discardableResult
     func createProject(
@@ -915,8 +834,6 @@ final class AppState {
         }
     }
 
-    /// Applies edits from the edit sheet. Sends the project's full field set so no
-    /// column is accidentally cleared server-side.
     @MainActor
     func updateProject(
         _ project: Project,
@@ -937,32 +854,24 @@ final class AppState {
         await performProjectUpdate(id: project.id, request: request)
     }
 
-    /// Archives a project (reversible). It leaves the active list and joins `archivedProjects`.
     @MainActor
     func archiveProject(_ project: Project) async {
         guard project.id > 0 else { return }
         await performProjectUpdate(id: project.id, request: ProjectUpdateRequest(from: project, isArchived: true))
     }
 
-    /// Unarchives a project, returning it to the active list.
     @MainActor
     func unarchiveProject(_ project: Project) async {
         guard project.id > 0 else { return }
         await performProjectUpdate(id: project.id, request: ProjectUpdateRequest(from: project, isArchived: false))
     }
 
-    /// Permanently deletes a project. Vikunja cascades this server-side to every task
-    /// and descendant project — it cannot be undone. Cleans up all local state that
-    /// referenced the project so no ghost rows or stale selection remain.
     @MainActor
     func deleteProject(_ project: Project) async {
-        guard project.id > 0 else { return } // never delete pseudo-projects (e.g. Favorites, id -1)
+        guard project.id > 0 else { return }
         let projectId = project.id
         do {
             try await projectService.deleteProject(id: projectId)
-            // Vikunja cascades the delete to descendant sub-projects and all their
-            // tasks; mirror that locally so no orphaned rows linger until the next
-            // full refresh.
             let removedIds = descendantProjectIds(of: projectId)
             projects.removeAll { removedIds.contains($0.id) }
             archivedProjects.removeAll { removedIds.contains($0.id) }
@@ -983,8 +892,6 @@ final class AppState {
         }
     }
 
-    /// Returns `root` plus the IDs of every known descendant project (transitive
-    /// closure over `parentProjectId`), matching Vikunja's recursive delete cascade.
     private func descendantProjectIds(of root: Int64) -> Set<Int64> {
         var ids: Set<Int64> = [root]
         let all = projects + archivedProjects
@@ -1001,8 +908,6 @@ final class AppState {
         return ids
     }
 
-    /// Loads archived projects for the Archived view. Vikunja's include-archived fetch
-    /// returns active **and** archived projects, so we keep only the archived ones.
     @MainActor
     func fetchArchivedProjects() async {
         do {
@@ -1017,8 +922,6 @@ final class AppState {
     private func performProjectUpdate(id: Int64, request: ProjectUpdateRequest) async {
         do {
             var updated = try await projectService.updateProject(id: id, request: request)
-            // Trust our intended archived state for list placement, in case the
-            // server response omits `is_archived`.
             updated.isArchived = request.isArchived
             applyUpdatedProject(updated)
             syncService?.updateCachedProject(updated)
@@ -1028,9 +931,6 @@ final class AppState {
         }
     }
 
-    /// Routes an updated project into `projects` or `archivedProjects` based on its
-    /// archived state, removing it from the other list. Edits to an active project keep
-    /// their position (in-place replace); unarchived projects append until next refresh.
     @MainActor
     private func applyUpdatedProject(_ project: Project) {
         if project.isArchived ?? false {
@@ -1081,14 +981,11 @@ final class AppState {
         return await calendarService.eventsForMonth(date)
     }
 
-    /// Event calendars available for the "Show in mDone" selection screen.
     func availableCalendars() async -> [CalendarInfo] {
         guard calendarAccessGranted else { return [] }
         return await calendarService.availableCalendars()
     }
 
-    /// Call after the user changes which calendars are visible. Bumps the
-    /// token so calendar views re-query, and refreshes the Today window.
     @MainActor
     func calendarSelectionDidChange() async {
         calendarFilterToken = UUID()
@@ -1104,7 +1001,10 @@ final class AppState {
 
     func tasksForDate(_ date: Date) -> [VTask] {
         let calendar = Calendar.current
-        return tasks.filter { task in
+        let endOfDay = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: date) ?? date
+        let allTasks = projectedTasks(through: endOfDay)
+        
+        return allTasks.filter { task in
             guard let dueDate = task.effectiveDueDate else { return false }
             return calendar.isDate(dueDate, inSameDayAs: date)
         }
@@ -1118,16 +1018,12 @@ final class AppState {
             let result: [VNotification] = try await APIClient.shared.fetch(Endpoint.notifications())
             notifications = result
         } catch {
-            #if DEBUG
-            print("[mDone] fetchNotifications error: \(error)")
-            #endif
         }
     }
 
     @MainActor
     func markNotificationRead(_ id: Int64) async {
         do {
-            // Send empty body to mark as read
             struct EmptyBody: Encodable {}
             let _: VNotification = try await APIClient.shared.send(
                 Endpoint.markNotificationRead(id: id),
@@ -1138,9 +1034,6 @@ final class AppState {
                 notifications[index].readAt = Date()
             }
         } catch {
-            #if DEBUG
-            print("[mDone] markNotificationRead error: \(error)")
-            #endif
         }
     }
 
@@ -1154,9 +1047,6 @@ final class AppState {
                 notifications[index].readAt = Date()
             }
         } catch {
-            #if DEBUG
-            print("[mDone] markAllNotificationsRead error: \(error)")
-            #endif
         }
     }
 
@@ -1169,19 +1059,19 @@ final class AppState {
 
     @MainActor
     func moveTask(_ task: VTask, toPosition position: Double, viewId: Int64 = 0) async {
-        let resolvedViewId = viewId > 0 ? viewId : listViewId(for: task)
+        let realTask = resolveRealTask(from: task)
+        let resolvedViewId = viewId > 0 ? viewId : listViewId(for: realTask)
         guard resolvedViewId > 0 else { return }
         do {
-            try await taskService.updatePosition(taskId: task.id, position: position, viewId: resolvedViewId)
-            if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+            try await taskService.updatePosition(taskId: realTask.id, position: position, viewId: resolvedViewId)
+            if let index = tasks.firstIndex(where: { $0.id == realTask.id }) {
                 tasks[index].position = position
             }
-            // Update cached project task order
-            if var cached = projectTaskCache[task.projectId] {
-                if let cacheIndex = cached.firstIndex(where: { $0.id == task.id }) {
+            if var cached = projectTaskCache[realTask.projectId] {
+                if let cacheIndex = cached.firstIndex(where: { $0.id == realTask.id }) {
                     cached[cacheIndex].position = position
                 }
-                projectTaskCache[task.projectId] = cached.sorted { ($0.position ?? 0) < ($1.position ?? 0) }
+                projectTaskCache[realTask.projectId] = cached.sorted { ($0.position ?? 0) < ($1.position ?? 0) }
             }
         } catch {
             handleError(error)
@@ -1193,10 +1083,13 @@ final class AppState {
         guard calendar.range(of: .day, in: .month, for: month) != nil else { return [:] }
         var result: [Date: [VTask]] = [:]
 
-        for task in tasks {
+        guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: month)),
+              let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else { return [:] }
+
+        let allTasks = projectedTasks(through: monthEnd)
+
+        for task in allTasks {
             guard let dueDate = task.effectiveDueDate else { continue }
-            guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: month)),
-                  let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else { continue }
 
             if dueDate >= monthStart, dueDate < monthEnd {
                 let dayStart = calendar.startOfDay(for: dueDate)
@@ -1217,8 +1110,6 @@ final class AppState {
 
     // MARK: - Widget Data
 
-    /// Serializes current task data as WidgetData to the shared App Group UserDefaults
-    /// so widgets have instant access without needing to make API calls.
     private func pushWidgetData() {
         let now = Date()
         let calendar = Calendar.current
@@ -1231,11 +1122,13 @@ final class AppState {
             WidgetTask(
                 id: task.id,
                 title: task.title,
+                description: task.description ?? "",
                 done: task.done,
                 dueDate: task.effectiveDueDate,
                 priority: Int(task.priority),
                 projectId: task.projectId,
                 projectTitle: projectLookup[task.projectId],
+                hexColor: task.hexColor,
                 isOverdue: task.isOverdue
             )
         }
@@ -1256,15 +1149,20 @@ final class AppState {
             .map(toWidgetTask)
 
         let overdue = tasks
-            .filter { $0.isOverdue && !$0.isDueToday }
-            .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
-            .prefix(10)
+            .filter { $0.isOverdue && !$0.done }
+            .sorted { $0.effectiveDueDate ?? Date.distantFuture < $1.effectiveDueDate ?? Date.distantFuture }
+            .prefix(20)
             .map(toWidgetTask)
+            
+        let widgetProjects = projects.map {
+            WidgetProject(id: $0.id, title: $0.title, hexColor: $0.hexColor)
+        }
 
         let widgetData = WidgetData(
             todayTasks: Array(today),
             upcomingTasks: Array(upcoming),
             overdueTasks: Array(overdue),
+            projects: widgetProjects,
             lastUpdated: now
         )
 
