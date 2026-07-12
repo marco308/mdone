@@ -68,6 +68,28 @@ extension [Project] {
         return nodes
     }
 
+    /// The transitive set of sub-project ids under `id` (children, grandchildren,
+    /// …), not including `id` itself. Used to keep a project from being moved
+    /// under itself or one of its own descendants, which Vikunja rejects.
+    func descendantIDs(of id: Int64) -> Set<Int64> {
+        var childrenByParent: [Int64: [Int64]] = [:]
+        for project in self {
+            if let parentId = project.parentProjectId {
+                childrenByParent[parentId, default: []].append(project.id)
+            }
+        }
+        var result: Set<Int64> = []
+        var stack = childrenByParent[id] ?? []
+        while let next = stack.popLast() {
+            // Skip the start node itself (a cycle can lead back to it) and anything
+            // already seen, so the walk terminates and never reports self.
+            guard next != id, !result.contains(next) else { continue }
+            result.insert(next)
+            stack.append(contentsOf: childrenByParent[next] ?? [])
+        }
+        return result
+    }
+
     /// Orders two projects for display: by `position`, then title, then id.
     private static func ordersBefore(_ lhs: Project, _ rhs: Project) -> Bool {
         let lp = lhs.position ?? 0
