@@ -922,7 +922,8 @@ final class AppState {
         title: String,
         description: String? = nil,
         hexColor: String? = nil,
-        isFavorite: Bool = false
+        isFavorite: Bool = false,
+        parentProjectId: Int64? = nil
     ) async -> Project? {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -930,7 +931,8 @@ final class AppState {
             title: trimmed,
             description: description.flatMap { $0.isEmpty ? nil : $0 },
             hexColor: hexColor.flatMap { $0.isEmpty ? nil : $0 },
-            isFavorite: isFavorite
+            isFavorite: isFavorite,
+            parentProjectId: parentProjectId
         )
         do {
             let newProject = try await projectService.createProject(request)
@@ -955,7 +957,8 @@ final class AppState {
         title: String,
         description: String,
         hexColor: String,
-        isFavorite: Bool
+        isFavorite: Bool,
+        parentProjectId: Int64?
     ) async {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -964,8 +967,21 @@ final class AppState {
             title: trimmed,
             description: description,
             hexColor: hexColor,
-            isFavorite: isFavorite
+            isFavorite: isFavorite,
+            parentProjectId: parentProjectId ?? 0
         )
+        await performProjectUpdate(id: project.id, request: request)
+    }
+
+    /// Moves a project under a new parent (or to the top level when `parentId`
+    /// is `nil`), preserving all its other fields. The caller is responsible for
+    /// not creating a cycle (moving a project under itself or a descendant);
+    /// the UI filters those targets out, and Vikunja rejects them regardless.
+    @MainActor
+    func moveProject(_ project: Project, toParentId parentId: Int64?) async {
+        guard project.id > 0 else { return } // ignore pseudo-projects (e.g. Favorites, id -1)
+        guard parentId != project.id else { return }
+        let request = ProjectUpdateRequest(from: project, parentProjectId: parentId ?? 0)
         await performProjectUpdate(id: project.id, request: request)
     }
 
@@ -1052,6 +1068,9 @@ final class AppState {
             // Trust our intended archived state for list placement, in case the
             // server response omits `is_archived`.
             updated.isArchived = request.isArchived
+            // Likewise trust the intended parent so a moved project nests in the
+            // right place immediately, even if the response omits parent_project_id.
+            updated.parentProjectId = request.parentProjectId == 0 ? nil : request.parentProjectId
             applyUpdatedProject(updated)
             syncService?.updateCachedProject(updated)
             WidgetCenter.shared.reloadAllTimelines()

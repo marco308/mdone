@@ -128,6 +128,31 @@ final class ProjectHierarchyTests: XCTestCase {
         XCTAssertEqual(rows.first { $0.project.id == 20 }?.hasChildren, true)
     }
 
+    // MARK: - descendantIDs
+
+    func testDescendantIDsReturnsTransitiveChildren() {
+        let projects = [
+            Project(id: 1, title: "Root"),
+            Project(id: 2, title: "Child", parentProjectId: 1),
+            Project(id: 3, title: "Grandchild", parentProjectId: 2),
+            Project(id: 4, title: "Sibling", parentProjectId: 1),
+            Project(id: 9, title: "Unrelated"),
+        ]
+        XCTAssertEqual(projects.descendantIDs(of: 1), [2, 3, 4])
+        XCTAssertEqual(projects.descendantIDs(of: 2), [3])
+        XCTAssertEqual(projects.descendantIDs(of: 9), [])
+    }
+
+    func testDescendantIDsIsCycleSafe() {
+        let projects = [
+            Project(id: 1, title: "One", parentProjectId: 2),
+            Project(id: 2, title: "Two", parentProjectId: 1),
+        ]
+        // Must terminate; each node's descendants exclude itself.
+        XCTAssertEqual(projects.descendantIDs(of: 1), [2])
+        XCTAssertEqual(projects.descendantIDs(of: 2), [1])
+    }
+
     // MARK: - Helpers
 
     private func flatten(_ nodes: [ProjectNode]) -> [ProjectNode] {

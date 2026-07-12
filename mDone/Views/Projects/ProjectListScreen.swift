@@ -169,6 +169,7 @@ struct ProjectListScreen: View {
                     systemImage: project.isFavorite == true ? "star.slash" : "star"
                 )
             }
+            moveMenu(for: project)
             Button {
                 Task { await appState.archiveProject(project) }
             } label: {
@@ -183,6 +184,33 @@ struct ProjectListScreen: View {
         }
     }
 
+    /// "Move to" submenu: re-parent this project under any project that isn't
+    /// itself, one of its descendants, or its current parent.
+    @ViewBuilder
+    private func moveMenu(for project: Project) -> some View {
+        let excluded = [project.id] + appState.projects.descendantIDs(of: project.id)
+        let targets = appState.projects
+            .filter { !excluded.contains($0.id) }
+            .projectHierarchy()
+            .flattened { _ in true }
+        Menu {
+            if project.parentProjectId != nil {
+                Button("Top Level") {
+                    Task { await appState.moveProject(project, toParentId: nil) }
+                }
+            }
+            ForEach(targets) { row in
+                if row.project.id != project.parentProjectId {
+                    Button(String(repeating: "  ", count: row.depth) + row.project.title) {
+                        Task { await appState.moveProject(project, toParentId: row.project.id) }
+                    }
+                }
+            }
+        } label: {
+            Label("Move to…", systemImage: "folder")
+        }
+    }
+
     private func toggleFavorite(_ project: Project) {
         Task {
             await appState.updateProject(
@@ -190,7 +218,8 @@ struct ProjectListScreen: View {
                 title: project.title,
                 description: project.description ?? "",
                 hexColor: project.hexColor ?? "",
-                isFavorite: !(project.isFavorite ?? false)
+                isFavorite: !(project.isFavorite ?? false),
+                parentProjectId: project.parentProjectId
             )
         }
     }
