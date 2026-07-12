@@ -15,6 +15,7 @@ struct TaskDetailSheet: View {
     @State private var priority: Int64
     @State private var selectedProjectId: Int64
     @State private var repeatInterval: Int64
+    @State private var repeatMode: Int64 // Añadido
     @State private var reminders: [TaskReminder]
     @State private var showDeleteConfirm = false
     @State private var isShowingDescriptionPreview: Bool
@@ -32,6 +33,7 @@ struct TaskDetailSheet: View {
         _priority = State(initialValue: task.priority)
         _selectedProjectId = State(initialValue: task.projectId)
         _repeatInterval = State(initialValue: task.repeatAfter ?? 0)
+        _repeatMode = State(initialValue: task.repeatMode ?? 0) // Añadido
         _reminders = State(initialValue: task.reminders ?? [])
         _isShowingDescriptionPreview = State(initialValue: !initialDescription.isEmpty)
         _estimateSeconds = State(initialValue: task.estimatedSeconds)
@@ -252,6 +254,7 @@ struct TaskDetailSheet: View {
             priority: priority,
             projectId: selectedProjectId,
             repeatAfter: repeatInterval,
+            repeatMode: repeatMode, // Añadido
             reminders: reminders,
             percentDone: percentDone,
             clearDueDate: !hasDueDate

@@ -25,6 +25,10 @@ struct TaskRow: View {
     }
     #endif
 
+    private var isProjected: Bool {
+        task.id < 0
+    }
+
     var body: some View {
         rowContent
         #if os(iOS)
@@ -35,7 +39,7 @@ struct TaskRow: View {
         .swipeActions(edge: .leading) {
             if !readOnly {
                 #if os(iOS)
-                if !task.done {
+                if !task.done && !isProjected {
                     Button {
                         Task { await appState.postponeTask(task, byHours: 24) }
                     } label: {
@@ -57,16 +61,18 @@ struct TaskRow: View {
                 .tint(.orange)
                 #endif
 
-                Button {
-                    Task { await appState.toggleTaskDone(task) }
-                } label: {
-                    Label(task.done ? "Undo" : "Done", systemImage: task.done ? "arrow.uturn.backward" : "checkmark")
+                if !isProjected {
+                    Button {
+                        Task { await appState.toggleTaskDone(task) }
+                    } label: {
+                        Label(task.done ? "Undo" : "Done", systemImage: task.done ? "arrow.uturn.backward" : "checkmark")
+                    }
+                    .tint(.green)
                 }
-                .tint(.green)
             }
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            if !readOnly {
+            if !readOnly && !isProjected {
                 Button(role: .destructive) {
                     Task { await appState.deleteTask(task) }
                 } label: {
@@ -76,7 +82,7 @@ struct TaskRow: View {
         }
         .contextMenu {
             if !readOnly {
-                if !task.done {
+                if !task.done && !isProjected {
                     Menu {
                         ForEach(QuickSchedule.options()) { option in
                             Button {
@@ -108,13 +114,15 @@ struct TaskRow: View {
                 }
                 #endif
 
-                Button {
-                    Task { await appState.toggleCurrent(task) }
-                } label: {
-                    Label(
-                        appState.isCurrent(task) ? "Remove from Current" : "Mark as Current",
-                        systemImage: appState.isCurrent(task) ? "pin.slash" : "pin"
-                    )
+                if !isProjected {
+                    Button {
+                        Task { await appState.toggleCurrent(task) }
+                    } label: {
+                        Label(
+                            appState.isCurrent(task) ? "Remove from Current" : "Mark as Current",
+                            systemImage: appState.isCurrent(task) ? "pin.slash" : "pin"
+                        )
+                    }
                 }
 
                 if appState.isCurrent(task) {
@@ -144,20 +152,28 @@ struct TaskRow: View {
                 .frame(width: 4, height: 36)
                 .accessibilityHidden(true)
 
-            Button {
-                Task {
-                    await appState.toggleTaskDone(task)
-                }
-            } label: {
-                Image(systemName: task.done ? "checkmark.circle.fill" : "circle")
+            if isProjected {
+                Image(systemName: "circle.dashed")
                     .font(.title3)
-                    .foregroundStyle(task.done ? .green : checkboxColor)
-                    .contentTransition(.symbolEffect(.replace))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityLabel("Future projection")
+                    .padding(.top, 2) // alignment
+            } else {
+                Button {
+                    Task {
+                        await appState.toggleTaskDone(task)
+                    }
+                } label: {
+                    Image(systemName: task.done ? "checkmark.circle.fill" : "circle")
+                        .font(.title3)
+                        .foregroundStyle(task.done ? .green : checkboxColor)
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .buttonStyle(.plain)
+                .disabled(readOnly)
+                .accessibilityLabel(task.done ? "Mark \(task.title) as incomplete" : "Mark \(task.title) as complete")
+                .accessibilityAddTraits(.isToggle)
             }
-            .buttonStyle(.plain)
-            .disabled(readOnly)
-            .accessibilityLabel(task.done ? "Mark \(task.title) as incomplete" : "Mark \(task.title) as complete")
-            .accessibilityAddTraits(.isToggle)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(task.title)

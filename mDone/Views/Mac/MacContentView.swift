@@ -16,9 +16,9 @@ struct MacContentView: View {
     private var sectionShowsTaskList: Bool {
         guard let selectedSection else { return false }
         switch selectedSection {
-        case .inbox, .today, .tomorrow, .thisWeek, .upcoming, .overdue, .noDate, .project:
+        case .inbox, .today, .tomorrow, .thisWeek, .upcoming, .overdue, .noDate, .project, .calendar:
             return true
-        case .archived, .notifications, .calendar, .settings:
+        case .archived, .notifications, .settings:
             return false
         }
     }

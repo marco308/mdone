@@ -1,5 +1,16 @@
 import Foundation
 
+struct SendableISO8601DateFormatter: @unchecked Sendable {
+    let formatter: ISO8601DateFormatter
+    init(options: ISO8601DateFormatter.Options) {
+        formatter = ISO8601DateFormatter()
+        formatter.formatOptions = options
+    }
+    func date(from string: String) -> Date? {
+        formatter.date(from: string)
+    }
+}
+
 actor APIClient {
     private let session: URLSession
     private let decoder: JSONDecoder
@@ -39,10 +50,8 @@ actor APIClient {
 
         decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let fallbackFormatter = ISO8601DateFormatter()
-        fallbackFormatter.formatOptions = [.withInternetDateTime]
+        let dateFormatter = SendableISO8601DateFormatter(options: [.withInternetDateTime, .withFractionalSeconds])
+        let fallbackFormatter = SendableISO8601DateFormatter(options: [.withInternetDateTime])
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
             let dateString = try container.decode(String.self)
@@ -480,6 +489,7 @@ actor APIClient {
     }
 
     func send<R: Decodable>(_ endpoint: Endpoint, body: some Encodable) async throws -> R {
+        
         let bodyData = try encoder.encode(body)
         let (data, httpResponse) = try await executeWithRefresh {
             var request = try self.buildRequest(for: endpoint)
