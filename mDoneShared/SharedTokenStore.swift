@@ -21,7 +21,7 @@ enum SharedTokenStore {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: account,
         ]
-        #if os(iOS)
+        #if os(iOS) || os(watchOS)
         query[kSecAttrAccessGroup as String] = SharedKeys.appGroupID
         #endif
         return query

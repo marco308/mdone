@@ -318,6 +318,9 @@ final class AppState {
         #if DEBUG
         print("[mDone] Credentials saved, setting isAuthenticated = true")
         #endif
+        #if os(iOS)
+        WatchConnectivityManager.shared.syncCredentials(serverURL: serverURL, token: token)
+        #endif
         isAuthenticated = true
     }
 
@@ -360,6 +363,9 @@ final class AppState {
         if let capturedRefreshToken {
             authService.saveRefreshToken(capturedRefreshToken)
         }
+        #if os(iOS)
+        WatchConnectivityManager.shared.syncCredentials(serverURL: url, token: loginResponse.token)
+        #endif
         isAuthenticated = true
     }
 
@@ -1231,11 +1237,13 @@ final class AppState {
             WidgetTask(
                 id: task.id,
                 title: task.title,
+                description: task.description ?? "",
                 done: task.done,
                 dueDate: task.effectiveDueDate,
                 priority: Int(task.priority),
                 projectId: task.projectId,
                 projectTitle: projectLookup[task.projectId],
+                hexColor: task.hexColor,
                 isOverdue: task.isOverdue
             )
         }
@@ -1256,15 +1264,20 @@ final class AppState {
             .map(toWidgetTask)
 
         let overdue = tasks
-            .filter { $0.isOverdue && !$0.isDueToday }
-            .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
-            .prefix(10)
+            .filter { $0.isOverdue && !$0.done }
+            .sorted { $0.effectiveDueDate ?? Date.distantFuture < $1.effectiveDueDate ?? Date.distantFuture }
+            .prefix(20)
             .map(toWidgetTask)
+            
+        let widgetProjects = projects.map {
+            WidgetProject(id: $0.id, title: $0.title, hexColor: $0.hexColor)
+        }
 
         let widgetData = WidgetData(
             todayTasks: Array(today),
             upcomingTasks: Array(upcoming),
             overdueTasks: Array(overdue),
+            projects: widgetProjects,
             lastUpdated: now
         )
 
