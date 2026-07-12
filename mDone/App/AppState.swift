@@ -22,6 +22,38 @@ final class AppState {
     var notifications: [VNotification] = []
     var selectedProject: Project?
 
+    /// IDs of parent projects the user has collapsed in the sidebar / project
+    /// list. Projects expand by default (absent here = expanded). Persisted to
+    /// `UserDefaults` so the tree keeps its shape across launches.
+    var collapsedProjectIDs: Set<Int64> = AppState.loadCollapsedProjectIDs() {
+        didSet { AppState.saveCollapsedProjectIDs(collapsedProjectIDs) }
+    }
+
+    /// Whether a project's sub-projects are currently shown.
+    func isProjectExpanded(_ id: Int64) -> Bool {
+        !collapsedProjectIDs.contains(id)
+    }
+
+    /// Expands or collapses a project's sub-projects, persisting the change.
+    func setProjectExpanded(_ expanded: Bool, for id: Int64) {
+        if expanded {
+            collapsedProjectIDs.remove(id)
+        } else {
+            collapsedProjectIDs.insert(id)
+        }
+    }
+
+    private static let collapsedProjectsKey = "collapsedProjectIDs"
+
+    private static func loadCollapsedProjectIDs() -> Set<Int64> {
+        let stored = UserDefaults.standard.array(forKey: collapsedProjectsKey) as? [NSNumber] ?? []
+        return Set(stored.map(\.int64Value))
+    }
+
+    private static func saveCollapsedProjectIDs(_ ids: Set<Int64>) {
+        UserDefaults.standard.set(ids.map { NSNumber(value: $0) }, forKey: collapsedProjectsKey)
+    }
+
     var searchQuery: String = ""
     var activeFilter: TaskFilter?
     var advancedFilterString: String?

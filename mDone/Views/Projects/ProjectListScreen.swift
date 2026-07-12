@@ -13,15 +13,16 @@ struct ProjectListScreen: View {
             if !favorites.isEmpty {
                 Section("Favorites") {
                     ForEach(favorites) { project in
-                        projectRow(project)
+                        projectRow(project, depth: 0, hasChildren: false)
                     }
                 }
             }
 
             let regular = appState.projects.filter { $0.isFavorite != true }
+            let rows = regular.projectHierarchy().flattened { appState.isProjectExpanded($0) }
             Section("Projects") {
-                ForEach(regular) { project in
-                    projectRow(project)
+                ForEach(rows) { row in
+                    projectRow(row.project, depth: row.depth, hasChildren: row.hasChildren)
                 }
             }
 
@@ -103,10 +104,36 @@ struct ProjectListScreen: View {
         }
     }
 
-    private func projectRow(_ project: Project) -> some View {
-        NavigationLink(value: project) {
-            ProjectRow(project: project, taskCount: appState.tasksForProject(project.id).count)
+    /// A tappable expand/collapse chevron for parent projects. Leaf projects get
+    /// an equal-width spacer so their titles line up under a parent's title.
+    @ViewBuilder
+    private func disclosureChevron(for project: Project, hasChildren: Bool) -> some View {
+        if hasChildren {
+            let expanded = appState.isProjectExpanded(project.id)
+            Button {
+                withAnimation { appState.setProjectExpanded(!expanded, for: project.id) }
+            } label: {
+                Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(expanded ? "Collapse \(project.title)" : "Expand \(project.title)")
+        } else {
+            Color.clear.frame(width: 16, height: 1)
         }
+    }
+
+    private func projectRow(_ project: Project, depth: Int, hasChildren: Bool) -> some View {
+        HStack(spacing: 6) {
+            disclosureChevron(for: project, hasChildren: hasChildren)
+            NavigationLink(value: project) {
+                ProjectRow(project: project, taskCount: appState.tasksForProject(project.id).count)
+            }
+        }
+        .padding(.leading, CGFloat(depth) * 16)
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive) {
                 projectPendingDelete = project
