@@ -140,7 +140,7 @@ struct TaskRow: View {
     private var rowContent: some View {
         HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 2)
-                .fill(priorityColor)
+                .fill(accentColor)
                 .frame(width: 4, height: 36)
                 .accessibilityHidden(true)
 
@@ -261,6 +261,18 @@ struct TaskRow: View {
         return days >= stallDays ? days : nil
     }
 
+    /// The task's own Vikunja color, when set. `nil` for uncolored tasks.
+    private var taskColor: Color? {
+        task.normalizedHexColor.map { Color(hex: $0) }
+    }
+
+    /// The leading accent bar prefers the user-assigned task color, falling
+    /// back to the priority color (which is also shown as a badge) so the bar
+    /// keeps signalling priority for uncolored tasks.
+    private var accentColor: Color {
+        taskColor ?? priorityColor
+    }
+
     private var priorityColor: Color {
         switch task.priorityLevel {
         case .critical, .urgent: .red
@@ -272,7 +284,8 @@ struct TaskRow: View {
     }
 
     private var checkboxColor: Color {
-        task.priorityLevel == .none ? .gray : priorityColor
+        if let taskColor { return taskColor }
+        return task.priorityLevel == .none ? .gray : priorityColor
     }
 }
 
