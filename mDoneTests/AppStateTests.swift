@@ -29,6 +29,32 @@ final class AppStateTests: XCTestCase {
         return AppState(projectService: ProjectService(apiClient: client))
     }
 
+    // MARK: - Project Collapse State
+
+    func testProjectsExpandedByDefault() async {
+        UserDefaults.standard.removeObject(forKey: "collapsedProjectIDs")
+        let appState = await makeProjectMockedAppState()
+        XCTAssertTrue(appState.isProjectExpanded(42))
+    }
+
+    func testCollapseAndExpandProjectPersists() async {
+        UserDefaults.standard.removeObject(forKey: "collapsedProjectIDs")
+        let appState = await makeProjectMockedAppState()
+
+        appState.setProjectExpanded(false, for: 42)
+        XCTAssertFalse(appState.isProjectExpanded(42))
+        XCTAssertTrue(appState.collapsedProjectIDs.contains(42))
+
+        // A fresh AppState reads the persisted collapse set back.
+        let reloaded = await makeProjectMockedAppState()
+        XCTAssertFalse(reloaded.isProjectExpanded(42))
+
+        appState.setProjectExpanded(true, for: 42)
+        XCTAssertTrue(appState.isProjectExpanded(42))
+        XCTAssertFalse(appState.collapsedProjectIDs.contains(42))
+        UserDefaults.standard.removeObject(forKey: "collapsedProjectIDs")
+    }
+
     // MARK: - Project Mutations
 
     func testCreateProjectAppendsToProjects() async {
