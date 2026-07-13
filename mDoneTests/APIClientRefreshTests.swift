@@ -113,13 +113,19 @@ final class APIClientRefreshTests: XCTestCase {
         let taskCalls = counter.entries(forPath: "/api/v1/tasks/1")
         XCTAssertEqual(taskCalls.count, 2, "Original endpoint should be retried exactly once")
         XCTAssertEqual(taskCalls[0].authorization, "Bearer \(originalJWT)")
-        XCTAssertEqual(taskCalls[1].authorization, "Bearer \(refreshedJWT)",
-                       "Retry must use the freshly refreshed JWT")
+        XCTAssertEqual(
+            taskCalls[1].authorization,
+            "Bearer \(refreshedJWT)",
+            "Retry must use the freshly refreshed JWT"
+        )
 
         let refreshCalls = counter.entries(forPath: "/api/v1/user/token/refresh")
         XCTAssertEqual(refreshCalls.count, 1)
-        XCTAssertEqual(refreshCalls[0].cookie, "vikunja_refresh_token=refresh-1",
-                       "Refresh must send the stored refresh-token cookie")
+        XCTAssertEqual(
+            refreshCalls[0].cookie,
+            "vikunja_refresh_token=refresh-1",
+            "Refresh must send the stored refresh-token cookie"
+        )
 
         // Rotated cookie should have replaced the old refresh token.
         let stored = await client.currentRefreshToken()
@@ -288,7 +294,7 @@ final class APIClientRefreshTests: XCTestCase {
             // though Foundation can deliver it from a real response.
             "X-Baz" as NSString: "both-ns" as NSString,
             // Non-string values should be skipped rather than crashing.
-            "X-Ignored": 42
+            "X-Ignored": 42,
         ]
 
         let normalised = APIClient.stringHeaders(from: raw)
@@ -335,11 +341,17 @@ final class APIClientRefreshTests: XCTestCase {
             XCTFail("Unexpected error type: \(error)")
         }
 
-        XCTAssertNotEqual(expiredFlag.value, true,
-                          "Session must survive a transient refresh failure")
+        XCTAssertNotEqual(
+            expiredFlag.value,
+            true,
+            "Session must survive a transient refresh failure"
+        )
         let stillStored = await client.currentRefreshToken()
-        XCTAssertEqual(stillStored, "refresh-token-1",
-                       "Refresh token must not be dropped on transport error so the next attempt can succeed")
+        XCTAssertEqual(
+            stillStored,
+            "refresh-token-1",
+            "Refresh token must not be dropped on transport error so the next attempt can succeed"
+        )
     }
 
     /// A 5xx from the refresh endpoint is transient — let the caller retry the
@@ -419,8 +431,11 @@ final class APIClientRefreshTests: XCTestCase {
             XCTFail("Unexpected error type: \(error)")
         }
 
-        XCTAssertEqual(expiredFlag.value, true,
-                       "Persistent 401 after a successful refresh must escalate to session expiry")
+        XCTAssertEqual(
+            expiredFlag.value,
+            true,
+            "Persistent 401 after a successful refresh must escalate to session expiry"
+        )
     }
 
     // MARK: - Helpers
@@ -430,7 +445,9 @@ final class APIClientRefreshTests: XCTestCase {
     private static func validJWT(payloadOverride: [String: Any] = [:]) -> String {
         let header = base64URL(Data(#"{"alg":"HS256"}"#.utf8))
         var payload: [String: Any] = ["sub": "1", "exp": 1_700_000_000]
-        for (k, v) in payloadOverride { payload[k] = v }
+        for (k, v) in payloadOverride {
+            payload[k] = v
+        }
         let payloadData = (try? JSONSerialization.data(withJSONObject: payload)) ?? Data()
         let body = base64URL(payloadData)
         let sig = base64URL(Data("sig".utf8))
@@ -468,12 +485,14 @@ private final class AsyncBox<T>: @unchecked Sendable {
     private var stored: T?
 
     var value: T? {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return stored
     }
 
     func set(_ value: T) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         stored = value
     }
 }
@@ -491,23 +510,27 @@ private final class RequestCounter: @unchecked Sendable {
     private var total = 0
 
     var totalCount: Int {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return total
     }
 
     func record(path: String, authorization: String, cookie: String?) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         perPath[path, default: []].append(Entry(authorization: authorization, cookie: cookie))
         total += 1
     }
 
     func count(forPath path: String) -> Int {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return perPath[path]?.count ?? 0
     }
 
     func entries(forPath path: String) -> [Entry] {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return perPath[path] ?? []
     }
 }

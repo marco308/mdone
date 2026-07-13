@@ -61,8 +61,11 @@ final class AuthServiceTests: XCTestCase {
 
         svc.clearSession()
 
-        XCTAssertEqual(svc.getServerURL(), "https://example.com",
-                       "expireSession() relies on the server URL surviving so users don't have to retype it")
+        XCTAssertEqual(
+            svc.getServerURL(),
+            "https://example.com",
+            "expireSession() relies on the server URL surviving so users don't have to retype it"
+        )
         XCTAssertNil(svc.getToken())
         XCTAssertNil(svc.getRefreshToken())
     }

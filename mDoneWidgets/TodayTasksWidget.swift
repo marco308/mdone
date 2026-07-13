@@ -88,12 +88,19 @@ struct TodayTasksWidgetView: View {
     let entry: TodayTasksEntry
     @Environment(\.widgetFamily) var family
 
-    private var fontSize: WidgetFontSize { entry.configuration.fontSize }
-    private var filterMode: TodayTaskFilterMode { entry.configuration.filterMode }
+    private var fontSize: WidgetFontSize {
+        entry.configuration.fontSize
+    }
+
+    private var filterMode: TodayTaskFilterMode {
+        entry.configuration.filterMode
+    }
 
     /// Calm Mode (set in the app, mirrored to the App Group): when on, overdue
     /// tasks are shown without any red highlight or separate grouping.
-    private var calmMode: Bool { SharedKeys.sharedDefaults.bool(forKey: SharedKeys.calmModeKey) }
+    private var calmMode: Bool {
+        SharedKeys.sharedDefaults.bool(forKey: SharedKeys.calmModeKey)
+    }
 
     private var visibleTodayTasks: [WidgetTask] {
         filterMode == .overdueOnly ? [] : entry.tasks

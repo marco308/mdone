@@ -10,7 +10,9 @@ enum EstimateFormatter {
         formatter.unitsStyle = .abbreviated
         formatter.maximumUnitCount = 2
         formatter.allowedUnits = safe >= 3600 ? [.hour, .minute] : [.minute]
-        if safe < 60 { return "<1m" }
+        if safe < 60 {
+            return "<1m"
+        }
         return formatter.string(from: safe) ?? "\(Int(safe / 60))m"
     }
 }
@@ -83,7 +85,6 @@ struct EstimatePicker: View {
         return !presets.contains(s)
     }
 
-    @ViewBuilder
     private func chip(label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(label)
@@ -123,7 +124,9 @@ private struct CustomEstimateSheet: View {
         // or even a sub-minute 30s) and tapping Set silently clears it.
         // The guard is on the original seconds — not on `totalMinutes` —
         // because anything 0 < seed < 60s already has totalMinutes == 0.
-        if seed > 0, snapped == 0 { snapped = 5 }
+        if seed > 0, snapped == 0 {
+            snapped = 5
+        }
         // Clamp into the picker's representable range so an agent-set
         // estimate larger than the hours wheel (currently up to 12h) lands
         // on a valid tag instead of leaving the picker in a no-selection

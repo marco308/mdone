@@ -37,7 +37,7 @@ final class DefaultDueTimePreferenceTests: XCTestCase {
         XCTAssertEqual(DefaultDueTimePreference.current(defaults: defaults), .sixPM)
     }
 
-    func testApplyReplacesTimeWithSixPMByDefault() {
+    func testApplyReplacesTimeWithSixPMByDefault() throws {
         var components = DateComponents()
         components.year = 2026
         components.month = 5
@@ -45,7 +45,7 @@ final class DefaultDueTimePreferenceTests: XCTestCase {
         components.hour = 0
         components.minute = 0
         let calendar = Calendar(identifier: .gregorian)
-        let midnight = calendar.date(from: components)!
+        let midnight = try XCTUnwrap(calendar.date(from: components))
 
         let result = DefaultDueTimePreference.apply(to: midnight, calendar: calendar, defaults: defaults)
         let resultComponents = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: result)
@@ -57,7 +57,7 @@ final class DefaultDueTimePreferenceTests: XCTestCase {
         XCTAssertEqual(resultComponents.minute, 0)
     }
 
-    func testApplyHonoursStoredEndOfDay() {
+    func testApplyHonoursStoredEndOfDay() throws {
         defaults.set(DefaultDueTimePreference.endOfDay.rawValue, forKey: DefaultDueTimePreference.storageKey)
 
         var components = DateComponents()
@@ -65,7 +65,7 @@ final class DefaultDueTimePreferenceTests: XCTestCase {
         components.month = 5
         components.day = 21
         let calendar = Calendar(identifier: .gregorian)
-        let date = calendar.date(from: components)!
+        let date = try XCTUnwrap(calendar.date(from: components))
 
         let result = DefaultDueTimePreference.apply(to: date, calendar: calendar, defaults: defaults)
         let resultComponents = calendar.dateComponents([.hour, .minute], from: result)

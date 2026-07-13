@@ -76,12 +76,12 @@ actor AuthService {
 
     // MARK: - Keychain helpers
 
-    nonisolated private func readKeychain(account: String) -> String? {
+    private nonisolated func readKeychain(account: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: account,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
+            kSecMatchLimit as String: kSecMatchLimitOne,
         ]
 
         var result: AnyObject?
@@ -94,7 +94,7 @@ actor AuthService {
         return String(data: data, encoding: .utf8)
     }
 
-    nonisolated private func writeKeychain(account: String, value: String) {
+    private nonisolated func writeKeychain(account: String, value: String) {
         deleteKeychain(account: account)
 
         guard let data = value.data(using: .utf8) else { return }
@@ -103,16 +103,16 @@ actor AuthService {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: account,
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
         ]
 
         SecItemAdd(query as CFDictionary, nil)
     }
 
-    nonisolated private func deleteKeychain(account: String) {
+    private nonisolated func deleteKeychain(account: String) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: account
+            kSecAttrAccount as String: account,
         ]
 
         SecItemDelete(query as CFDictionary)

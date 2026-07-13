@@ -24,9 +24,15 @@ final class NetworkMonitor {
     }
 
     private func getConnectionType(_ path: NWPath) -> ConnectionType {
-        if path.usesInterfaceType(.wifi) { return .wifi }
-        if path.usesInterfaceType(.cellular) { return .cellular }
-        if path.usesInterfaceType(.wiredEthernet) { return .wired }
+        if path.usesInterfaceType(.wifi) {
+            return .wifi
+        }
+        if path.usesInterfaceType(.cellular) {
+            return .cellular
+        }
+        if path.usesInterfaceType(.wiredEthernet) {
+            return .wired
+        }
         return .unknown
     }
 

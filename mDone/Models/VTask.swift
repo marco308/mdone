@@ -54,12 +54,24 @@ struct VTask: Codable, Identifiable, Hashable {
         guard let interval = repeatAfter, interval > 0 else { return nil }
         let hours = interval / 3600
         let days = hours / 24
-        if days == 1 { return "Daily" }
-        if days == 7 { return "Weekly" }
-        if days >= 28 && days <= 31 { return "Monthly" }
-        if days == 365 || days == 366 { return "Yearly" }
-        if days > 0 { return "Every \(days) days" }
-        if hours > 0 { return "Every \(hours) hours" }
+        if days == 1 {
+            return "Daily"
+        }
+        if days == 7 {
+            return "Weekly"
+        }
+        if days >= 28 && days <= 31 {
+            return "Monthly"
+        }
+        if days == 365 || days == 366 {
+            return "Yearly"
+        }
+        if days > 0 {
+            return "Every \(days) days"
+        }
+        if hours > 0 {
+            return "Every \(hours) hours"
+        }
         return "Repeating"
     }
 
@@ -73,7 +85,9 @@ struct VTask: Codable, Identifiable, Hashable {
     /// Returns nil for Vikunja's zero-date sentinel (year 1)
     var effectiveDueDate: Date? {
         guard let dueDate else { return nil }
-        if Calendar.current.component(.year, from: dueDate) <= 1 { return nil }
+        if Calendar.current.component(.year, from: dueDate) <= 1 {
+            return nil
+        }
         return dueDate
     }
 

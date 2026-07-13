@@ -100,7 +100,9 @@ struct LockScreenEntry: TimelineEntry {
 struct LockScreenCircularView: View {
     let entry: LockScreenEntry
 
-    private var calmMode: Bool { SharedKeys.sharedDefaults.bool(forKey: SharedKeys.calmModeKey) }
+    private var calmMode: Bool {
+        SharedKeys.sharedDefaults.bool(forKey: SharedKeys.calmModeKey)
+    }
 
     var body: some View {
         if !entry.isAuthenticated {

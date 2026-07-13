@@ -6,17 +6,21 @@ struct TaskRow: View {
     @Environment(FocusManager.self) private var focusManager
     #endif
     let task: VTask
-    
+
+    /// When true, the row is display-only: no completion toggle, swipe actions,
+    /// context menu, or tap-to-edit. Used for archived (read-only) projects.
     var readOnly: Bool = false
+    /// When true, the row shows a progress bar and (when stalled) an idle badge.
+    /// Used by the "Current" section.
     var showsProgress: Bool = false
-    
+
     @State private var showDetail = false
     @AppStorage("calmMode") private var calmMode = false
     @AppStorage("currentStallDays") private var stallDays = 7
-    
-    // LEEMOS EL ESTILO DESDE LOS AJUSTES (Por defecto arranca en el original)
+
     @AppStorage("taskRowStyle") private var taskRowStyle = TaskRowStyle.standard.rawValue
 
+    /// Quick-set progress percentages offered in the context menu.
     private static let progressSteps = [0, 25, 50, 75, 100]
 
     #if os(iOS)
@@ -24,7 +28,7 @@ struct TaskRow: View {
         focusManager.focusedTaskId == task.id
     }
     #endif
-    
+
     private var currentStyle: TaskRowStyle {
         TaskRowStyle(rawValue: taskRowStyle) ?? .standard
     }
@@ -33,132 +37,147 @@ struct TaskRow: View {
         rowContent
         #if os(iOS)
         .contentShape(Rectangle())
-        .onTapGesture { if !readOnly { showDetail = true } }
-        // Adaptamos el fondo de la lista al estilo elegido
-        .listRowBackground(currentStyle == .fullCard ? (isFocused ? Color.orange.opacity(0.08) : Color.clear) : (isFocused ? Color.orange.opacity(0.08) : nil))
+        .onTapGesture {
+            if !readOnly {
+                showDetail = true
+            }
+        }
+        .listRowBackground(currentStyle == .fullCard ? (isFocused ? Color.orange.opacity(0.08) : Color.clear) :
+            (isFocused ? Color.orange.opacity(0.08) : nil))
+        #else
+            .listRowBackground(currentStyle == .fullCard ? Color.clear : nil)
         #endif
-        .swipeActions(edge: .leading) {
-            if !readOnly {
-                #if os(iOS)
-                if !task.done {
-                    Button {
-                        Task { await appState.postponeTask(task, byHours: 24) }
-                    } label: {
-                        Label("+24h", systemImage: "clock.arrow.circlepath")
+            .swipeActions(edge: .leading) {
+                if !readOnly {
+                    #if os(iOS)
+                    if !task.done {
+                        Button {
+                            Task {
+                                await appState.postponeTask(task, byHours: 24)
+                            }
+                        } label: {
+                            Label("+24h", systemImage: "clock.arrow.circlepath")
+                        }
+                        .tint(.blue)
                     }
-                    .tint(.blue)
-                }
 
-                Button {
+                    Button {
+                        if isFocused {
+                            focusManager.endFocus()
+                        } else {
+                            let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
+                            focusManager.switchFocus(task: task, projectName: projectName)
+                        }
+                    } label: {
+                        Label(isFocused ? "End Focus" : "Focus", systemImage: "scope")
+                    }
+                    .tint(.orange)
+                    #endif
+
+                    Button {
+                        Task {
+                            await appState.toggleTaskDone(task)
+                        }
+                    } label: {
+                        Label(
+                            task.done ? "Undo" : "Done",
+                            systemImage: task.done ? "arrow.uturn.backward" : "checkmark"
+                        )
+                    }
+                    .tint(.green)
+                }
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                if !readOnly {
+                    Button(role: .destructive) {
+                        Task {
+                            await appState.deleteTask(task)
+                        }
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+            }
+            .contextMenu {
+                if !readOnly {
+                    if !task.done {
+                        Menu {
+                            ForEach(QuickSchedule.options()) { option in
+                                Button {
+                                    guard let date = option.resolvedDate() else { return }
+                                    Task {
+                                        await appState.rescheduleTask(task, to: date)
+                                    }
+                                } label: {
+                                    Label(option.label, systemImage: option.systemImage)
+                                }
+                            }
+                        } label: {
+                            Label("Schedule", systemImage: "calendar")
+                        }
+                    }
+
+                    #if os(iOS)
                     if isFocused {
-                        focusManager.endFocus()
+                        Button {
+                            focusManager.endFocus()
+                        } label: {
+                            Label("End Focus", systemImage: "scope")
+                        }
                     } else {
-                        let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
-                        focusManager.switchFocus(task: task, projectName: projectName)
+                        Button {
+                            let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
+                            focusManager.switchFocus(task: task, projectName: projectName)
+                        } label: {
+                            Label("Focus", systemImage: "scope")
+                        }
                     }
-                } label: {
-                    Label(isFocused ? "End Focus" : "Start Focus", systemImage: "scope")
-                }
-                .tint(.orange)
-                #endif
+                    #endif
 
-                Button {
-                    Task { await appState.toggleTaskDone(task) }
-                } label: {
-                    Label(task.done ? "Undo" : "Done", systemImage: task.done ? "arrow.uturn.backward" : "checkmark")
-                }
-                .tint(.green)
-            }
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            if !readOnly {
-                Button(role: .destructive) {
-                    Task { await appState.deleteTask(task) }
-                } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-            }
-        }
-        .contextMenu {
-            if !readOnly {
-                if !task.done {
-                    Menu {
-                        ForEach(QuickSchedule.options()) { option in
-                            Button {
-                                guard let date = option.resolvedDate() else { return }
-                                Task { await appState.rescheduleTask(task, to: date) }
-                            } label: {
-                                Label(option.label, systemImage: option.systemImage)
-                            }
+                    Button {
+                        Task {
+                            await appState.toggleCurrent(task)
                         }
                     } label: {
-                        Label("Schedule", systemImage: "calendar")
+                        Label(
+                            appState.isCurrent(task) ? "Remove from Current" : "Mark as Current",
+                            systemImage: appState.isCurrent(task) ? "pin.slash" : "pin"
+                        )
                     }
-                }
 
-                #if os(iOS)
-                if isFocused {
-                    Button {
-                        focusManager.endFocus()
-                    } label: {
-                        Label("End Focus", systemImage: "scope")
-                    }
-                } else {
-                    Button {
-                        let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
-                        focusManager.switchFocus(task: task, projectName: projectName)
-                    } label: {
-                        Label("Start Focus", systemImage: "scope")
-                    }
-                }
-                #endif
-
-                Button {
-                    Task { await appState.toggleCurrent(task) }
-                } label: {
-                    Label(
-                        appState.isCurrent(task) ? "Remove from Current" : "Mark as Current",
-                        systemImage: appState.isCurrent(task) ? "pin.slash" : "pin"
-                    )
-                }
-
-                if appState.isCurrent(task) {
-                    Menu {
-                        ForEach(Self.progressSteps, id: \.self) { pct in
-                            Button("\(pct)%") {
-                                Task { await appState.setProgress(task, percent: Double(pct) / 100) }
+                    if appState.isCurrent(task) {
+                        Menu {
+                            ForEach(Self.progressSteps, id: \.self) { pct in
+                                Button("\(pct)%") {
+                                    Task {
+                                        await appState.setProgress(task, percent: Double(pct) / 100)
+                                    }
+                                }
                             }
+                        } label: {
+                            Label("Set Progress", systemImage: "chart.bar")
                         }
-                    } label: {
-                        Label("Set Progress", systemImage: "chart.bar")
                     }
                 }
             }
-        }
         #if os(iOS)
-        .sheet(isPresented: $showDetail) {
-            TaskDetailSheet(task: task)
-        }
+            .sheet(isPresented: $showDetail) {
+                TaskDetailSheet(task: task)
+            }
         #endif
     }
 
-    // EL SELECTOR MAESTRO DE ESTILOS
     @ViewBuilder
     private var rowContent: some View {
         switch currentStyle {
-        case .standard:
-            standardView
-        case .colorCircle:
-            colorCircleView
+        case .standard, .colorCircle:
+            compactRowView
         case .fullCard:
             fullCardView
         }
     }
-    
-    // --------------------------------------------------------
-    // 1. ESTILO ORIGINAL (STANDARD)
-    // --------------------------------------------------------
-    private var standardView: some View {
+
+    private var compactRowView: some View {
         HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 2)
                 .fill(priorityColor)
@@ -166,11 +185,15 @@ struct TaskRow: View {
                 .accessibilityHidden(true)
 
             Button {
-                Task { await appState.toggleTaskDone(task) }
+                Task {
+                    await appState.toggleTaskDone(task)
+                }
             } label: {
                 Image(systemName: task.done ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(task.done ? .green : standardCheckboxColor)
+                    .foregroundStyle(task
+                        .done ? (currentStyle == .colorCircle && hasCustomColor ? vikunjaColor.opacity(0.5) : .green) :
+                        (currentStyle == .colorCircle ? vikunjaColor : standardCheckboxColor))
                     .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(.plain)
@@ -182,43 +205,9 @@ struct TaskRow: View {
 
             Spacer()
 
-            if task.priority > 0 { PriorityBadge(priority: task.priorityLevel) }
-            focusIcon
-        }
-        .padding(.vertical, 4)
-        .opacity(task.done ? 0.6 : 1)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(taskAccessibilityLabel)
-    }
-    
-    // --------------------------------------------------------
-    // 2. ESTILO CIRCULO DE COLOR (Nuestra primera modificación)
-    // --------------------------------------------------------
-    private var colorCircleView: some View {
-        HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(priorityColor)
-                .frame(width: 4, height: 36)
-                .accessibilityHidden(true)
-
-            Button {
-                Task { await appState.toggleTaskDone(task) }
-            } label: {
-                Image(systemName: task.done ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(task.done ? ((task.hexColor != nil && task.hexColor != "") ? vikunjaColor.opacity(0.5) : .green) : vikunjaColor)
-                    .contentTransition(.symbolEffect(.replace))
+            if task.priority > 0 {
+                PriorityBadge(priority: task.priorityLevel)
             }
-            .buttonStyle(.plain)
-            .disabled(readOnly)
-            .accessibilityLabel(task.done ? "Mark \(task.title) as incomplete" : "Mark \(task.title) as complete")
-            .accessibilityAddTraits(.isToggle)
-
-            taskDetailsColumn
-
-            Spacer()
-
-            if task.priority > 0 { PriorityBadge(priority: task.priorityLevel) }
             focusIcon
         }
         .padding(.vertical, 4)
@@ -226,10 +215,7 @@ struct TaskRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(taskAccessibilityLabel)
     }
-    
-    // --------------------------------------------------------
-    // 3. ESTILO FULL CARD (Tarjeta completa tipo Vikunja iOS)
-    // --------------------------------------------------------
+
     private var fullCardView: some View {
         HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 2)
@@ -241,11 +227,15 @@ struct TaskRow: View {
 
             Spacer()
 
-            if task.priority > 0 { PriorityBadge(priority: task.priorityLevel) }
+            if task.priority > 0 {
+                PriorityBadge(priority: task.priorityLevel)
+            }
             focusIcon
 
             Button {
-                Task { await appState.toggleTaskDone(task) }
+                Task {
+                    await appState.toggleTaskDone(task)
+                }
             } label: {
                 Image(systemName: task.done ? "checkmark.circle.fill" : "circle")
                     .font(.title2)
@@ -265,7 +255,7 @@ struct TaskRow: View {
                     LinearGradient(
                         stops: [
                             .init(color: vikunjaColor.opacity(0.25), location: 0.0),
-                            .init(color: vikunjaColor.opacity(0.0), location: 0.7)
+                            .init(color: vikunjaColor.opacity(0.0), location: 0.7),
                         ],
                         startPoint: .leading,
                         endPoint: .trailing
@@ -276,18 +266,12 @@ struct TaskRow: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(vikunjaColor.opacity(0.3), lineWidth: 1)
         }
-        #if os(macOS)
-        .listRowBackground(Color.clear)
-        #endif
         .padding(.vertical, 4)
         .opacity(task.done ? 0.5 : 1)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(taskAccessibilityLabel)
     }
 
-    // --------------------------------------------------------
-    // COLUMNA CENTRAL (Compartida por todos los estilos para no duplicar código)
-    // --------------------------------------------------------
     private var taskDetailsColumn: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(task.title)
@@ -336,8 +320,7 @@ struct TaskRow: View {
             }
         }
     }
-    
-    // Icono de enfoque de iOS extraído para evitar repeticiones
+
     @ViewBuilder
     private var focusIcon: some View {
         #if os(iOS)
@@ -351,19 +334,24 @@ struct TaskRow: View {
         #endif
     }
 
-    // --------------------------------------------------------
-    // MÉTODOS DE SOPORTE DE ACCESIBILIDAD Y COLORES
-    // --------------------------------------------------------
     private var taskAccessibilityLabel: String {
         var parts: [String] = []
         parts.append(task.title)
-        if task.done { parts.append("completed") }
-        if task.priority > 0 { parts.append("priority \(task.priorityLevel.label)") }
+        if task.done {
+            parts.append("completed")
+        }
+        if task.priority > 0 {
+            parts.append("priority \(task.priorityLevel.label)")
+        }
         if let dueDate = task.effectiveDueDate {
-            if task.isOverdue { parts.append("overdue") }
+            if task.isOverdue {
+                parts.append("overdue")
+            }
             parts.append("due \(dueDate.formatted(date: .abbreviated, time: .omitted))")
         }
-        if task.isRepeating, let desc = task.repeatDescription { parts.append("repeats \(desc)") }
+        if task.isRepeating, let desc = task.repeatDescription {
+            parts.append("repeats \(desc)")
+        }
         if let labels = task.labels, !labels.isEmpty {
             let labelNames = labels.prefix(3).map(\.title).joined(separator: ", ")
             parts.append("labels: \(labelNames)")
@@ -371,6 +359,7 @@ struct TaskRow: View {
         return parts.joined(separator: ", ")
     }
 
+    /// Number of days since the task was last updated, or nil if under the stall threshold.
     private var stalledDays: Int? {
         guard let updated = task.updated else { return nil }
         let days = Calendar.current.dateComponents([.day], from: updated, to: Date()).day ?? 0
@@ -391,14 +380,19 @@ struct TaskRow: View {
         task.priorityLevel == .none ? .gray : priorityColor
     }
 
+    private var hasCustomColor: Bool {
+        task.hexColor != nil && !task.hexColor!.isEmpty
+    }
+
     private var vikunjaColor: Color {
-        if let hexString = task.hexColor, !hexString.isEmpty {
-            return Color(hex: hexString)
+        if hasCustomColor {
+            return Color(hex: task.hexColor!)
         }
         return standardCheckboxColor
     }
 }
 
+/// A progress bar for Current tasks, showing completion percentage and an optional stall badge.
 struct CurrentProgressIndicator: View {
     let percent: Double
     let stalledDays: Int?
@@ -432,7 +426,9 @@ struct CurrentProgressIndicator: View {
 
     private var accessibilityText: String {
         var parts = ["\(Int((percent * 100).rounded())) percent complete"]
-        if let stalledDays { parts.append("idle \(stalledDays) days") }
+        if let stalledDays {
+            parts.append("idle \(stalledDays) days")
+        }
         return parts.joined(separator: ", ")
     }
 }

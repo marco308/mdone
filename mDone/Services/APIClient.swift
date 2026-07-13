@@ -17,6 +17,9 @@ actor APIClient {
     private let baseRetryDelay: UInt64 = 1_000_000_000 // 1 second in nanoseconds
     private static let refreshCookieName = "vikunja_refresh_token"
 
+    private static let fractionalFormat = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+    private static let standardFormat = Date.ISO8601FormatStyle()
+
     /// Fired when the access token (and optionally its refresh cookie) change
     /// because of a `/login` response or a refresh-on-401. Callers should
     /// persist both to the keychain so the new credentials survive relaunch.
@@ -38,33 +41,26 @@ actor APIClient {
         self.session = session
 
         decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                
-                decoder.dateDecodingStrategy = .custom { decoder in
-                    let container = try decoder.singleValueContainer()
-                    let dateString = try container.decode(String.self)
-                    
-                    if dateString == "0001-01-01T00:00:00Z" {
-                        return Date.distantPast
-                    }
-                    
-                    // Instanciamos los formateadores dentro del closure para evitar la advertencia de "non-Sendable"
-                    let dateFormatter = ISO8601DateFormatter()
-                    dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                    
-                    if let date = dateFormatter.date(from: dateString) {
-                        return date
-                    }
-                    
-                    let fallbackFormatter = ISO8601DateFormatter()
-                    fallbackFormatter.formatOptions = [.withInternetDateTime]
-                    
-                    if let date = fallbackFormatter.date(from: dateString) {
-                        return date
-                    }
-                    
-                    throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date: \(dateString)")
-                }
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+
+            if dateString == "0001-01-01T00:00:00Z" {
+                return Date.distantPast
+            }
+
+            if let date = try? Self.fractionalFormat.parse(dateString) {
+                return date
+            }
+
+            if let date = try? Self.standardFormat.parse(dateString) {
+                return date
+            }
+
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date: \(dateString)")
+        }
 
         encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
@@ -94,10 +90,14 @@ actor APIClient {
     }
 
     /// Test/inspection hook for the currently stored refresh token.
-    func currentRefreshToken() -> String? { refreshToken }
+    func currentRefreshToken() -> String? {
+        refreshToken
+    }
 
     /// Test/inspection hook for the currently stored access token.
-    func currentToken() -> String? { apiToken }
+    func currentToken() -> String? {
+        apiToken
+    }
 
     private func buildRequest(for endpoint: Endpoint) throws -> URLRequest {
         guard let serverURL else { throw NetworkError.invalidURL }
@@ -333,7 +333,7 @@ actor APIClient {
         // which would have masked a real bug.
         let task = Task<Void, Error> { [self] in
             defer { self.inFlightRefresh = nil }
-            try await self.performRefresh()
+            try await performRefresh()
         }
         inFlightRefresh = task
         try await task.value

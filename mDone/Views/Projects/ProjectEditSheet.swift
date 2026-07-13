@@ -70,7 +70,9 @@ struct ProjectEditSheet: View {
                     }
                 }
                 .onAppear {
-                    if !isEditing { titleFocused = true }
+                    if !isEditing {
+                        titleFocused = true
+                    }
                 }
         }
         #if os(macOS)

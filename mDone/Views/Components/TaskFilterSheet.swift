@@ -6,8 +6,8 @@ struct TaskFilterSheet: View {
 
     @State private var selectedPriority: PriorityLevel? = nil
     @State private var selectedDateRange: DateRangeOption = .any
-    @State private var customStartDate: Date = Date()
-    @State private var customEndDate: Date = Date().addingTimeInterval(7.0 * 24.0 * 3600.0)
+    @State private var customStartDate: Date = .init()
+    @State private var customEndDate: Date = .init().addingTimeInterval(7.0 * 24.0 * 3600.0)
     @State private var doneFilter: DoneFilter = .undone
     @State private var selectedProjectId: Int64? = nil
 
@@ -131,16 +131,28 @@ struct TaskFilterSheet: View {
         case .today:
             let startOfDay = calendar.startOfDay(for: now)
             let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
-            parts.append("due_date > \"\(Self.isoString(from: startOfDay))\" && due_date < \"\(Self.isoString(from: endOfDay))\"")
+            parts
+                .append(
+                    "due_date > \"\(Self.isoString(from: startOfDay))\" && due_date < \"\(Self.isoString(from: endOfDay))\""
+                )
         case .thisWeek:
             let weekEnd = calendar.date(byAdding: .day, value: 7, to: now) ?? now
-            parts.append("due_date > \"\(Self.isoString(from: now))\" && due_date < \"\(Self.isoString(from: weekEnd))\"")
+            parts
+                .append(
+                    "due_date > \"\(Self.isoString(from: now))\" && due_date < \"\(Self.isoString(from: weekEnd))\""
+                )
         case .thisMonth:
             // Actual calendar-month boundary: now → start of next month.
             let monthEnd = calendar.dateInterval(of: .month, for: now)?.end ?? now
-            parts.append("due_date > \"\(Self.isoString(from: now))\" && due_date < \"\(Self.isoString(from: monthEnd))\"")
+            parts
+                .append(
+                    "due_date > \"\(Self.isoString(from: now))\" && due_date < \"\(Self.isoString(from: monthEnd))\""
+                )
         case .custom:
-            parts.append("due_date > \"\(Self.isoString(from: customStartDate))\" && due_date < \"\(Self.isoString(from: customEndDate))\"")
+            parts
+                .append(
+                    "due_date > \"\(Self.isoString(from: customStartDate))\" && due_date < \"\(Self.isoString(from: customEndDate))\""
+                )
         }
 
         switch doneFilter {

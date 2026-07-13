@@ -129,7 +129,7 @@ final class CalendarSelectionTests: XCTestCase {
             event("1", calendar: "work"),
             event("2", calendar: "home"),
             event("3", calendar: "spam"),
-            event("4", calendar: "home")
+            event("4", calendar: "home"),
         ]
         XCTAssertEqual(store.visibleEvents(events).map(\.id), ["2", "4"])
     }

@@ -23,7 +23,9 @@ struct FocusHistoryRow: View {
                 Text(summary)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                    .accessibilityLabel("Focused \(accessibleDuration), \(records.count) \(records.count == 1 ? "session" : "sessions")")
+                    .accessibilityLabel(
+                        "Focused \(accessibleDuration), \(records.count) \(records.count == 1 ? "session" : "sessions")"
+                    )
             }
         }
     }

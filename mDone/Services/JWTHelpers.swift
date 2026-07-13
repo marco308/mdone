@@ -7,7 +7,9 @@ enum JWTHelpers {
     /// Vikunja API tokens (created in the user's settings UI) start with `tk_`
     /// and are non-expiring. Anything else returned by `/api/v1/login` is a JWT.
     static func isJWT(_ token: String) -> Bool {
-        if token.hasPrefix("tk_") { return false }
+        if token.hasPrefix("tk_") {
+            return false
+        }
         let segments = token.split(separator: ".", omittingEmptySubsequences: false)
         guard segments.count == 3 else { return false }
         return decodePayload(segments[1]) != nil

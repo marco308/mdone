@@ -239,7 +239,9 @@ final class WidgetDataProvider: @unchecked Sendable {
     /// Returns nil for Vikunja's zero-date sentinel (year <= 1).
     private func effectiveDate(_ date: Date?) -> Date? {
         guard let date else { return nil }
-        if Calendar.current.component(.year, from: date) <= 1 { return nil }
+        if Calendar.current.component(.year, from: date) <= 1 {
+            return nil
+        }
         return date
     }
 

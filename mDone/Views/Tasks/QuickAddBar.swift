@@ -100,7 +100,6 @@ struct QuickAddBar: View {
 
     /// Subtle, dismissible hint. Tapping the body fills the estimate field;
     /// tapping the X dismisses for this title. Never auto-fills, never blocks.
-    @ViewBuilder
     private func suggestionHint(_ s: EstimateSuggestion) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "sparkle.magnifyingglass")
@@ -167,14 +166,18 @@ struct QuickAddBar: View {
         // concurrency. Cross-actor at the boundary, not inside the hot path.
         debounceTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(250))
-            if Task.isCancelled { return }
+            if Task.isCancelled {
+                return
+            }
             let history = FocusHistoryQuery.historicalTasks(in: modelContext)
             let result = EstimateSuggester.suggestion(
                 for: trimmed,
                 history: history,
                 projectId: projectId
             )
-            if Task.isCancelled { return }
+            if Task.isCancelled {
+                return
+            }
             suggestion = result
             suggestionForTitle = result == nil ? nil : trimmed
         }

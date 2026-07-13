@@ -68,9 +68,14 @@ final class FocusOutboxService {
 
         while batchesProcessed < maxBatches {
             let records = fetchPending()
-            if records.isEmpty { return }
+            if records.isEmpty {
+                return
+            }
 
-            logger.info("Draining batch of \(records.count) pending focus record(s) → \(url.absoluteString, privacy: .public)")
+            logger
+                .info(
+                    "Draining batch of \(records.count) pending focus record(s) → \(url.absoluteString, privacy: .public)"
+                )
 
             for record in records {
                 let outcome = await deliver(record, to: url, token: token)
@@ -78,15 +83,18 @@ final class FocusOutboxService {
                 case .accepted:
                     record.deliveredAt = Date()
                     try? modelContainer.mainContext.save()
-                case .rateLimited(let retryAfter):
+                case let .rateLimited(retryAfter):
                     rateLimitedUntil = Date().addingTimeInterval(retryAfter)
                     logger.notice("Rate-limited, backing off \(retryAfter)s")
                     return
                 case .authFailed:
                     logger.error("focus-service rejected token (401/403). Pausing drain — user must fix settings.")
                     return
-                case .schemaRejected(let body):
-                    logger.error("focus-service rejected payload (422): \(body, privacy: .public). Discarding record clientId=\(record.clientId ?? "<nil>", privacy: .public) — schema drift requires a code fix, not a retry.")
+                case let .schemaRejected(body):
+                    logger
+                        .error(
+                            "focus-service rejected payload (422): \(body, privacy: .public). Discarding record clientId=\(record.clientId ?? "<nil>", privacy: .public) — schema drift requires a code fix, not a retry."
+                        )
                     record.discardedAt = Date()
                     try? modelContainer.mainContext.save()
                 case .transient:
@@ -206,7 +214,9 @@ final class FocusOutboxService {
 
     private func parseRetryAfter(_ response: HTTPURLResponse) -> TimeInterval? {
         guard let raw = response.value(forHTTPHeaderField: "Retry-After") else { return nil }
-        if let seconds = TimeInterval(raw) { return seconds }
+        if let seconds = TimeInterval(raw) {
+            return seconds
+        }
         // HTTP-date form — rare from slowapi, but support for robustness.
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")

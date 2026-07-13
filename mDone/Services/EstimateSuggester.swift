@@ -111,7 +111,9 @@ enum EstimateSuggester {
         scored.reserveCapacity(history.count)
         for task in history {
             let candTokens = tokenize(task.title)
-            if candTokens.isEmpty { continue }
+            if candTokens.isEmpty {
+                continue
+            }
             let tri = dice(queryTrigrams, trigrams(from: candTokens))
             let tok = jaccard(queryTokenSet, Set(candTokens))
             var score = trigramWeight * tri + tokenWeight * tok
@@ -137,7 +139,9 @@ enum EstimateSuggester {
         // Deterministic ordering: score desc, then shorter duration first as a
         // stable tie-break so identical inputs always yield the same answer.
         scored.sort { lhs, rhs in
-            if lhs.score != rhs.score { return lhs.score > rhs.score }
+            if lhs.score != rhs.score {
+                return lhs.score > rhs.score
+            }
             return lhs.seconds < rhs.seconds
         }
 
@@ -177,7 +181,7 @@ enum EstimateSuggester {
         guard chars.count >= 3 else { return chars.isEmpty ? [] : [String(chars)] }
         var set = Set<String>()
         set.reserveCapacity(chars.count)
-        for i in 0...(chars.count - 3) {
+        for i in 0 ... (chars.count - 3) {
             set.insert(String(chars[i ..< i + 3]))
         }
         return set
@@ -185,15 +189,21 @@ enum EstimateSuggester {
 
     /// Sørensen–Dice coefficient: 2·|A∩B| / (|A|+|B|). 1 == identical sets.
     static func dice(_ a: Set<String>, _ b: Set<String>) -> Double {
-        if a.isEmpty, b.isEmpty { return 1 }
-        if a.isEmpty || b.isEmpty { return 0 }
+        if a.isEmpty, b.isEmpty {
+            return 1
+        }
+        if a.isEmpty || b.isEmpty {
+            return 0
+        }
         let inter = a.intersection(b).count
         return (2.0 * Double(inter)) / Double(a.count + b.count)
     }
 
     /// Jaccard index over token sets: |A∩B| / |A∪B|.
     static func jaccard(_ a: Set<String>, _ b: Set<String>) -> Double {
-        if a.isEmpty, b.isEmpty { return 1 }
+        if a.isEmpty, b.isEmpty {
+            return 1
+        }
         let union = a.union(b).count
         guard union > 0 else { return 0 }
         return Double(a.intersection(b).count) / Double(union)

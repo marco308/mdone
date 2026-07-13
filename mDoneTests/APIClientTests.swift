@@ -4,7 +4,10 @@ import XCTest
 final class APIClientTests: XCTestCase {
     // MARK: - Model Decoding Tests
 
-    func testVTaskDecoding() throws {
+    func testVTaskDecoding() async throws {
+        let client = makeTestClient()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+
         let json = """
         {
             "id": 1,
@@ -22,20 +25,12 @@ final class APIClientTests: XCTestCase {
         }
         """.data(using: .utf8)!
 
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        decoder.dateDecodingStrategy = .custom { decoder in
-            let container = try decoder.singleValueContainer()
-            let dateString = try container.decode(String.self)
-            if let date = isoFormatter.date(from: dateString) {
-                return date
-            }
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid date: \(dateString)")
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
+            return (response, json)
         }
 
-        let task = try decoder.decode(VTask.self, from: json)
+        let task: VTask = try await client.fetch(Endpoint.task(id: 1))
         XCTAssertEqual(task.id, 1)
         XCTAssertEqual(task.title, "Buy groceries")
         XCTAssertEqual(task.description, "Milk, eggs, bread")
@@ -47,7 +42,10 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(task.percentDone, 0.5)
     }
 
-    func testProjectDecoding() throws {
+    func testProjectDecoding() async throws {
+        let client = makeTestClient()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+
         let json = """
         {
             "id": 1,
@@ -62,20 +60,16 @@ final class APIClientTests: XCTestCase {
         }
         """.data(using: .utf8)!
 
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        decoder.dateDecodingStrategy = .custom { decoder in
-            let container = try decoder.singleValueContainer()
-            let dateString = try container.decode(String.self)
-            if let date = isoFormatter.date(from: dateString) {
-                return date
-            }
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid date: \(dateString)")
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
+            return (response, json)
         }
 
-        let project = try decoder.decode(Project.self, from: json)
+        // We use a dummy fetch since we just want to test decoding.
+        // There is no explicit project(id:) endpoint in Endpoint.swift in our snippet,
+        // but we can use currentUser and decode Project if it's generic, or just use send/fetch with a dummy endpoint.
+        // Wait, client.fetch is generic. We can just use an arbitrary endpoint that returns T.
+        let project: Project = try await client.fetch(Endpoint.currentUser)
         XCTAssertEqual(project.id, 1)
         XCTAssertEqual(project.title, "Work")
         XCTAssertEqual(project.hexColor, "#4772FA")
@@ -83,7 +77,10 @@ final class APIClientTests: XCTestCase {
         XCTAssertFalse(project.isArchived ?? false)
     }
 
-    func testLabelDecoding() throws {
+    func testLabelDecoding() async throws {
+        let client = makeTestClient()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+
         let json = """
         {
             "id": 5,
@@ -95,26 +92,21 @@ final class APIClientTests: XCTestCase {
         }
         """.data(using: .utf8)!
 
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        decoder.dateDecodingStrategy = .custom { decoder in
-            let container = try decoder.singleValueContainer()
-            let dateString = try container.decode(String.self)
-            if let date = isoFormatter.date(from: dateString) {
-                return date
-            }
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid date: \(dateString)")
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
+            return (response, json)
         }
 
-        let label = try decoder.decode(VLabel.self, from: json)
+        let label: VLabel = try await client.fetch(Endpoint.currentUser)
         XCTAssertEqual(label.id, 5)
         XCTAssertEqual(label.title, "Bug")
         XCTAssertEqual(label.hexColor, "#FF0000")
     }
 
-    func testUserDecoding() throws {
+    func testUserDecoding() async throws {
+        let client = makeTestClient()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+
         let json = """
         {
             "id": 1,
@@ -126,20 +118,12 @@ final class APIClientTests: XCTestCase {
         }
         """.data(using: .utf8)!
 
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        decoder.dateDecodingStrategy = .custom { decoder in
-            let container = try decoder.singleValueContainer()
-            let dateString = try container.decode(String.self)
-            if let date = isoFormatter.date(from: dateString) {
-                return date
-            }
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid date: \(dateString)")
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
+            return (response, json)
         }
 
-        let user = try decoder.decode(User.self, from: json)
+        let user: User = try await client.fetch(Endpoint.currentUser)
         XCTAssertEqual(user.id, 1)
         XCTAssertEqual(user.username, "testuser")
         XCTAssertEqual(user.name, "Test User")

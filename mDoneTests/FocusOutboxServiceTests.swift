@@ -38,7 +38,7 @@ final class FocusOutboxServiceTests: XCTestCase {
 
     // MARK: - Happy path
 
-    func testDrainPostsAndMarksDelivered() async throws {
+    func testDrainPostsAndMarksDelivered() async {
         let record = insertRecord(taskId: 1)
         MockURLProtocol.requestHandler = { _ in
             let body = Data(#"{"id":1,"received_at":"2026-05-16T10:00:00Z","duplicate":false}"#.utf8)
@@ -89,7 +89,7 @@ final class FocusOutboxServiceTests: XCTestCase {
 
     // MARK: - Backfill of pre-outbox records
 
-    func testBackfillsExistingRecordsWithoutClientId() async throws {
+    func testBackfillsExistingRecordsWithoutClientId() async {
         let r1 = insertRecord(taskId: 10, clientId: nil)
         let r2 = insertRecord(taskId: 11, clientId: nil)
         let r3 = insertRecord(taskId: 12, clientId: nil)
@@ -107,7 +107,7 @@ final class FocusOutboxServiceTests: XCTestCase {
         }
     }
 
-    func testAlreadyDeliveredRecordsNotResent() async throws {
+    func testAlreadyDeliveredRecordsNotResent() async {
         _ = insertRecord(taskId: 20, deliveredAt: Date())
         _ = insertRecord(taskId: 21, deliveredAt: nil)
 
@@ -122,7 +122,7 @@ final class FocusOutboxServiceTests: XCTestCase {
 
     // MARK: - Error handling
 
-    func testRateLimitedHaltsDrain() async throws {
+    func testRateLimitedHaltsDrain() async {
         _ = insertRecord(taskId: 30)
         _ = insertRecord(taskId: 31)
         var calls = 0
@@ -137,7 +137,7 @@ final class FocusOutboxServiceTests: XCTestCase {
         XCTAssertEqual(calls, 1, "Drain must stop after a 429, not hammer the server")
     }
 
-    func testRateLimitedSubsequentDrainSkipsUntilCooldown() async throws {
+    func testRateLimitedSubsequentDrainSkipsUntilCooldown() async {
         _ = insertRecord(taskId: 40)
         MockURLProtocol.requestHandler = { _ in
             (MockURLProtocol.makeResponse(statusCode: 429, headers: ["Retry-After": "60"]), Data())
@@ -151,7 +151,7 @@ final class FocusOutboxServiceTests: XCTestCase {
         XCTAssertEqual(MockURLProtocol.capturedRequests.count, firstCallCount)
     }
 
-    func testAuthFailureStopsDrainWithoutMarkingDelivered() async throws {
+    func testAuthFailureStopsDrainWithoutMarkingDelivered() async {
         let record = insertRecord(taskId: 50)
         MockURLProtocol.requestHandler = { _ in
             (MockURLProtocol.makeResponse(statusCode: 401), Data())
@@ -163,7 +163,7 @@ final class FocusOutboxServiceTests: XCTestCase {
         XCTAssertEqual(MockURLProtocol.capturedRequests.count, 1)
     }
 
-    func testSchemaRejectionDiscardsRecordAndContinues() async throws {
+    func testSchemaRejectionDiscardsRecordAndContinues() async {
         let bad = insertRecord(taskId: 60)
         let good = insertRecord(taskId: 61)
         var seenTaskIds: [Int] = []
@@ -188,7 +188,7 @@ final class FocusOutboxServiceTests: XCTestCase {
         XCTAssertNotNil(good.deliveredAt)
     }
 
-    func testDiscardedRecordsNotRetriedOnSubsequentDrain() async throws {
+    func testDiscardedRecordsNotRetriedOnSubsequentDrain() async {
         // First drain: get a 422, record gets discarded.
         let record = insertRecord(taskId: 65)
         MockURLProtocol.requestHandler = { _ in
@@ -210,7 +210,7 @@ final class FocusOutboxServiceTests: XCTestCase {
 
     // MARK: - Multi-batch drain
 
-    func testDrainLoopsAcrossMultipleBatches() async throws {
+    func testDrainLoopsAcrossMultipleBatches() async {
         // Insert more than one batch worth of records (51 > batchSize 50).
         // A single-batch implementation would only deliver the first 50.
         let total = 55
@@ -223,10 +223,14 @@ final class FocusOutboxServiceTests: XCTestCase {
 
         await outbox.drain()
 
-        XCTAssertEqual(MockURLProtocol.capturedRequests.count, total, "Drain must continue across batches until pending is empty")
+        XCTAssertEqual(
+            MockURLProtocol.capturedRequests.count,
+            total,
+            "Drain must continue across batches until pending is empty"
+        )
     }
 
-    func testTransientServerErrorStopsButLeavesRecordPending() async throws {
+    func testTransientServerErrorStopsButLeavesRecordPending() async {
         let record = insertRecord(taskId: 70)
         MockURLProtocol.requestHandler = { _ in
             (MockURLProtocol.makeResponse(statusCode: 502), Data())
@@ -239,7 +243,7 @@ final class FocusOutboxServiceTests: XCTestCase {
 
     // MARK: - Unconfigured / no-op
 
-    func testUnconfiguredDrainIsNoOp() async throws {
+    func testUnconfiguredDrainIsNoOp() async {
         FocusSyncConfig.clearServerURL()
         FocusSyncConfig.deleteToken()
         _ = insertRecord(taskId: 80)
@@ -290,7 +294,9 @@ private extension URLRequest {
         defer { buffer.deallocate() }
         while stream.hasBytesAvailable {
             let read = stream.read(buffer, maxLength: bufferSize)
-            if read <= 0 { break }
+            if read <= 0 {
+                break
+            }
             data.append(buffer, count: read)
         }
         return data.isEmpty ? nil : data

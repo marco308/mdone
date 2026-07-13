@@ -186,7 +186,7 @@ final class TaskServiceTests: XCTestCase {
 
     // MARK: - VTask isOverdue end-of-day grace
 
-    func testDateOnlyTaskDueTodayIsNotOverdue() throws {
+    func testDateOnlyTaskDueTodayIsNotOverdue() {
         let calendar = Calendar.current
         let midnightToday = calendar.startOfDay(for: Date())
         let task = VTask(id: 1, title: "All-day today", done: false, dueDate: midnightToday, priority: 0, projectId: 1)
@@ -205,7 +205,11 @@ final class TaskServiceTests: XCTestCase {
         let calendar = Calendar.current
         let pastNoon = try XCTUnwrap(calendar.date(bySettingHour: 12, minute: 30, second: 0, of: Date()))
         // If the test happens to run before 12:30 local time, push to yesterday so the task is definitively overdue.
-        let dueDate = pastNoon < Date() ? pastNoon : try XCTUnwrap(calendar.date(byAdding: .day, value: -1, to: pastNoon))
+        let dueDate = pastNoon < Date() ? pastNoon : try XCTUnwrap(calendar.date(
+            byAdding: .day,
+            value: -1,
+            to: pastNoon
+        ))
         let task = VTask(id: 1, title: "Timed", done: false, dueDate: dueDate, priority: 0, projectId: 1)
         XCTAssertTrue(task.hasSpecificTime)
         XCTAssertTrue(task.isOverdue)

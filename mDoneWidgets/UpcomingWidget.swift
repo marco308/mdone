@@ -84,7 +84,9 @@ struct UpcomingWidgetView: View {
     let entry: UpcomingTasksEntry
     @Environment(\.widgetFamily) var family
 
-    private var fontSize: WidgetFontSize { entry.configuration.fontSize }
+    private var fontSize: WidgetFontSize {
+        entry.configuration.fontSize
+    }
 
     private var maxRows: Int {
         switch (family, fontSize) {

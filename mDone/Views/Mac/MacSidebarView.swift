@@ -220,7 +220,11 @@ struct MacSidebarView: View {
             "Delete \(projectPendingDelete?.title ?? "")?",
             isPresented: Binding(
                 get: { projectPendingDelete != nil },
-                set: { if !$0 { projectPendingDelete = nil } }
+                set: {
+                    if !$0 {
+                        projectPendingDelete = nil
+                    }
+                }
             ),
             titleVisibility: .visible,
             presenting: projectPendingDelete

@@ -55,7 +55,7 @@ final class FocusHistoryTests: XCTestCase {
         XCTAssertTrue(records.isEmpty, "Sub-second sessions should be dropped")
     }
 
-    func testPersistWithoutContainerIsNoOp() throws {
+    func testPersistWithoutContainerIsNoOp() {
         // FocusManager built with no container (e.g. a unit test path that never wired
         // SwiftData) should silently no-op rather than crash.
         let manager = FocusManager(modelContainer: nil)

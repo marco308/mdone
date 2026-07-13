@@ -12,50 +12,48 @@ struct DayTaskList: View {
     @ScaledMetric(relativeTo: .title) private var emptyIconSize: CGFloat = 36
 
     var body: some View {
-        Group {
-            if isEmpty {
-                VStack(spacing: 12) {
-                    Spacer()
-                    Image(systemName: "calendar.badge.checkmark")
-                        .font(.system(size: emptyIconSize))
-                        .foregroundStyle(.secondary)
-                        .accessibilityHidden(true)
-                    Text("No tasks or events for this day")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity)
-            } else {
-                List {
-                    if !tasks.isEmpty {
-                        Section {
-                            ForEach(tasks) { task in
-                                TaskRow(task: task)
-                            }
-                        } header: {
-                            Text(date, format: .dateTime.weekday(.wide).month(.wide).day())
-                                .font(.caption)
-                                .textCase(.uppercase)
-                        }
-                    }
-
-                    if !calendarEvents.isEmpty {
-                        Section {
-                            ForEach(calendarEvents) { event in
-                                CalendarEventRow(event: event)
-                            }
-                        } header: {
-                            Label("Calendar", systemImage: "calendar")
-                                .font(.caption)
-                                .textCase(.uppercase)
-                        }
-                    }
-                }
-                #if os(iOS)
-                .listStyle(.insetGrouped)
-                #endif
+        if isEmpty {
+            VStack(spacing: 12) {
+                Spacer()
+                Image(systemName: "calendar.badge.checkmark")
+                    .font(.system(size: emptyIconSize))
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                Text("No tasks or events for this day")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Spacer()
             }
+            .frame(maxWidth: .infinity)
+        } else {
+            List {
+                if !tasks.isEmpty {
+                    Section {
+                        ForEach(tasks) { task in
+                            TaskRow(task: task)
+                        }
+                    } header: {
+                        Text(date, format: .dateTime.weekday(.wide).month(.wide).day())
+                            .font(.caption)
+                            .textCase(.uppercase)
+                    }
+                }
+
+                if !calendarEvents.isEmpty {
+                    Section {
+                        ForEach(calendarEvents) { event in
+                            CalendarEventRow(event: event)
+                        }
+                    } header: {
+                        Label("Calendar", systemImage: "calendar")
+                            .font(.caption)
+                            .textCase(.uppercase)
+                    }
+                }
+            }
+            #if os(iOS)
+            .listStyle(.insetGrouped)
+            #endif
         }
     }
 }

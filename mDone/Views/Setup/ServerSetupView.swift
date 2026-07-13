@@ -169,7 +169,9 @@ struct ServerSetupView: View {
     }
 
     private var isFormIncomplete: Bool {
-        if serverURL.isEmpty { return true }
+        if serverURL.isEmpty {
+            return true
+        }
         if authMode == .credentials {
             return username.isEmpty || password.isEmpty
         } else {

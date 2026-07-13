@@ -13,7 +13,7 @@ enum WidgetFontSize: String, AppEnum {
     static var caseDisplayRepresentations: [WidgetFontSize: DisplayRepresentation] = [
         .compact: "Compact",
         .standard: "Standard",
-        .large: "Large"
+        .large: "Large",
     ]
 }
 
@@ -26,7 +26,7 @@ enum TodayTaskFilterMode: String, AppEnum {
     static var caseDisplayRepresentations: [TodayTaskFilterMode: DisplayRepresentation] = [
         .todayAndOverdue: "Today + Overdue",
         .todayOnly: "Today Only",
-        .overdueOnly: "Overdue Only"
+        .overdueOnly: "Overdue Only",
     ]
 }
 

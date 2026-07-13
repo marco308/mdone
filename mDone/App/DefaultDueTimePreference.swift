@@ -21,7 +21,9 @@ enum DefaultDueTimePreference: Int, CaseIterable, Identifiable {
     /// Matches Vikunja's web frontend, which defaults same-day tasks to 18:00.
     static let defaultRawValue: Int = sixPM.rawValue
 
-    var id: Int { rawValue }
+    var id: Int {
+        rawValue
+    }
 
     var label: String {
         switch self {
@@ -34,8 +36,13 @@ enum DefaultDueTimePreference: Int, CaseIterable, Identifiable {
         }
     }
 
-    var hour: Int { rawValue / 100 }
-    var minute: Int { rawValue % 100 }
+    var hour: Int {
+        rawValue / 100
+    }
+
+    var minute: Int {
+        rawValue % 100
+    }
 
     /// Reads the user's stored preference, falling back to `defaultRawValue`
     /// when nothing has been set or the stored value is unrecognised. The

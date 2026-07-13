@@ -355,7 +355,7 @@ final class FocusManager {
         sharedDefaults.removeObject(forKey: FocusConstants.focusSessionKey)
     }
 
-    // Internal (not private) so unit tests can drive it without going through ActivityKit.
+    /// Internal (not private) so unit tests can drive it without going through ActivityKit.
     func persistCompletedSession(
         _ session: FocusSession,
         endedAt: Date,

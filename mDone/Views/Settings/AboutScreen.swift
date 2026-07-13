@@ -54,18 +54,20 @@ struct AboutScreen: View {
                 } header: {
                     Text("Support mDone")
                 } footer: {
-                    Text("mDone is built and maintained by one person. If it's useful to you, a tip or sponsorship helps keep it going.")
+                    Text(
+                        "mDone is built and maintained by one person. If it's useful to you, a tip or sponsorship helps keep it going."
+                    )
                 }
             }
             .navigationTitle("About")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(.inline)
             #endif
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                    }
                 }
-            }
         }
         #if os(macOS)
         .frame(minWidth: 420, minHeight: 480)

@@ -538,7 +538,9 @@ final class AppState {
     /// response drive them.
     static func preservingRelations(existing: VTask, response: VTask) -> VTask {
         var result = response
-        if result.labels == nil { result.labels = existing.labels }
+        if result.labels == nil {
+            result.labels = existing.labels
+        }
         return result
     }
 
@@ -725,7 +727,9 @@ final class AppState {
     /// exist yet. Persists the id so it survives a later rename.
     @MainActor
     private func ensureCurrentLabel() async throws -> VLabel {
-        if let existing = currentLabel { return existing }
+        if let existing = currentLabel {
+            return existing
+        }
         let created = try await labelService.createLabel(
             LabelCreateRequest(title: Self.currentLabelTitle, hexColor: "1a8cff")
         )
@@ -1040,7 +1044,9 @@ final class AppState {
             } else {
                 archivedProjects.append(project)
             }
-            if selectedProject?.id == project.id { selectedProject = nil }
+            if selectedProject?.id == project.id {
+                selectedProject = nil
+            }
         } else {
             archivedProjects.removeAll { $0.id == project.id }
             if let idx = projects.firstIndex(where: { $0.id == project.id }) {
@@ -1048,7 +1054,9 @@ final class AppState {
             } else {
                 projects.append(project)
             }
-            if selectedProject?.id == project.id { selectedProject = project }
+            if selectedProject?.id == project.id {
+                selectedProject = project
+            }
         }
     }
 

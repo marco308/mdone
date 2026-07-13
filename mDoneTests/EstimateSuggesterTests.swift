@@ -27,14 +27,14 @@ final class EstimateSuggesterTests: XCTestCase {
 
     // MARK: - Identical & near titles
 
-    func testIdenticalTitleScoresOneAndReturnsItsDuration() {
+    func testIdenticalTitleScoresOneAndReturnsItsDuration() throws {
         let history = [HistoricalTask(title: "Write the quarterly report", actualSeconds: 3600)]
         let s = EstimateSuggester.suggestion(for: "Write the quarterly report", history: history)
         let result = try? XCTUnwrap(s)
         XCTAssertNotNil(result)
-        XCTAssertEqual(s!.topScore, 1.0, accuracy: 0.0001)
-        XCTAssertEqual(s!.suggestedSeconds, 3600)
-        XCTAssertEqual(s!.matchCount, 1)
+        XCTAssertEqual(try XCTUnwrap(s?.topScore), 1.0, accuracy: 0.0001)
+        XCTAssertEqual(s?.suggestedSeconds, 3600)
+        XCTAssertEqual(s?.matchCount, 1)
     }
 
     func testReorderedAndPaddedWordsStillMatch() {
@@ -55,7 +55,7 @@ final class EstimateSuggesterTests: XCTestCase {
     func testRankingPrefersTheMoreSimilarTask() {
         let history = [
             HistoricalTask(title: "Buy groceries at the store", actualSeconds: 9999),
-            HistoricalTask(title: "Write the weekly status report", actualSeconds: 1500)
+            HistoricalTask(title: "Write the weekly status report", actualSeconds: 1500),
         ]
         let s = EstimateSuggester.suggestion(
             for: "Write the weekly report",
@@ -85,19 +85,19 @@ final class EstimateSuggesterTests: XCTestCase {
 
     // MARK: - Median aggregation & outliers
 
-    func testUsesMedianNotMeanSoOutliersDoNotSkew() {
+    func testUsesMedianNotMeanSoOutliersDoNotSkew() throws {
         let history = [
             HistoricalTask(title: "Fix login bug", actualSeconds: 1200),
             HistoricalTask(title: "Fix login bug again", actualSeconds: 1500),
             HistoricalTask(title: "Fix the login bug once more", actualSeconds: 1800),
-            HistoricalTask(title: "Fix login bug huge outlier", actualSeconds: 36000)
+            HistoricalTask(title: "Fix login bug huge outlier", actualSeconds: 36000),
         ]
         let s = EstimateSuggester.suggestion(for: "Fix login bug", history: history, threshold: 0.2)
         // Median of [1200,1500,1800,36000] = (1500+1800)/2 = 1650, rounded
         // up to the next whole minute = 1680. Mean would be ~10125 — the
         // outlier must not dominate.
         XCTAssertEqual(s?.suggestedSeconds, 1680)
-        XCTAssertLessThan(s!.suggestedSeconds, 5000)
+        XCTAssertLessThan(try XCTUnwrap(s?.suggestedSeconds), 5000)
     }
 
     func testMedianOddCount() {
@@ -120,7 +120,7 @@ final class EstimateSuggesterTests: XCTestCase {
         // topN=1 the 600s task must always be the chosen one.
         let history = [
             HistoricalTask(title: "Email the client", actualSeconds: 1800),
-            HistoricalTask(title: "Email the client", actualSeconds: 600)
+            HistoricalTask(title: "Email the client", actualSeconds: 600),
         ]
         for _ in 0 ..< 20 {
             let s = EstimateSuggester.suggestion(for: "Email the client", history: history, topN: 1)
@@ -160,7 +160,6 @@ final class EstimateSuggesterTests: XCTestCase {
         }
     }
 
-
     func testMetadataBonusCannotRescueACompletelyUnrelatedTitle() {
         let history = [HistoricalTask(
             title: "Plant tomatoes in the garden",
@@ -186,7 +185,7 @@ final class EstimateSuggesterTests: XCTestCase {
         // clamp now degrades gracefully to a single best match.
         let history = [
             HistoricalTask(title: "Email the client", actualSeconds: 600),
-            HistoricalTask(title: "Email client back", actualSeconds: 1200)
+            HistoricalTask(title: "Email client back", actualSeconds: 1200),
         ]
         let s = EstimateSuggester.suggestion(for: "Email the client", history: history, topN: 0)
         XCTAssertNotNil(s)

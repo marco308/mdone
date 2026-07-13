@@ -11,7 +11,9 @@ enum WeekStartPreference: Int, CaseIterable, Identifiable {
 
     static let storageKey = "firstWeekday"
 
-    var id: Int { rawValue }
+    var id: Int {
+        rawValue
+    }
 
     var label: String {
         switch self {
