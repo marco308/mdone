@@ -10,6 +10,7 @@ struct SettingsScreen: View {
         .defaultRawValue
     @AppStorage("calmMode") private var calmMode = false
     @AppStorage("currentStallDays") private var currentStallDays = 7
+    @AppStorage(TaskListDensity.storageKey) private var taskListDensity = TaskListDensity.standard.rawValue
     @State private var showLogoutConfirm = false
     @State private var showAbout = false
 
@@ -33,12 +34,24 @@ struct SettingsScreen: View {
                 }
             }
 
-            Section("Appearance") {
+            Section {
                 Picker("Start week on", selection: $firstWeekday) {
                     ForEach(WeekStartPreference.allCases) { preference in
                         Text(preference.label).tag(preference.rawValue)
                     }
                 }
+
+                Picker("Task row size", selection: $taskListDensity) {
+                    ForEach(TaskListDensity.allCases) { density in
+                        Text(density.label).tag(density.rawValue)
+                    }
+                }
+            } header: {
+                Text("Appearance")
+            } footer: {
+                Text(
+                    "Task row size changes how much each task takes up in your lists. Compact fits more on screen; Large makes tasks easier to read."
+                )
             }
 
             Section {
