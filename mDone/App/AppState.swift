@@ -918,6 +918,61 @@ final class AppState {
         return tasks.filter { seen.insert($0.id).inserted }
     }
 
+    // MARK: - Kanban Buckets
+
+    /// Fetches the kanban buckets (columns) for a project's board view. Returns an
+    /// empty array if the project has no kanban view or the request fails — the
+    /// board UI treats that as "no columns to show".
+    @MainActor
+    func fetchBuckets(project: Project) async -> [Bucket] {
+        guard let viewId = project.kanbanViewId else { return [] }
+        do {
+            let buckets = try await projectService.fetchBuckets(projectId: project.id, viewId: viewId)
+            // Merge any embedded tasks into the global task list so edits made on
+            // the board (e.g. completing a task) stay consistent with list views.
+            for task in buckets.flatMap({ $0.tasks ?? [] }) {
+                if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+                    tasks[index] = task
+                } else {
+                    tasks.append(task)
+                }
+            }
+            return buckets.sorted { ($0.position ?? 0) < ($1.position ?? 0) }
+        } catch {
+            #if DEBUG
+            print("[mDone] fetchBuckets error: \(error)")
+            #endif
+            return []
+        }
+    }
+
+    /// Moves a task into another kanban bucket. Updates the task's `bucketId`
+    /// locally on success. Returns `true` when the move succeeded.
+    @MainActor
+    @discardableResult
+    func moveTask(_ task: VTask, toBucket bucketId: Int64, in project: Project) async -> Bool {
+        guard let viewId = project.kanbanViewId else { return false }
+        guard task.bucketId != bucketId else { return true }
+        do {
+            try await taskService.moveTaskToBucket(
+                taskId: task.id, projectId: project.id, viewId: viewId, bucketId: bucketId
+            )
+            if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+                tasks[index].bucketId = bucketId
+            } else {
+                // The board can be shown before the list has fetched this task,
+                // so insert it to keep list views consistent with the board.
+                var moved = task
+                moved.bucketId = bucketId
+                tasks.append(moved)
+            }
+            return true
+        } catch {
+            handleError(error)
+            return false
+        }
+    }
+
     // MARK: - Project Mutations
 
     /// Creates a project and returns it on success (or `nil` on failure).

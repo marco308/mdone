@@ -27,6 +27,13 @@ struct Project: Codable, Identifiable, Hashable {
     var listViewId: Int64? {
         views?.first(where: { $0.viewKind == "list" })?.id
     }
+
+    /// The id of this project's Kanban view, if it has one. Vikunja creates a
+    /// kanban view for every project by default, so this is normally non-nil
+    /// once `views` has been loaded.
+    var kanbanViewId: Int64? {
+        views?.first(where: { $0.viewKind == "kanban" })?.id
+    }
 }
 
 struct ProjectView: Codable, Identifiable {

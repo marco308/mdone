@@ -19,6 +19,12 @@ actor ProjectService {
         try await apiClient.fetch(Endpoint.projectViews(projectId: projectId))
     }
 
+    /// Fetches the kanban buckets (columns) for a project view, each with its
+    /// embedded tasks.
+    func fetchBuckets(projectId: Int64, viewId: Int64) async throws -> [Bucket] {
+        try await apiClient.fetch(Endpoint.projectBuckets(projectId: projectId, viewId: viewId))
+    }
+
     func createProject(_ request: ProjectCreateRequest) async throws -> Project {
         try await apiClient.send(Endpoint.createProject(), body: request)
     }

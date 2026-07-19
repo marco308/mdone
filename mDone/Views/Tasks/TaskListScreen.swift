@@ -13,6 +13,25 @@ struct TaskListScreen: View {
     @State private var sortOrder: SortOrder = .dueDate
     @State private var sortAscending: Bool = true
     @AppStorage("calmMode") private var calmMode = false
+    #if os(iOS)
+    @State private var showBoard = false
+    #endif
+
+    /// A board (Kanban) view is offered only for real, editable projects that
+    /// have a kanban view configured on the server.
+    private var boardAvailable: Bool {
+        !readOnly && projectFilter?.kanbanViewId != nil
+    }
+
+    /// True while the board is displayed instead of the list. The filter and
+    /// sort controls only affect the list, so they're hidden in board mode.
+    private var boardActive: Bool {
+        #if os(iOS)
+        return showBoard && projectFilter != nil
+        #else
+        return false
+        #endif
+    }
 
     enum SortOrder: String, CaseIterable {
         case dueDate = "Due Date"
@@ -22,7 +41,52 @@ struct TaskListScreen: View {
 
     var body: some View {
         @Bindable var bindableAppState = appState
-        ZStack(alignment: .bottom) {
+        content
+            .task(id: projectFilter?.id) {
+                if let projectFilter {
+                    await appState.fetchProjectTasks(project: projectFilter)
+                }
+            }
+            .task {
+                await appState.requestCalendarAccess()
+            }
+            .searchable(text: $bindableAppState.searchQuery, prompt: "Search tasks")
+            .onSubmit(of: .search) {
+                Task { await appState.searchTasks(query: appState.searchQuery) }
+            }
+            .navigationTitle(projectFilter?.title ?? "Inbox")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+                .toolbar { toolbarContent }
+                .sheet(isPresented: $showAdvancedFilter) {
+                    TaskFilterSheet { filterString in
+                        Task { await appState.applyAdvancedFilter(filterString) }
+                    }
+                }
+                .overlay {
+                    if appState.isLoading, appState.tasks.isEmpty {
+                        LoadingOverlay()
+                    }
+                }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        #if os(iOS)
+        if showBoard, let projectFilter {
+            ProjectBoardView(project: projectFilter)
+        } else {
+            listBody
+        }
+        #else
+        listBody
+        #endif
+    }
+
+    private var listBody: some View {
+        @Bindable var bindableAppState = appState
+        return ZStack(alignment: .bottom) {
             VStack(spacing: 0) {
                 FilterBar(activeFilter: $bindableAppState.activeFilter)
 
@@ -90,70 +154,61 @@ struct TaskListScreen: View {
                 )
             }
         }
-        .task(id: projectFilter?.id) {
-            if let projectFilter {
-                await appState.fetchProjectTasks(project: projectFilter)
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        #if os(iOS)
+        if boardAvailable {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showBoard.toggle()
+                } label: {
+                    Image(systemName: showBoard ? "list.bullet" : "rectangle.split.3x1")
+                }
+                .accessibilityLabel(showBoard ? "Show list" : "Show board")
             }
         }
-        .task {
-            await appState.requestCalendarAccess()
-        }
-        .searchable(text: $bindableAppState.searchQuery, prompt: "Search tasks")
-        .onSubmit(of: .search) {
-            Task { await appState.searchTasks(query: appState.searchQuery) }
-        }
-        .navigationTitle(projectFilter?.title ?? "Inbox")
-        #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
         #endif
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showAdvancedFilter = true
-                    } label: {
-                        Image(systemName: appState
-                            .advancedFilterString != nil ? "line.3.horizontal.decrease.circle.fill" :
-                            "line.3.horizontal.decrease.circle")
-                    }
-                    .accessibilityLabel(appState
-                        .advancedFilterString != nil ? "Advanced filter active" : "Advanced filter")
-                }
 
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        ForEach(SortOrder.allCases, id: \.self) { order in
-                            Button {
+        if !boardActive {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showAdvancedFilter = true
+                } label: {
+                    Image(systemName: appState
+                        .advancedFilterString != nil ? "line.3.horizontal.decrease.circle.fill" :
+                        "line.3.horizontal.decrease.circle")
+                }
+                .accessibilityLabel(appState
+                    .advancedFilterString != nil ? "Advanced filter active" : "Advanced filter")
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    ForEach(SortOrder.allCases, id: \.self) { order in
+                        Button {
+                            if sortOrder == order {
+                                sortAscending.toggle()
+                            } else {
+                                sortOrder = order
+                                sortAscending = true
+                            }
+                        } label: {
+                            HStack {
+                                Text(order.rawValue)
                                 if sortOrder == order {
-                                    sortAscending.toggle()
-                                } else {
-                                    sortOrder = order
-                                    sortAscending = true
-                                }
-                            } label: {
-                                HStack {
-                                    Text(order.rawValue)
-                                    if sortOrder == order {
-                                        Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                                    }
+                                    Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
                                 }
                             }
                         }
-                    } label: {
-                        Image(systemName: "arrow.up.arrow.down")
                     }
-                    .accessibilityLabel("Sort by \(sortOrder.rawValue), \(sortAscending ? "ascending" : "descending")")
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
                 }
+                .accessibilityLabel("Sort by \(sortOrder.rawValue), \(sortAscending ? "ascending" : "descending")")
             }
-            .sheet(isPresented: $showAdvancedFilter) {
-                TaskFilterSheet { filterString in
-                    Task { await appState.applyAdvancedFilter(filterString) }
-                }
-            }
-            .overlay {
-                if appState.isLoading, appState.tasks.isEmpty {
-                    LoadingOverlay()
-                }
-            }
+        }
     }
 
     private var isFiltering: Bool {
