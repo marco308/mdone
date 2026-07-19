@@ -89,37 +89,8 @@ struct CompleteTaskIntent: AppIntent {
     }
 }
 
-// MARK: - Open Task Intent
-
-struct OpenTaskIntent: AppIntent {
-    static var title: LocalizedStringResource = "Open Task"
-    static var description: IntentDescription = "Opens a task in mDone"
-    static var openAppWhenRun: Bool = true
-
-    @Parameter(title: "Task ID")
-    var taskID: Int
-
-    init() {}
-
-    init(taskID: Int64) {
-        self.taskID = Int(taskID)
-    }
-
-    func perform() async throws -> some IntentResult {
-        .result()
-    }
-}
-
-// MARK: - Quick Add Intent
-
-struct QuickAddIntent: AppIntent {
-    static var title: LocalizedStringResource = "Quick Add Task"
-    static var description: IntentDescription = "Opens mDone to create a new task"
-    static var openAppWhenRun: Bool = true
-
-    init() {}
-
-    func perform() async throws -> some IntentResult {
-        .result()
-    }
-}
+// The former OpenTaskIntent and QuickAddIntent lived here with
+// openAppWhenRun = true, which is unsupported inside an app extension and made
+// them fail from Shortcuts with an internal error (#121). Quick Add now lives
+// in the app target (mDone/App/AppIntents.swift); widgets open the app through
+// the mdone:// deep links instead of intents.

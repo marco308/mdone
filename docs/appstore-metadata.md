@@ -83,6 +83,24 @@ Steps to test:
 
 This is a private test server maintained by the developer for App Store review purposes.
 
+## What's New (v1.8.1)
+
+Shortcuts and Siri fixes.
+
+- The "Quick Add Task" action in the Shortcuts app now works: it opens mDone with the quick-add bar ready to type. It previously failed with an internal error.
+- Quick Add Task is now a proper App Shortcut, so it appears in the Shortcuts app automatically and works with Siri: just say "Add a task in mDone".
+- Removed the broken "Open Task" action.
+- Available on both iPhone and Mac.
+
+## What's New (v1.8.0)
+
+Project hierarchy: organise your projects into folders.
+
+- Sub-projects now nest under their parent, indented and sorted, matching Vikunja on the web.
+- Expand or collapse any project with a tap; it stays that way next time you open the app.
+- Set a parent when creating or editing a project, or use "Move to…" to reorganise your hierarchy.
+- Available on both iPhone and Mac.
+
 ## What's New (v1.7.0)
 
 Current tasks: keep long-running work from slipping out of sight.
