@@ -13,6 +13,7 @@ struct ProjectEditSheet: View {
     @State private var description: String
     @State private var colorHex: String
     @State private var isFavorite: Bool
+    @State private var parentProjectId: Int64?
     @State private var isSaving = false
     @FocusState private var titleFocused: Bool
 
@@ -22,6 +23,16 @@ struct ProjectEditSheet: View {
         _description = State(initialValue: project?.description ?? "")
         _colorHex = State(initialValue: project?.hexColor ?? "")
         _isFavorite = State(initialValue: project?.isFavorite ?? false)
+        _parentProjectId = State(initialValue: project?.parentProjectId)
+    }
+
+    /// Projects that may be chosen as the parent: everything except the project
+    /// being edited and its own descendants (which would create a cycle),
+    /// ordered as a flattened hierarchy so nesting reads naturally in the menu.
+    private var parentOptions: [ProjectTreeRow] {
+        let excluded: Set<Int64> = project.map { Set([$0.id]).union(appState.projects.descendantIDs(of: $0.id)) } ?? []
+        let candidates = appState.projects.filter { !excluded.contains($0.id) }
+        return candidates.projectHierarchy().flattened { _ in true }
     }
 
     private var isEditing: Bool {
@@ -47,6 +58,17 @@ struct ProjectEditSheet: View {
 
                 Section("Color") {
                     ColorSwatchPicker(selectedHex: $colorHex)
+                }
+
+                Section("Parent Project") {
+                    Picker("Parent", selection: $parentProjectId) {
+                        Text("None (Top Level)").tag(Int64?.none)
+                        ForEach(parentOptions) { row in
+                            Text(String(repeating: "  ", count: row.depth) + row.project.title)
+                                .tag(Int64?.some(row.project.id))
+                        }
+                    }
+                    .pickerStyle(.menu)
                 }
 
                 Section {
@@ -87,14 +109,16 @@ struct ProjectEditSheet: View {
                     title: title,
                     description: description,
                     hexColor: colorHex,
-                    isFavorite: isFavorite
+                    isFavorite: isFavorite,
+                    parentProjectId: parentProjectId
                 )
             } else {
                 await appState.createProject(
                     title: title,
                     description: description,
                     hexColor: colorHex,
-                    isFavorite: isFavorite
+                    isFavorite: isFavorite,
+                    parentProjectId: parentProjectId
                 )
             }
             dismiss()

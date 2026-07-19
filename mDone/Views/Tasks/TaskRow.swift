@@ -15,6 +15,13 @@ struct TaskRow: View {
     @State private var showDetail = false
     @AppStorage("calmMode") private var calmMode = false
     @AppStorage("currentStallDays") private var stallDays = 7
+    @AppStorage(TaskListDensity.storageKey) private var densityRaw = TaskListDensity.standard.rawValue
+
+    /// The user's chosen row size. Falls back to `.standard` if the stored
+    /// value is ever unrecognised.
+    private var density: TaskListDensity {
+        TaskListDensity(rawValue: densityRaw) ?? .standard
+    }
 
     /// Quick-set progress percentages offered in the context menu.
     private static let progressSteps = [0, 25, 50, 75, 100]
@@ -29,7 +36,11 @@ struct TaskRow: View {
         rowContent
         #if os(iOS)
         .contentShape(Rectangle())
-        .onTapGesture { if !readOnly { showDetail = true } }
+        .onTapGesture {
+            if !readOnly {
+                showDetail = true
+            }
+        }
         .listRowBackground(isFocused ? Color.orange.opacity(0.08) : nil)
         #endif
         .swipeActions(edge: .leading) {
@@ -76,6 +87,21 @@ struct TaskRow: View {
         }
         .contextMenu {
             if !readOnly {
+                if !task.done {
+                    Menu {
+                        ForEach(QuickSchedule.options()) { option in
+                            Button {
+                                guard let date = option.resolvedDate() else { return }
+                                Task { await appState.rescheduleTask(task, to: date) }
+                            } label: {
+                                Label(option.label, systemImage: option.systemImage)
+                            }
+                        }
+                    } label: {
+                        Label("Schedule", systemImage: "calendar")
+                    }
+                }
+
                 #if os(iOS)
                 if isFocused {
                     Button {
@@ -125,8 +151,8 @@ struct TaskRow: View {
     private var rowContent: some View {
         HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 2)
-                .fill(priorityColor)
-                .frame(width: 4, height: 36)
+                .fill(accentColor)
+                .frame(width: 4, height: density.accentBarHeight)
                 .accessibilityHidden(true)
 
             Button {
@@ -135,7 +161,7 @@ struct TaskRow: View {
                 }
             } label: {
                 Image(systemName: task.done ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
+                    .font(density.checkboxFont)
                     .foregroundStyle(task.done ? .green : checkboxColor)
                     .contentTransition(.symbolEffect(.replace))
             }
@@ -144,12 +170,12 @@ struct TaskRow: View {
             .accessibilityLabel(task.done ? "Mark \(task.title) as incomplete" : "Mark \(task.title) as complete")
             .accessibilityAddTraits(.isToggle)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: density.contentSpacing) {
                 Text(task.title)
-                    .font(.body)
+                    .font(density.titleFont)
                     .strikethrough(task.done)
                     .foregroundStyle(task.done ? .secondary : .primary)
-                    .lineLimit(2)
+                    .lineLimit(density.titleLineLimit)
 
                 HStack(spacing: 8) {
                     if let dueDate = task.effectiveDueDate {
@@ -161,7 +187,7 @@ struct TaskRow: View {
                                 Text(dueDate, style: .date)
                             }
                         }
-                        .font(.caption)
+                        .font(density.metadataFont)
                         .foregroundStyle(task.isOverdue && !calmMode ? .red : .secondary)
                     }
 
@@ -172,7 +198,7 @@ struct TaskRow: View {
                                 Text(desc)
                             }
                         }
-                        .font(.caption)
+                        .font(density.metadataFont)
                         .foregroundStyle(.secondary)
                     }
 
@@ -206,7 +232,7 @@ struct TaskRow: View {
             }
             #endif
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, density.rowVerticalPadding)
         .opacity(task.done ? 0.6 : 1)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(taskAccessibilityLabel)
@@ -246,6 +272,18 @@ struct TaskRow: View {
         return days >= stallDays ? days : nil
     }
 
+    /// The task's own Vikunja color, when set. `nil` for uncolored tasks.
+    private var taskColor: Color? {
+        task.normalizedHexColor.map { Color(hex: $0) }
+    }
+
+    /// The leading accent bar prefers the user-assigned task color, falling
+    /// back to the priority color (which is also shown as a badge) so the bar
+    /// keeps signalling priority for uncolored tasks.
+    private var accentColor: Color {
+        taskColor ?? priorityColor
+    }
+
     private var priorityColor: Color {
         switch task.priorityLevel {
         case .critical, .urgent: .red
@@ -257,7 +295,10 @@ struct TaskRow: View {
     }
 
     private var checkboxColor: Color {
-        task.priorityLevel == .none ? .gray : priorityColor
+        if let taskColor {
+            return taskColor
+        }
+        return task.priorityLevel == .none ? .gray : priorityColor
     }
 }
 

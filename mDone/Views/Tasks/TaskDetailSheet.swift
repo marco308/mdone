@@ -184,8 +184,9 @@ struct TaskDetailSheet: View {
                 if !appState.projects.isEmpty {
                     Section("Project") {
                         Picker("Project", selection: $selectedProjectId) {
-                            ForEach(appState.projects) { project in
-                                Text(project.title).tag(project.id)
+                            ForEach(appState.projects.projectHierarchy().flattened { _ in true }) { row in
+                                Text(String(repeating: "  ", count: row.depth) + row.project.title)
+                                    .tag(row.project.id)
                             }
                         }
                         .pickerStyle(.menu)

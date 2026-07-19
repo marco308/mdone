@@ -212,16 +212,15 @@ final class WidgetDataTests: XCTestCase {
 
     func testIsAuthenticatedFalseByDefault() {
         let provider = WidgetDataProvider()
-        // A fresh provider with no credentials in shared defaults should not be authenticated
-        // (Unless the real app has stored credentials, but the shared defaults for the App Group
-        // are separate from the test host's defaults.)
-        // We clear the keys to ensure a clean state.
+        // A fresh provider with no credentials should not be authenticated.
+        // We clear the stored credentials (URL in shared defaults, token in
+        // the shared keychain item) to ensure a clean state.
         let defaults = SharedKeys.sharedDefaults
         let savedServerURL = defaults.string(forKey: SharedKeys.serverURLKey)
-        let savedApiToken = defaults.string(forKey: SharedKeys.apiTokenKey)
+        let savedApiToken = SharedTokenStore.get()
 
         defaults.removeObject(forKey: SharedKeys.serverURLKey)
-        defaults.removeObject(forKey: SharedKeys.apiTokenKey)
+        SharedTokenStore.delete()
 
         addTeardownBlock {
             // Restore original values
@@ -229,7 +228,7 @@ final class WidgetDataTests: XCTestCase {
                 defaults.set(url, forKey: SharedKeys.serverURLKey)
             }
             if let token = savedApiToken {
-                defaults.set(token, forKey: SharedKeys.apiTokenKey)
+                SharedTokenStore.save(token)
             }
         }
 

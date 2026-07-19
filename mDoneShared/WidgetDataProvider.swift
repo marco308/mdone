@@ -1,7 +1,8 @@
 import Foundation
 
-/// Lightweight API client for widget use. Reads credentials from shared App Group UserDefaults
-/// and fetches tasks directly from the Vikunja REST API without depending on the main app module.
+/// Lightweight API client for widget use. Reads the server URL from shared App Group UserDefaults
+/// and the API token from the shared keychain item, then fetches tasks directly from the
+/// Vikunja REST API without depending on the main app module.
 final class WidgetDataProvider: @unchecked Sendable {
     static let shared = WidgetDataProvider()
 
@@ -50,7 +51,7 @@ final class WidgetDataProvider: @unchecked Sendable {
     }
 
     private var apiToken: String? {
-        SharedKeys.sharedDefaults.string(forKey: SharedKeys.apiTokenKey)
+        SharedTokenStore.get()
     }
 
     var isAuthenticated: Bool {

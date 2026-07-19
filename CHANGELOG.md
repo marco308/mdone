@@ -7,11 +7,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
-- A task no longer briefly disappears from the **Current** section when you change its progress (or otherwise edit it). The task stayed gone until the next refresh because the server's update response omits labels; the app now keeps the task's labels through an edit.
+- The "Quick Add Task" action in the Shortcuts app now works. It opens mDone with the quick-add bar focused and ready to type. Previously the action always failed with "an internal error occurred" because it ran from the widget extension instead of the app (#121).
+
+### Added
+- "Quick Add Task" is now a proper App Shortcut: it appears automatically in the Shortcuts app, can be run by voice with Siri ("Add a task in mDone"), and works on Mac as well as iPhone.
+
+### Removed
+- The "Open Task" action no longer appears in the Shortcuts app. It never worked (it failed with the same internal error as Quick Add Task) and offered no way to pick a task, so it has been removed rather than left broken.
+
+## [1.8.0] - 2026-07-13
+
+### Added
+- You can now choose how big tasks appear in your lists: Settings > Appearance > **Task row size** offers Compact, Standard, and Large. Compact shrinks the text and tightens the rows so more tasks fit on screen, Large makes them easier to read, and Standard keeps the app's original look (and stays the default). Applies to the Inbox, project lists, the calendar's day list, and the Mac task list, matching the size options the widgets already offer (#122).
+- Projects now display as a hierarchy: sub-projects nest under their parent with an indent and an expand/collapse chevron, matching Vikunja's folder structure on the web. Both the iPhone project list and the Mac sidebar are sorted by each project's position (then name), so the ordering is stable instead of showing sub-projects jumbled at the top. Collapsed projects stay collapsed across app launches (#118).
+- You can now build and rearrange that hierarchy from the app: pick a **Parent Project** when creating or editing a project, and **Move to…** a project under a different parent (or back to the top level) from its right-click / long-press menu. Options that would create a loop (moving a project under itself or one of its own sub-projects) are hidden (#118).
+- Tasks now show the color you assign them in Vikunja. Each colored task tints its leading accent bar and completion circle with its hex color, so color-coded contexts (work, personal, clients) are visible at a glance in every list. Uncolored tasks are unchanged (#112).
+- Long-press (or right-click) a task and pick "Schedule" to reschedule it to Today, Tomorrow, Later This Week, Next Week, or Next Month. These set an absolute due date (they ignore the task's current date, unlike the +24h swipe), and "Next Week" follows your "Start week on" preference (#67).
+
+### Fixed
+- The Vikunja API token shared with the widgets is now stored in the Keychain instead of the app group preferences, where it sat in cleartext on disk. Existing installs migrate automatically the next time the app or a widget runs, and the old cleartext copy is removed.
+- Editing a sub-project (renaming it, changing its color, toggling favorite) no longer risks moving it back to the top level; the app now always sends the project's parent along with the edit (#118).
+
+## [1.7.0] - 2026-06
 
 ### Added
 - **Board view**: projects with a Kanban view now offer a board layout on iPhone. Switch between the list and the board with the toolbar button on a project. The board shows one column per Kanban bucket with each task as a card, and you can move a task to another column from its long-press menu (#55).
 - **Current tasks**: mark a long-running task as "Current" to pin it to a dedicated section at the top of your Inbox, above Today, so slow-burn projects stay top of mind instead of sinking out of view. Each Current task shows a progress bar you can update (from its detail view, or quickly via the right-click / long-press menu), and an "Idle" badge appears when a Current task hasn't been touched for a while. Set how many idle days trigger the badge in Settings under "Current Tasks". Mark or unmark a task as Current from its context menu or detail view, on both iPhone and Mac.
+
+### Fixed
+- A task no longer briefly disappears from the **Current** section when you change its progress (or otherwise edit it). The task stayed gone until the next refresh because the server's update response omits labels; the app now keeps the task's labels through an edit.
 
 ## [1.6.2] - 2026-06-08
 

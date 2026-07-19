@@ -22,6 +22,38 @@ final class AppState {
     var notifications: [VNotification] = []
     var selectedProject: Project?
 
+    /// IDs of parent projects the user has collapsed in the sidebar / project
+    /// list. Projects expand by default (absent here = expanded). Persisted to
+    /// `UserDefaults` so the tree keeps its shape across launches.
+    var collapsedProjectIDs: Set<Int64> = AppState.loadCollapsedProjectIDs() {
+        didSet { AppState.saveCollapsedProjectIDs(collapsedProjectIDs) }
+    }
+
+    /// Whether a project's sub-projects are currently shown.
+    func isProjectExpanded(_ id: Int64) -> Bool {
+        !collapsedProjectIDs.contains(id)
+    }
+
+    /// Expands or collapses a project's sub-projects, persisting the change.
+    func setProjectExpanded(_ expanded: Bool, for id: Int64) {
+        if expanded {
+            collapsedProjectIDs.remove(id)
+        } else {
+            collapsedProjectIDs.insert(id)
+        }
+    }
+
+    private static let collapsedProjectsKey = "collapsedProjectIDs"
+
+    private static func loadCollapsedProjectIDs() -> Set<Int64> {
+        let stored = UserDefaults.standard.array(forKey: collapsedProjectsKey) as? [NSNumber] ?? []
+        return Set(stored.map(\.int64Value))
+    }
+
+    private static func saveCollapsedProjectIDs(_ ids: Set<Int64>) {
+        UserDefaults.standard.set(ids.map { NSNumber(value: $0) }, forKey: collapsedProjectsKey)
+    }
+
     var searchQuery: String = ""
     var activeFilter: TaskFilter?
     var advancedFilterString: String?
@@ -67,6 +99,11 @@ final class AppState {
         notifications.filter { $0.read != true }.count
     }
 
+    /// The live instance backing the UI, set on init. App Intents run in the
+    /// app process without access to the SwiftUI environment, so this is their
+    /// only route to app state. Touch it from the main actor only.
+    static weak var shared: AppState?
+
     /// `taskService` is injectable so tests can drive the network paths
     /// (e.g. `undoLastCompletion`) through a mocked `APIClient`.
     init(
@@ -77,6 +114,7 @@ final class AppState {
         self.taskService = taskService
         self.projectService = projectService
         self.labelService = labelService
+        AppState.shared = self
     }
 
     private let taskService: TaskService
@@ -269,12 +307,14 @@ final class AppState {
         let authenticated = authService.isAuthenticated()
         if authenticated {
             await configureAPIClient()
-            // Sync credentials to shared App Group UserDefaults so widgets can access them
+            // Sync credentials to the widget extension: server URL via the App
+            // Group UserDefaults (non-sensitive), token via the shared keychain
+            // item — never the defaults, which are cleartext on disk.
             if let serverURL = authService.getServerURL(),
                let token = authService.getToken()
             {
                 SharedKeys.sharedDefaults.set(serverURL, forKey: SharedKeys.serverURLKey)
-                SharedKeys.sharedDefaults.set(token, forKey: SharedKeys.apiTokenKey)
+                SharedTokenStore.save(token)
             }
         }
         isAuthenticated = authenticated
@@ -674,6 +714,33 @@ final class AppState {
         }
     }
 
+    /// Reschedules a task to an absolute due date, ignoring its current date.
+    /// Backs the quick-schedule long-press options (Today, Tomorrow, Next Week, …).
+    @MainActor
+    func rescheduleTask(_ task: VTask, to newDate: Date) async {
+        let originalDueDate: Date?
+        if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+            originalDueDate = tasks[index].dueDate
+            tasks[index].dueDate = newDate
+        } else {
+            originalDueDate = nil
+        }
+
+        do {
+            let updated = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(dueDate: newDate))
+            if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
+                tasks[index] = updated
+            }
+            syncService?.updateCachedTask(updated)
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+                tasks[index].dueDate = originalDueDate
+            }
+            handleError(error)
+        }
+    }
+
     @MainActor
     func updateTask(id: Int64, request: TaskUpdateRequest) async {
         do {
@@ -910,7 +977,8 @@ final class AppState {
         title: String,
         description: String? = nil,
         hexColor: String? = nil,
-        isFavorite: Bool = false
+        isFavorite: Bool = false,
+        parentProjectId: Int64? = nil
     ) async -> Project? {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -918,7 +986,8 @@ final class AppState {
             title: trimmed,
             description: description.flatMap { $0.isEmpty ? nil : $0 },
             hexColor: hexColor.flatMap { $0.isEmpty ? nil : $0 },
-            isFavorite: isFavorite
+            isFavorite: isFavorite,
+            parentProjectId: parentProjectId
         )
         do {
             let newProject = try await projectService.createProject(request)
@@ -943,7 +1012,8 @@ final class AppState {
         title: String,
         description: String,
         hexColor: String,
-        isFavorite: Bool
+        isFavorite: Bool,
+        parentProjectId: Int64?
     ) async {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -952,8 +1022,21 @@ final class AppState {
             title: trimmed,
             description: description,
             hexColor: hexColor,
-            isFavorite: isFavorite
+            isFavorite: isFavorite,
+            parentProjectId: parentProjectId ?? 0
         )
+        await performProjectUpdate(id: project.id, request: request)
+    }
+
+    /// Moves a project under a new parent (or to the top level when `parentId`
+    /// is `nil`), preserving all its other fields. The caller is responsible for
+    /// not creating a cycle (moving a project under itself or a descendant);
+    /// the UI filters those targets out, and Vikunja rejects them regardless.
+    @MainActor
+    func moveProject(_ project: Project, toParentId parentId: Int64?) async {
+        guard project.id > 0 else { return } // ignore pseudo-projects (e.g. Favorites, id -1)
+        guard parentId != project.id else { return }
+        let request = ProjectUpdateRequest(from: project, parentProjectId: parentId ?? 0)
         await performProjectUpdate(id: project.id, request: request)
     }
 
@@ -1040,6 +1123,9 @@ final class AppState {
             // Trust our intended archived state for list placement, in case the
             // server response omits `is_archived`.
             updated.isArchived = request.isArchived
+            // Likewise trust the intended parent so a moved project nests in the
+            // right place immediately, even if the response omits parent_project_id.
+            updated.parentProjectId = request.parentProjectId == 0 ? nil : request.parentProjectId
             applyUpdatedProject(updated)
             syncService?.updateCachedProject(updated)
             WidgetCenter.shared.reloadAllTimelines()

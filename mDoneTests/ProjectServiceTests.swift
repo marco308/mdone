@@ -329,6 +329,18 @@ final class ProjectServiceTests: XCTestCase {
         XCTAssertNil(json["description"])
         XCTAssertNil(json["hex_color"])
         XCTAssertNil(json["is_favorite"])
+        // A top-level project omits the parent entirely.
+        XCTAssertNil(json["parent_project_id"])
+    }
+
+    func testProjectCreateRequestUnderParentEncodesParentId() throws {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let request = ProjectCreateRequest(
+            title: "Child", description: nil, hexColor: nil, isFavorite: nil, parentProjectId: 42
+        )
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(request)) as? [String: Any])
+        XCTAssertEqual(json["parent_project_id"] as? Int, 42)
     }
 
     func testProjectUpdateRequestFromProjectSendsFullFieldSet() throws {
@@ -347,5 +359,27 @@ final class ProjectServiceTests: XCTestCase {
         XCTAssertEqual(json["is_archived"] as? Bool, true)
         XCTAssertEqual(json["title"] as? String, "Keep")
         XCTAssertEqual(json["hex_color"] as? String, "#00FF00")
+    }
+
+    func testProjectUpdateRequestPreservesParentByDefault() throws {
+        // A plain edit of a sub-project must keep its parent, not root it.
+        let child = Project(id: 8, title: "Child", parentProjectId: 3)
+        let request = ProjectUpdateRequest(from: child, title: "Renamed")
+        XCTAssertEqual(request.parentProjectId, 3)
+
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(request)) as? [String: Any])
+        XCTAssertEqual(json["parent_project_id"] as? Int, 3)
+    }
+
+    func testProjectUpdateRequestParentOverrideMovesProject() {
+        let child = Project(id: 8, title: "Child", parentProjectId: 3)
+        // Override to 0 = move to top level.
+        let toRoot = ProjectUpdateRequest(from: child, parentProjectId: 0)
+        XCTAssertEqual(toRoot.parentProjectId, 0)
+        // Override to another id = move under it.
+        let toOther = ProjectUpdateRequest(from: child, parentProjectId: 9)
+        XCTAssertEqual(toOther.parentProjectId, 9)
     }
 }

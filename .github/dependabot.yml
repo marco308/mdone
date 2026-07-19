@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # The app has no external package dependencies (pure Swift, no SPM),
+  # so the only thing to keep fresh is the action pins in our workflows.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"

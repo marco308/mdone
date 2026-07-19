@@ -37,6 +37,22 @@ struct VTask: Codable, Identifiable, Hashable {
         (repeatAfter ?? 0) > 0
     }
 
+    /// The user-assigned task color from Vikunja, normalized for display.
+    /// Returns `nil` when Vikunja sends no color (an empty string) or a value
+    /// that isn't a valid 3/6/8-digit hex, so uncolored tasks fall back to the
+    /// default styling instead of rendering a stray gray. The leading `#`, if
+    /// present, is stripped.
+    var normalizedHexColor: String? {
+        guard let hexColor else { return nil }
+        let trimmed = hexColor
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        guard [3, 6, 8].contains(trimmed.count),
+              trimmed.allSatisfy(\.isHexDigit)
+        else { return nil }
+        return trimmed
+    }
+
     /// `description` with the mDone estimate marker stripped — what the user
     /// should see in editors and previews. `nil` if the description has no
     /// body once the marker is removed.

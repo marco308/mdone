@@ -1,6 +1,6 @@
 # mDone — Feature Roadmap
 
-27 open issues prioritized by impact. All tracked at [github.com/marco308/mdone/issues](https://github.com/marco308/mdone/issues).
+28 open issues prioritized by impact. All tracked at [github.com/marco308/mdone/issues](https://github.com/marco308/mdone/issues).
 
 ---
 
@@ -45,3 +45,4 @@
 | [#25](https://github.com/marco308/mdone/issues/25) | Add webhook management | 22 event types, HMAC-SHA256 signing |
 | [#26](https://github.com/marco308/mdone/issues/26) | Add task subscriptions (watch/unwatch) | Subscribe for notifications on task/project changes |
 | [#27](https://github.com/marco308/mdone/issues/27) | Add emoji reactions | Reactions on tasks and comments |
+| [#122](https://github.com/marco308/mdone/issues/122) | Adjustable task text size / list density | Appearance setting (Compact / Standard / Large) for task rows, mirroring the widget option; current size stays the default |

@@ -55,6 +55,9 @@ struct ProjectCreateRequest: Encodable {
     var description: String?
     var hexColor: String?
     var isFavorite: Bool?
+    /// Parent to nest the new project under. `nil` (the default) creates it at
+    /// the top level. Snake-cased to `parent_project_id` by `APIClient`.
+    var parentProjectId: Int64?
 }
 
 /// Request body for updating a project (`POST /api/v1/projects/{id}`).
@@ -70,29 +73,46 @@ struct ProjectUpdateRequest: Encodable {
     var hexColor: String
     var isFavorite: Bool
     var isArchived: Bool
+    /// Desired parent project. `0` means top level (Vikunja's zero value for
+    /// "no parent"). Always sent — for the same reason the other fields are —
+    /// so a normal edit preserves the project's place in the hierarchy instead
+    /// of silently rooting it. Snake-cased to `parent_project_id`.
+    var parentProjectId: Int64
 
-    init(title: String, description: String, hexColor: String, isFavorite: Bool, isArchived: Bool) {
+    init(
+        title: String,
+        description: String,
+        hexColor: String,
+        isFavorite: Bool,
+        isArchived: Bool,
+        parentProjectId: Int64 = 0
+    ) {
         self.title = title
         self.description = description
         self.hexColor = hexColor
         self.isFavorite = isFavorite
         self.isArchived = isArchived
+        self.parentProjectId = parentProjectId
     }
 
     /// Builds a full update request from an existing project, overriding only the
-    /// fields you pass. Ensures we never accidentally blank out a field on the server.
+    /// fields you pass. Ensures we never accidentally blank out a field on the
+    /// server. `parentProjectId` defaults to the project's current parent, so a
+    /// plain field edit keeps the project where it is; pass it to move the project.
     init(
         from project: Project,
         title: String? = nil,
         description: String? = nil,
         hexColor: String? = nil,
         isFavorite: Bool? = nil,
-        isArchived: Bool? = nil
+        isArchived: Bool? = nil,
+        parentProjectId: Int64? = nil
     ) {
         self.title = title ?? project.title
         self.description = description ?? project.description ?? ""
         self.hexColor = hexColor ?? project.hexColor ?? ""
         self.isFavorite = isFavorite ?? project.isFavorite ?? false
         self.isArchived = isArchived ?? project.isArchived ?? false
+        self.parentProjectId = parentProjectId ?? project.parentProjectId ?? 0
     }
 }

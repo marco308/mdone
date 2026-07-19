@@ -125,26 +125,9 @@ struct MacSidebarView: View {
             }
 
             Section {
-                ForEach(appState.projects) { project in
-                    Label {
-                        HStack {
-                            Text(project.title)
-                            Spacer()
-                            let count = appState.tasksForProject(project.id).count
-                            if count > 0 {
-                                Text("\(count)")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    } icon: {
-                        Circle()
-                            .fill(projectColor(project))
-                            .frame(width: 10, height: 10)
-                            .accessibilityHidden(true)
-                    }
-                    .tag(MacContentView.SidebarSection.project(project))
-                    .contextMenu { projectContextMenu(project) }
+                let rows = appState.projects.projectHierarchy().flattened { appState.isProjectExpanded($0) }
+                ForEach(rows) { row in
+                    projectSidebarRow(row)
                 }
             } header: {
                 HStack {
@@ -255,7 +238,8 @@ struct MacSidebarView: View {
                     title: project.title,
                     description: project.description ?? "",
                     hexColor: project.hexColor ?? "",
-                    isFavorite: !(project.isFavorite ?? false)
+                    isFavorite: !(project.isFavorite ?? false),
+                    parentProjectId: project.parentProjectId
                 )
             }
         } label: {
@@ -264,6 +248,7 @@ struct MacSidebarView: View {
                 systemImage: project.isFavorite == true ? "star.slash" : "star"
             )
         }
+        moveMenu(for: project)
         Button {
             Task { await appState.archiveProject(project) }
         } label: {
@@ -277,8 +262,85 @@ struct MacSidebarView: View {
         }
     }
 
+    /// "Move to" submenu: re-parent this project under any project that isn't
+    /// itself, one of its descendants, or its current parent.
+    @ViewBuilder
+    private func moveMenu(for project: Project) -> some View {
+        let excluded = [project.id] + appState.projects.descendantIDs(of: project.id)
+        let targets = appState.projects
+            .filter { !excluded.contains($0.id) }
+            .projectHierarchy()
+            .flattened { _ in true }
+        Menu {
+            if project.parentProjectId != nil {
+                Button("Top Level") {
+                    Task { await appState.moveProject(project, toParentId: nil) }
+                }
+            }
+            ForEach(targets) { row in
+                if row.project.id != project.parentProjectId {
+                    Button(String(repeating: "  ", count: row.depth) + row.project.title) {
+                        Task { await appState.moveProject(project, toParentId: row.project.id) }
+                    }
+                }
+            }
+        } label: {
+            Label("Move to…", systemImage: "folder")
+        }
+    }
+
     private func projectColor(_ project: Project) -> Color {
         guard let hex = project.hexColor, !hex.isEmpty else { return Color.accentColor }
         return Color(hex: hex)
+    }
+
+    @ViewBuilder
+    private func projectSidebarRow(_ row: ProjectTreeRow) -> some View {
+        let project = row.project
+        HStack(spacing: 2) {
+            sidebarChevron(for: project, hasChildren: row.hasChildren)
+            Label {
+                HStack {
+                    Text(project.title)
+                    Spacer()
+                    let count = appState.tasksForProject(project.id).count
+                    if count > 0 {
+                        Text("\(count)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } icon: {
+                Circle()
+                    .fill(projectColor(project))
+                    .frame(width: 10, height: 10)
+                    .accessibilityHidden(true)
+            }
+        }
+        .padding(.leading, CGFloat(row.depth) * 14)
+        .tag(MacContentView.SidebarSection.project(project))
+        .contextMenu { projectContextMenu(project) }
+    }
+
+    /// Expand/collapse chevron for a parent project; a matching-width spacer for
+    /// leaf projects so titles align under their parent.
+    @ViewBuilder
+    private func sidebarChevron(for project: Project, hasChildren: Bool) -> some View {
+        if hasChildren {
+            let expanded = appState.isProjectExpanded(project.id)
+            Button {
+                withAnimation { appState.setProjectExpanded(!expanded, for: project.id) }
+            } label: {
+                Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 12)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(expanded ? "Collapse \(project.title)" : "Expand \(project.title)")
+        } else {
+            Color.clear.frame(width: 12, height: 1)
+        }
     }
 }

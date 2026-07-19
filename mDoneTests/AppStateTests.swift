@@ -29,6 +29,32 @@ final class AppStateTests: XCTestCase {
         return AppState(projectService: ProjectService(apiClient: client))
     }
 
+    // MARK: - Project Collapse State
+
+    func testProjectsExpandedByDefault() async {
+        UserDefaults.standard.removeObject(forKey: "collapsedProjectIDs")
+        let appState = await makeProjectMockedAppState()
+        XCTAssertTrue(appState.isProjectExpanded(42))
+    }
+
+    func testCollapseAndExpandProjectPersists() async {
+        UserDefaults.standard.removeObject(forKey: "collapsedProjectIDs")
+        let appState = await makeProjectMockedAppState()
+
+        appState.setProjectExpanded(false, for: 42)
+        XCTAssertFalse(appState.isProjectExpanded(42))
+        XCTAssertTrue(appState.collapsedProjectIDs.contains(42))
+
+        // A fresh AppState reads the persisted collapse set back.
+        let reloaded = await makeProjectMockedAppState()
+        XCTAssertFalse(reloaded.isProjectExpanded(42))
+
+        appState.setProjectExpanded(true, for: 42)
+        XCTAssertTrue(appState.isProjectExpanded(42))
+        XCTAssertFalse(appState.collapsedProjectIDs.contains(42))
+        UserDefaults.standard.removeObject(forKey: "collapsedProjectIDs")
+    }
+
     // MARK: - Project Mutations
 
     func testCreateProjectAppendsToProjects() async {
@@ -64,11 +90,60 @@ final class AppStateTests: XCTestCase {
         }
 
         await appState.updateProject(
-            appState.projects[0], title: "Updated", description: "", hexColor: "", isFavorite: true
+            appState.projects[0], title: "Updated", description: "", hexColor: "", isFavorite: true,
+            parentProjectId: nil
         )
         XCTAssertEqual(appState.projects.count, 1)
         XCTAssertEqual(appState.projects.first?.title, "Updated")
         XCTAssertEqual(appState.projects.first?.isFavorite, true)
+    }
+
+    func testCreateProjectUnderParentSendsParentId() async {
+        let appState = await makeProjectMockedAppState()
+        var capturedBody: [String: Any]?
+        MockURLProtocol.requestHandler = { request in
+            capturedBody = request.decodedJSONBody
+            let json = #"{"id": 200, "title": "Child", "parent_project_id": 10}"#.data(using: .utf8)!
+            return (MockURLProtocol.makeResponse(statusCode: 201, url: request.url), json)
+        }
+
+        await appState.createProject(title: "Child", parentProjectId: 10)
+        XCTAssertEqual(capturedBody?["parent_project_id"] as? Int, 10)
+        XCTAssertEqual(appState.projects.first?.parentProjectId, 10)
+    }
+
+    func testMoveProjectSendsNewParentAndNestsLocally() async {
+        let appState = await makeProjectMockedAppState()
+        appState.projects = [
+            Project(id: 20, title: "Target"),
+            Project(id: 5, title: "Mover", parentProjectId: nil),
+        ]
+        var capturedBody: [String: Any]?
+        MockURLProtocol.requestHandler = { request in
+            capturedBody = request.decodedJSONBody
+            // Response omits parent_project_id; AppState must still trust intent.
+            let json = #"{"id": 5, "title": "Mover", "is_archived": false}"#.data(using: .utf8)!
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), json)
+        }
+
+        await appState.moveProject(appState.projects[1], toParentId: 20)
+        XCTAssertEqual(capturedBody?["parent_project_id"] as? Int, 20)
+        XCTAssertEqual(appState.projects.first { $0.id == 5 }?.parentProjectId, 20)
+    }
+
+    func testMoveProjectToTopLevelSendsZero() async {
+        let appState = await makeProjectMockedAppState()
+        appState.projects = [Project(id: 5, title: "Mover", parentProjectId: 20)]
+        var capturedBody: [String: Any]?
+        MockURLProtocol.requestHandler = { request in
+            capturedBody = request.decodedJSONBody
+            let json = #"{"id": 5, "title": "Mover", "is_archived": false}"#.data(using: .utf8)!
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), json)
+        }
+
+        await appState.moveProject(appState.projects[0], toParentId: nil)
+        XCTAssertEqual(capturedBody?["parent_project_id"] as? Int, 0)
+        XCTAssertNil(appState.projects.first?.parentProjectId)
     }
 
     func testArchiveProjectMovesToArchivedList() async {
@@ -135,7 +210,11 @@ final class AppStateTests: XCTestCase {
         }
 
         await appState.deleteProject(appState.projects[0]) // delete Parent (3)
-        XCTAssertEqual(appState.projects.map(\.id).sorted(), [9], "Parent and all descendants are removed; unrelated kept")
+        XCTAssertEqual(
+            appState.projects.map(\.id).sorted(),
+            [9],
+            "Parent and all descendants are removed; unrelated kept"
+        )
         XCTAssertEqual(appState.tasks.map(\.id).sorted(), [3], "Tasks of the parent and its descendants are removed")
     }
 
@@ -500,6 +579,62 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(appState.undoableCompletion?.id, 11)
     }
 
+    // MARK: - Reschedule (#67)
+
+    func testRescheduleTaskUpdatesDueDateOnSuccess() async throws {
+        let appState = await makeMockedAppState()
+        var task = VTask(id: 50, title: "Renew passport", done: false, priority: 1, projectId: 4)
+        task.dueDate = Date(timeIntervalSince1970: 1_700_000_000)
+        appState.tasks = [task]
+        let newDate = Date(timeIntervalSince1970: 1_760_000_000)
+
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url!)
+            // Vikunja echoes the new due date back as ISO8601.
+            let iso = ISO8601DateFormatter().string(from: newDate)
+            let json = """
+            {"id": 50, "title": "Renew passport", "done": false, "priority": 1, \
+            "project_id": 4, "due_date": "\(iso)"}
+            """
+            return (response, Data(json.utf8))
+        }
+
+        await appState.rescheduleTask(task, to: newDate)
+
+        XCTAssertEqual(appState.tasks.count, 1, "Reschedule must not duplicate the task")
+        XCTAssertEqual(appState.tasks.first?.id, 50)
+        let resolved = try XCTUnwrap(appState.tasks.first?.effectiveDueDate)
+        XCTAssertEqual(
+            resolved.timeIntervalSince1970,
+            newDate.timeIntervalSince1970,
+            accuracy: 1,
+            "Reschedule must adopt the new due date returned by the server"
+        )
+    }
+
+    func testRescheduleTaskRollsBackOnFailure() async {
+        let appState = await makeMockedAppState()
+        let original = Date(timeIntervalSince1970: 1_700_000_000)
+        var task = VTask(id: 51, title: "Book dentist", done: false, priority: 0, projectId: 2)
+        task.dueDate = original
+        appState.tasks = [task]
+        let newDate = Date(timeIntervalSince1970: 1_760_000_000)
+
+        // 400 (not 5xx) so APIClient fails fast instead of retrying with backoff.
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 400, url: request.url!)
+            return (response, Data("{\"message\": \"bad request\"}".utf8))
+        }
+
+        await appState.rescheduleTask(task, to: newDate)
+
+        XCTAssertEqual(
+            appState.tasks.first?.dueDate,
+            original,
+            "A failed reschedule must restore the original due date"
+        )
+    }
+
     // MARK: - Calm Mode (#68)
 
     /// Seeds a deterministic spread of due dates: overdue, due-today,
@@ -509,15 +644,39 @@ final class AppStateTests: XCTestCase {
         let cal = Calendar.current
         let todayEndOfDay = try XCTUnwrap(cal.date(bySettingHour: 23, minute: 59, second: 59, of: now))
         appState.tasks = [
-            VTask(id: 1, title: "Overdue", done: false,
-                  dueDate: cal.date(byAdding: .day, value: -2, to: now), priority: 0, projectId: 1),
-            VTask(id: 2, title: "Today", done: false,
-                  dueDate: todayEndOfDay, priority: 0, projectId: 1),
-            VTask(id: 3, title: "Upcoming", done: false,
-                  dueDate: cal.date(byAdding: .day, value: 3, to: now), priority: 0, projectId: 1),
+            VTask(
+                id: 1,
+                title: "Overdue",
+                done: false,
+                dueDate: cal.date(byAdding: .day, value: -2, to: now),
+                priority: 0,
+                projectId: 1
+            ),
+            VTask(
+                id: 2,
+                title: "Today",
+                done: false,
+                dueDate: todayEndOfDay,
+                priority: 0,
+                projectId: 1
+            ),
+            VTask(
+                id: 3,
+                title: "Upcoming",
+                done: false,
+                dueDate: cal.date(byAdding: .day, value: 3, to: now),
+                priority: 0,
+                projectId: 1
+            ),
             VTask(id: 4, title: "No date", done: false, priority: 0, projectId: 1),
-            VTask(id: 5, title: "Done overdue", done: true,
-                  dueDate: cal.date(byAdding: .day, value: -3, to: now), priority: 0, projectId: 1),
+            VTask(
+                id: 5,
+                title: "Done overdue",
+                done: true,
+                dueDate: cal.date(byAdding: .day, value: -3, to: now),
+                priority: 0,
+                projectId: 1
+            ),
         ]
     }
 
@@ -563,5 +722,32 @@ final class AppStateTests: XCTestCase {
         SharedKeys.sharedDefaults.set(true, forKey: SharedKeys.calmModeKey)
         XCTAssertTrue(SharedKeys.sharedDefaults.bool(forKey: SharedKeys.calmModeKey))
         SharedKeys.sharedDefaults.removeObject(forKey: SharedKeys.calmModeKey)
+    }
+}
+
+private extension URLRequest {
+    /// MockURLProtocol delivers the body as a stream; read + decode it as JSON.
+    var decodedJSONBody: [String: Any]? {
+        let data: Data?
+        if let body = httpBody {
+            data = body
+        } else if let stream = httpBodyStream {
+            stream.open()
+            defer { stream.close() }
+            var buffer = Data()
+            let size = 1024
+            let ptr = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
+            defer { ptr.deallocate() }
+            while stream.hasBytesAvailable {
+                let read = stream.read(ptr, maxLength: size)
+                if read <= 0 { break }
+                buffer.append(ptr, count: read)
+            }
+            data = buffer.isEmpty ? nil : buffer
+        } else {
+            data = nil
+        }
+        guard let data else { return nil }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 }
