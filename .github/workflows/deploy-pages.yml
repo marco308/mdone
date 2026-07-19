@@ -1,4 +1,4 @@
-name: Deploy website to GitHub Pages
+name: Pages Deploy
 
 # Publishes the static marketing site in website/ to GitHub Pages.
 # Only runs when the site (or this workflow) changes, so ordinary app
