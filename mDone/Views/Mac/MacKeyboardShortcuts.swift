@@ -9,6 +9,13 @@ struct MacKeyboardShortcuts: ViewModifier {
             .sheet(isPresented: $showingQuickAdd) {
                 MacQuickAddSheet()
             }
+            .onChange(of: appState.quickAddTrigger) { _, newValue in
+                // Set by QuickAddIntent when the "Quick Add Task" Shortcuts
+                // action runs. Consume it so a later trigger fires again.
+                guard newValue != nil else { return }
+                appState.quickAddTrigger = nil
+                showingQuickAdd = true
+            }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {

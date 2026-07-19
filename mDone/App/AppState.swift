@@ -99,6 +99,11 @@ final class AppState {
         notifications.filter { $0.read != true }.count
     }
 
+    /// The live instance backing the UI, set on init. App Intents run in the
+    /// app process without access to the SwiftUI environment, so this is their
+    /// only route to app state. Touch it from the main actor only.
+    static weak var shared: AppState?
+
     /// `taskService` is injectable so tests can drive the network paths
     /// (e.g. `undoLastCompletion`) through a mocked `APIClient`.
     init(
@@ -109,6 +114,7 @@ final class AppState {
         self.taskService = taskService
         self.projectService = projectService
         self.labelService = labelService
+        AppState.shared = self
     }
 
     private let taskService: TaskService
