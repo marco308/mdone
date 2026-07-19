@@ -111,6 +111,10 @@ struct Endpoint {
         if let orderBy, !orderBy.isEmpty {
             items.append(URLQueryItem(name: "order_by", value: orderBy))
         }
+        // Ask the server to embed each task's subtask relations. Current
+        // Vikunja (2.x) populates `related_tasks` in list responses anyway,
+        // but versions that gate it behind `expand` need this to be explicit.
+        items.append(URLQueryItem(name: "expand", value: "subtasks"))
         return Endpoint(path: "/api/v1/tasks", queryItems: items)
     }
 
@@ -118,6 +122,7 @@ struct Endpoint {
         Endpoint(path: "/api/v1/projects/\(projectId)/views/\(viewId)/tasks", queryItems: [
             URLQueryItem(name: "page", value: "\(page)"),
             URLQueryItem(name: "per_page", value: "\(perPage)"),
+            URLQueryItem(name: "expand", value: "subtasks"),
         ])
     }
 
@@ -135,6 +140,22 @@ struct Endpoint {
 
     static func task(id: Int64) -> Endpoint {
         Endpoint(path: "/api/v1/tasks/\(id)")
+    }
+
+    // MARK: - Task Relations
+
+    /// Creates a relation between two tasks. Vikunja uses PUT (not POST) for
+    /// creation, with a body of `{ "other_task_id": <id>, "relation_kind": "<kind>" }`.
+    /// The inverse relation (e.g. `parenttask` on the other task when creating
+    /// a `subtask`) is created server-side automatically.
+    static func createTaskRelation(taskId: Int64) -> Endpoint {
+        Endpoint(path: "/api/v1/tasks/\(taskId)/relations", method: .PUT)
+    }
+
+    /// Removes a relation; the server also removes the inverse relation from
+    /// the other task.
+    static func deleteTaskRelation(taskId: Int64, relationKind: String, otherTaskId: Int64) -> Endpoint {
+        Endpoint(path: "/api/v1/tasks/\(taskId)/relations/\(relationKind)/\(otherTaskId)", method: .DELETE)
     }
 
     // MARK: - Labels

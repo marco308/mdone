@@ -114,6 +114,8 @@ struct MacTaskDetailView: View {
                 }
             }
 
+            TaskRelationsSections(task: task)
+
             Section("Due Date") {
                 Toggle("Has due date", isOn: $hasDueDate.animation())
 

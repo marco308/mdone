@@ -9,13 +9,24 @@ struct SmartListSection: View {
     var showsProgress: Bool = false
 
     var body: some View {
+        let rows = TaskNesting.rows(for: tasks)
         Section {
-            ForEach(tasks) { task in
-                TaskRow(task: task, showsProgress: showsProgress)
-                    .tag(task)
-            }
-            .onMove { source, destination in
-                handleMove(from: source, to: destination)
+            if rows.contains(where: { $0.depth > 0 }) {
+                // Nested display: subtasks sit indented beneath their parent.
+                // Drag-reorder is disabled here because the visual order no
+                // longer matches the flat position order Vikunja stores.
+                ForEach(rows) { row in
+                    TaskRow(task: row.task, showsProgress: showsProgress, indentLevel: row.depth)
+                        .tag(row.task)
+                }
+            } else {
+                ForEach(tasks) { task in
+                    TaskRow(task: task, showsProgress: showsProgress)
+                        .tag(task)
+                }
+                .onMove { source, destination in
+                    handleMove(from: source, to: destination)
+                }
             }
         } header: {
             HStack {

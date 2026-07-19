@@ -100,11 +100,11 @@ struct MacTaskListView: View {
                 }
                 .listStyle(.inset)
             } else {
-                List(tasks, selection: $selectedTask) { task in
-                    TaskRow(task: task)
-                        .tag(task)
-                        .draggable(String(task.id)) {
-                            Text(task.title)
+                List(TaskNesting.rows(for: tasks), selection: $selectedTask) { row in
+                    TaskRow(task: row.task, indentLevel: row.depth)
+                        .tag(row.task)
+                        .draggable(String(row.task.id)) {
+                            Text(row.task.title)
                                 .padding(8)
                                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
                         }

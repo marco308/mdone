@@ -8,8 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - The "Quick Add Task" action in the Shortcuts app now works. It opens mDone with the quick-add bar focused and ready to type. Previously the action always failed with "an internal error occurred" because it ran from the widget extension instead of the app (#121).
+- Rescheduling a task via the long-press "Schedule" menu no longer drops it from the **Current** section until the next refresh (the same server-response quirk fixed for other edits in 1.7.0).
 
 ### Added
+- **Subtasks**: tasks with subtasks now show them indented underneath in every list (Inbox sections, project lists, and the Mac task list), with a "2/5" progress badge on the parent row showing how many are done. Checking a subtask off updates the parent's count immediately (#1).
+- Manage subtasks from a task's detail view: add a new subtask by typing its title, link an existing task from the same project, check subtasks off, or unlink one (unlinking never deletes the task). Tasks that are subtasks also show their parent, and any other relations created in Vikunja (Blocked By, Precedes, Duplicates, …) are listed and can be removed (#1).
 - "Quick Add Task" is now a proper App Shortcut: it appears automatically in the Shortcuts app, can be run by voice with Siri ("Add a task in mDone"), and works on Mac as well as iPhone.
 
 ### Removed

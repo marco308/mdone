@@ -564,19 +564,20 @@ final class AppState {
         }
     }
 
-    /// Vikunja's task-update/toggle response returns `labels: null` (it doesn't
-    /// echo the task's labels). Replacing the local task wholesale with that
-    /// response would drop its labels until the next full refresh, which made a
-    /// Current task vanish from its section the moment you edited it (e.g.
-    /// changed its progress). Carry the existing labels forward when the
-    /// response omits them. Only labels are preserved: they're never edited via
-    /// the task-update endpoint (the Current label is toggled through the
-    /// dedicated label endpoints), so this can't mask a user edit. Other
-    /// relations like reminders *are* sent in the update request, so we let the
+    /// Vikunja's task-update/toggle response returns `labels: null` and
+    /// `related_tasks: null` (it doesn't echo either). Replacing the local task
+    /// wholesale with that response would drop its labels until the next full
+    /// refresh, which made a Current task vanish from its section the moment
+    /// you edited it (e.g. changed its progress) — and would likewise wipe its
+    /// subtask list and count. Carry both forward when the response omits them.
+    /// Neither is edited via the task-update endpoint (labels use the label
+    /// endpoints, relations the relation endpoints), so this can't mask a user
+    /// edit. Reminders *are* sent in the update request, so we let the
     /// response drive them.
     static func preservingRelations(existing: VTask, response: VTask) -> VTask {
         var result = response
         if result.labels == nil { result.labels = existing.labels }
+        if result.relatedTasks == nil { result.relatedTasks = existing.relatedTasks }
         return result
     }
 
@@ -588,7 +589,13 @@ final class AppState {
                 .map { Self.preservingRelations(existing: $0, response: response) } ?? response
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
+            } else {
+                // Subtasks toggled from a parent's detail view may not be in
+                // the live list (some server versions omit done tasks) —
+                // insert so subsequent toggles and counts see fresh state.
+                tasks.append(updated)
             }
+            syncEmbeddedRelations(with: updated)
             syncService?.updateCachedTask(updated)
             if updated.done {
                 recordCompletionForUndo(task)
@@ -628,6 +635,7 @@ final class AppState {
             } else {
                 tasks.append(restored)
             }
+            syncEmbeddedRelations(with: restored)
             syncService?.updateCachedTask(restored)
             #if os(iOS)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -704,6 +712,7 @@ final class AppState {
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
+            syncEmbeddedRelations(with: updated)
             syncService?.updateCachedTask(updated)
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
@@ -727,10 +736,13 @@ final class AppState {
         }
 
         do {
-            let updated = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(dueDate: newDate))
+            let response = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(dueDate: newDate))
+            let updated = tasks.first(where: { $0.id == response.id })
+                .map { Self.preservingRelations(existing: $0, response: response) } ?? response
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
+            syncEmbeddedRelations(with: updated)
             syncService?.updateCachedTask(updated)
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
@@ -750,10 +762,120 @@ final class AppState {
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
+            syncEmbeddedRelations(with: updated)
             syncService?.updateCachedTask(updated)
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
             handleError(error)
+        }
+    }
+
+    // MARK: - Subtasks & Relations
+
+    /// Links `childId` as a subtask of `parentId`, then refreshes both tasks
+    /// so each side's `related_tasks` reflects the server's view. Returns
+    /// `true` on success.
+    @MainActor
+    @discardableResult
+    func addSubtaskRelation(parentId: Int64, childId: Int64) async -> Bool {
+        do {
+            try await taskService.createRelation(taskId: parentId, otherTaskId: childId, kind: .subtask)
+            await refreshTasksAfterRelationChange(ids: [parentId, childId])
+            #if os(iOS)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
+            return true
+        } catch {
+            handleError(error)
+            return false
+        }
+    }
+
+    /// Creates a new task in the parent's project and links it as a subtask.
+    /// Returns `true` when both steps succeed.
+    @MainActor
+    @discardableResult
+    func createSubtask(title: String, parent: VTask) async -> Bool {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        guard let newTask = await createTask(title: trimmed, projectId: parent.projectId) else { return false }
+        return await addSubtaskRelation(parentId: parent.id, childId: newTask.id)
+    }
+
+    /// Removes the `kind` relation between `taskId` and `otherTaskId` (the
+    /// server drops the inverse too), then refreshes both tasks. Removing a
+    /// `subtask` relation only unlinks the tasks — neither is deleted.
+    @MainActor
+    func removeRelation(taskId: Int64, otherTaskId: Int64, kind: RelationKind) async {
+        do {
+            try await taskService.deleteRelation(taskId: taskId, otherTaskId: otherTaskId, kind: kind)
+            await refreshTasksAfterRelationChange(ids: [taskId, otherTaskId])
+        } catch {
+            handleError(error)
+        }
+    }
+
+    /// Refetches the tasks touched by a relation change and merges them into
+    /// the live list. Single-task GETs return authoritative `related_tasks`,
+    /// unlike the relation endpoints (which return only the relation).
+    @MainActor
+    private func refreshTasksAfterRelationChange(ids: [Int64]) async {
+        for id in ids {
+            guard let fresh = try? await taskService.fetchTask(id: id) else { continue }
+            if let index = tasks.firstIndex(where: { $0.id == fresh.id }) {
+                tasks[index] = fresh
+            } else {
+                tasks.append(fresh)
+            }
+            syncEmbeddedRelations(with: fresh)
+            syncService?.updateCachedTask(fresh)
+        }
+    }
+
+    /// Mirrors an updated task into the embedded related-task snapshots other
+    /// tasks hold (`relatedTasks` copies), so subtask counts and nested rows
+    /// stay fresh without a refetch — e.g. checking a subtask off updates its
+    /// parent's "2/5 done" badge immediately.
+    @MainActor
+    private func syncEmbeddedRelations(with updatedTask: VTask) {
+        // Embedded snapshots never carry their own relations (the server
+        // doesn't recurse), so strip them before mirroring.
+        var snapshot = updatedTask
+        snapshot.relatedTasks = nil
+        for index in tasks.indices where tasks[index].id != updatedTask.id {
+            guard let related = tasks[index].relatedTasks else { continue }
+            var updatedMap = related
+            var changed = false
+            for (kind, list) in related where list.contains(where: { $0.id == updatedTask.id }) {
+                updatedMap[kind] = list.map { $0.id == updatedTask.id ? snapshot : $0 }
+                changed = true
+            }
+            if changed {
+                tasks[index].relatedTasks = updatedMap
+            }
+        }
+    }
+
+    /// Strips a deleted task out of every other task's embedded relation
+    /// snapshots so counts don't keep counting a task that no longer exists.
+    @MainActor
+    private func removeEmbeddedRelations(taskId: Int64) {
+        for index in tasks.indices {
+            guard let related = tasks[index].relatedTasks else { continue }
+            var updatedMap = related
+            var changed = false
+            for (kind, list) in related where list.contains(where: { $0.id == taskId }) {
+                let filtered = list.filter { $0.id != taskId }
+                if filtered.isEmpty {
+                    updatedMap.removeValue(forKey: kind)
+                } else {
+                    updatedMap[kind] = filtered
+                }
+                changed = true
+            }
+            if changed {
+                tasks[index].relatedTasks = updatedMap.isEmpty ? nil : updatedMap
+            }
         }
     }
 
@@ -763,7 +885,9 @@ final class AppState {
     /// exist yet. Persists the id so it survives a later rename.
     @MainActor
     private func ensureCurrentLabel() async throws -> VLabel {
-        if let existing = currentLabel { return existing }
+        if let existing = currentLabel {
+            return existing
+        }
         let created = try await labelService.createLabel(
             LabelCreateRequest(title: Self.currentLabelTitle, hexColor: "1a8cff")
         )
@@ -855,6 +979,7 @@ final class AppState {
             let taskId = task.id
             try await taskService.deleteTask(id: taskId)
             tasks.removeAll { $0.id == taskId }
+            removeEmbeddedRelations(taskId: taskId)
             syncService?.deleteCachedTask(id: taskId)
             onTaskDeleted?(taskId)
             #if os(iOS)
@@ -1152,7 +1277,9 @@ final class AppState {
             } else {
                 archivedProjects.append(project)
             }
-            if selectedProject?.id == project.id { selectedProject = nil }
+            if selectedProject?.id == project.id {
+                selectedProject = nil
+            }
         } else {
             archivedProjects.removeAll { $0.id == project.id }
             if let idx = projects.firstIndex(where: { $0.id == project.id }) {
@@ -1160,7 +1287,9 @@ final class AppState {
             } else {
                 projects.append(project)
             }
-            if selectedProject?.id == project.id { selectedProject = project }
+            if selectedProject?.id == project.id {
+                selectedProject = project
+            }
         }
     }
 

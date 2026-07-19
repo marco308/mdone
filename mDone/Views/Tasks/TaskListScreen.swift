@@ -116,10 +116,18 @@ struct TaskListScreen: View {
                                 )
                             }
                         } else {
+                            let rows = TaskNesting.rows(for: projectTasks)
                             Section {
                                 if readOnly {
-                                    ForEach(projectTasks) { task in
-                                        TaskRow(task: task, readOnly: true)
+                                    ForEach(rows) { row in
+                                        TaskRow(task: row.task, readOnly: true, indentLevel: row.depth)
+                                    }
+                                } else if rows.contains(where: { $0.depth > 0 }) {
+                                    // Nested display: drag-reorder is disabled
+                                    // because visual order no longer matches the
+                                    // flat position order Vikunja stores.
+                                    ForEach(rows) { row in
+                                        TaskRow(task: row.task, indentLevel: row.depth)
                                     }
                                 } else {
                                     ForEach(projectTasks) { task in
