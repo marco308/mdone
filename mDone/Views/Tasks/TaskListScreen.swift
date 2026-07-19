@@ -23,6 +23,16 @@ struct TaskListScreen: View {
         !readOnly && projectFilter?.kanbanViewId != nil
     }
 
+    /// True while the board is displayed instead of the list. The filter and
+    /// sort controls only affect the list, so they're hidden in board mode.
+    private var boardActive: Bool {
+        #if os(iOS)
+        return showBoard && projectFilter != nil
+        #else
+        return false
+        #endif
+    }
+
     enum SortOrder: String, CaseIterable {
         case dueDate = "Due Date"
         case priority = "Priority"
@@ -161,41 +171,43 @@ struct TaskListScreen: View {
         }
         #endif
 
-        ToolbarItem(placement: .primaryAction) {
-            Button {
-                showAdvancedFilter = true
-            } label: {
-                Image(systemName: appState
-                    .advancedFilterString != nil ? "line.3.horizontal.decrease.circle.fill" :
-                    "line.3.horizontal.decrease.circle")
+        if !boardActive {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showAdvancedFilter = true
+                } label: {
+                    Image(systemName: appState
+                        .advancedFilterString != nil ? "line.3.horizontal.decrease.circle.fill" :
+                        "line.3.horizontal.decrease.circle")
+                }
+                .accessibilityLabel(appState
+                    .advancedFilterString != nil ? "Advanced filter active" : "Advanced filter")
             }
-            .accessibilityLabel(appState
-                .advancedFilterString != nil ? "Advanced filter active" : "Advanced filter")
-        }
 
-        ToolbarItem(placement: .primaryAction) {
-            Menu {
-                ForEach(SortOrder.allCases, id: \.self) { order in
-                    Button {
-                        if sortOrder == order {
-                            sortAscending.toggle()
-                        } else {
-                            sortOrder = order
-                            sortAscending = true
-                        }
-                    } label: {
-                        HStack {
-                            Text(order.rawValue)
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    ForEach(SortOrder.allCases, id: \.self) { order in
+                        Button {
                             if sortOrder == order {
-                                Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
+                                sortAscending.toggle()
+                            } else {
+                                sortOrder = order
+                                sortAscending = true
+                            }
+                        } label: {
+                            HStack {
+                                Text(order.rawValue)
+                                if sortOrder == order {
+                                    Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
+                                }
                             }
                         }
                     }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
                 }
-            } label: {
-                Image(systemName: "arrow.up.arrow.down")
+                .accessibilityLabel("Sort by \(sortOrder.rawValue), \(sortAscending ? "ascending" : "descending")")
             }
-            .accessibilityLabel("Sort by \(sortOrder.rawValue), \(sortAscending ? "ascending" : "descending")")
         }
     }
 

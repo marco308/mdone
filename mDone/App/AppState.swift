@@ -959,6 +959,12 @@ final class AppState {
             )
             if let index = tasks.firstIndex(where: { $0.id == task.id }) {
                 tasks[index].bucketId = bucketId
+            } else {
+                // The board can be shown before the list has fetched this task,
+                // so insert it to keep list views consistent with the board.
+                var moved = task
+                moved.bucketId = bucketId
+                tasks.append(moved)
             }
             return true
         } catch {

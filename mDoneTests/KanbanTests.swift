@@ -184,6 +184,33 @@ final class KanbanTests: XCTestCase {
     }
 
     @MainActor
+    func testAppStateMoveTaskInsertsMissingTask() async {
+        let client = APIClient(session: MockURLProtocol.mockSession())
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+        let appState = AppState(taskService: TaskService(apiClient: client))
+
+        let project = Project(
+            id: 7,
+            title: "Work",
+            views: [ProjectView(id: 3, title: "Kanban", projectId: 7, viewKind: "kanban")]
+        )
+        // The board was loaded before the list, so the task isn't in `tasks` yet.
+        var task = VTask(id: 42, title: "Board only", done: false, priority: 0, projectId: 7)
+        task.bucketId = 1
+        appState.tasks = []
+
+        MockURLProtocol.requestHandler = { request in
+            (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), Data())
+        }
+
+        let moved = await appState.moveTask(task, toBucket: 9, in: project)
+        XCTAssertTrue(moved)
+        XCTAssertEqual(appState.tasks.count, 1)
+        XCTAssertEqual(appState.tasks.first?.id, 42)
+        XCTAssertEqual(appState.tasks.first?.bucketId, 9)
+    }
+
+    @MainActor
     func testAppStateMoveTaskNoOpWhenSameBucket() async {
         let appState = AppState()
         let project = Project(

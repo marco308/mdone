@@ -172,8 +172,9 @@ private struct BoardTaskCard: View {
                         ForEach(otherBuckets) { bucket in
                             Button(bucket.title) {
                                 Task {
-                                    await appState.moveTask(task, toBucket: bucket.id, in: project)
-                                    await onChanged()
+                                    if await appState.moveTask(task, toBucket: bucket.id, in: project) {
+                                        await onChanged()
+                                    }
                                 }
                             }
                         }
