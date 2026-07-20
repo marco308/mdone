@@ -83,10 +83,21 @@ Steps to test:
 
 This is a private test server maintained by the developer for App Store review purposes.
 
-## What's New (v1.8.1)
+## What's New (v1.10.0)
 
-Shortcuts and Siri fixes.
+Subtasks: break big tasks into steps.
 
+- Tasks now show their subtasks nested underneath in every list, with a progress badge on the parent (e.g. 2/5 done).
+- Add subtasks from a task's detail view, or link any existing task — from any project — as a subtask, with search.
+- Tick subtasks off right from the parent task's detail view; the progress badge updates instantly.
+- Relations created in Vikunja on the web (Blocked By, Precedes, Duplicates and more) now show on the task and can be removed.
+- Available on both iPhone and Mac.
+
+## What's New (v1.9.0)
+
+Task row sizes, plus Shortcuts and Siri fixes.
+
+- Choose how big tasks appear in your lists: Settings > Appearance > Task row size offers Compact, Standard, and Large.
 - The "Quick Add Task" action in the Shortcuts app now works: it opens mDone with the quick-add bar ready to type. It previously failed with an internal error.
 - Quick Add Task is now a proper App Shortcut, so it appears in the Shortcuts app automatically and works with Siri: just say "Add a task in mDone".
 - Removed the broken "Open Task" action.
