@@ -297,6 +297,44 @@ final class TaskRelationTests: XCTestCase {
         XCTAssertEqual(rows.map(\.id), [1, 3, 2], "Child nests under the first parent encountered")
     }
 
+    // MARK: - SubtaskLinkCandidates
+
+    func testLinkCandidatesExcludeIneligibleTasks() {
+        let parent = makeTask(
+            id: 1, projectId: 5,
+            relatedTasks: [
+                "subtask": [makeTask(id: 2)],
+                "parenttask": [makeTask(id: 3)],
+            ]
+        )
+        let tasks = [
+            parent,
+            makeTask(id: 2, title: "Already a subtask", projectId: 5),
+            makeTask(id: 3, title: "Is the parent", projectId: 5),
+            makeTask(id: 4, title: "Done task", done: true, projectId: 5),
+            makeTask(id: 5, title: "Eligible", projectId: 5),
+        ]
+
+        let candidates = SubtaskLinkCandidates.candidates(for: parent, in: tasks)
+        XCTAssertEqual(candidates.map(\.id), [5])
+    }
+
+    func testLinkCandidatesIncludeOtherProjectsAfterOwnProject() {
+        let parent = makeTask(id: 1, projectId: 5)
+        let tasks = [
+            parent,
+            makeTask(id: 2, title: "Zebra (same project)", projectId: 5),
+            makeTask(id: 3, title: "Alpha (other project)", projectId: 9),
+            makeTask(id: 4, title: "Alpha (same project)", projectId: 5),
+        ]
+
+        let candidates = SubtaskLinkCandidates.candidates(for: parent, in: tasks)
+        XCTAssertEqual(
+            candidates.map(\.id), [4, 2, 3],
+            "Own project sorts first (alphabetical), then other projects"
+        )
+    }
+
     // MARK: - preservingRelations
 
     func testPreservingRelationsCarriesRelatedTasksForward() {

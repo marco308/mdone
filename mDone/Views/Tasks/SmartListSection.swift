@@ -10,23 +10,22 @@ struct SmartListSection: View {
 
     var body: some View {
         let rows = TaskNesting.rows(for: tasks)
+        let hasNesting = rows.contains { $0.depth > 0 }
         Section {
-            if rows.contains(where: { $0.depth > 0 }) {
-                // Nested display: subtasks sit indented beneath their parent.
-                // Drag-reorder is disabled here because the visual order no
-                // longer matches the flat position order Vikunja stores.
-                ForEach(rows) { row in
-                    TaskRow(task: row.task, showsProgress: showsProgress, indentLevel: row.depth)
-                        .tag(row.task)
-                }
-            } else {
-                ForEach(tasks) { task in
-                    TaskRow(task: task, showsProgress: showsProgress)
-                        .tag(task)
-                }
-                .onMove { source, destination in
-                    handleMove(from: source, to: destination)
-                }
+            // One ForEach for both flat and nested display, so a row's
+            // identity survives the list gaining/losing nesting — otherwise a
+            // detail sheet presented from a row gets torn down the moment its
+            // task's first subtask is linked. Reorder stays flat-only (nested
+            // visual order doesn't match Vikunja's flat position order);
+            // when flat, `rows` preserves `tasks`' order so `handleMove`
+            // indices line up.
+            ForEach(rows) { row in
+                TaskRow(task: row.task, showsProgress: showsProgress, indentLevel: row.depth)
+                    .tag(row.task)
+                    .moveDisabled(hasNesting)
+            }
+            .onMove { source, destination in
+                handleMove(from: source, to: destination)
             }
         } header: {
             HStack {

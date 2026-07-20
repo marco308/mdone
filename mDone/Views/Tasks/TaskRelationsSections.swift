@@ -10,6 +10,7 @@ struct TaskRelationsSections: View {
 
     @State private var newSubtaskTitle = ""
     @State private var isAddingSubtask = false
+    @State private var showLinkSheet = false
 
     /// The freshest copy of the task we can get: live from AppState when
     /// loaded, else the snapshot the detail view was opened with.
@@ -46,18 +47,13 @@ struct TaskRelationsSections: View {
                 .accessibilityLabel("Add subtask")
             }
 
-            if !linkCandidates.isEmpty {
-                Menu {
-                    ForEach(linkCandidates) { candidate in
-                        Button(candidate.title) {
-                            Task {
-                                await appState.addSubtaskRelation(parentId: liveTask.id, childId: candidate.id)
-                            }
-                        }
-                    }
-                } label: {
-                    Label("Link Existing Task", systemImage: "link")
-                }
+            Button {
+                showLinkSheet = true
+            } label: {
+                Label("Link Existing Task…", systemImage: "link")
+            }
+            .sheet(isPresented: $showLinkSheet) {
+                LinkSubtaskSheet(parent: liveTask)
             }
         } header: {
             HStack {
@@ -68,6 +64,8 @@ struct TaskRelationsSections: View {
                         .monospacedDigit()
                 }
             }
+        } footer: {
+            Text("Subtasks nest under this task in your lists. Unlinking never deletes a task.")
         }
     }
 
@@ -198,23 +196,92 @@ struct TaskRelationsSections: View {
         }
     }
 
-    /// Same-project tasks that could become subtasks of this one: not done,
-    /// not itself, not already a subtask, and not one of its parents (which
-    /// would create an immediate cycle). Capped to keep the menu usable.
-    private var linkCandidates: [VTask] {
-        let current = liveTask
-        let subtaskIds = Set(current.subtasks.map(\.id))
-        let parentIds = Set(current.parentTasks.map(\.id))
-        return appState.tasks
-            .filter {
-                $0.projectId == current.projectId
-                    && !$0.done
-                    && $0.id != current.id
-                    && !subtaskIds.contains($0.id)
-                    && !parentIds.contains($0.id)
+}
+
+/// Full-screen-friendly picker for turning an existing task into a subtask of
+/// `parent`. Lists every eligible open task across all projects (Vikunja
+/// supports cross-project relations), the parent's own project first, with a
+/// search field and each task's project shown underneath its title.
+struct LinkSubtaskSheet: View {
+    @Environment(AppState.self) private var appState
+    @Environment(\.dismiss) private var dismiss
+    let parent: VTask
+
+    @State private var searchText = ""
+    @State private var isLinking = false
+
+    private var candidates: [VTask] {
+        let all = SubtaskLinkCandidates.candidates(for: parent, in: appState.tasks)
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return all }
+        return all.filter { $0.title.localizedCaseInsensitiveContains(query) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if candidates.isEmpty {
+                    EmptyStateView(
+                        icon: "link",
+                        title: searchText.isEmpty ? "No Tasks to Link" : "No Matches",
+                        subtitle: searchText.isEmpty
+                            ? "Every other open task is already related to this one."
+                            : "No open task titles match your search."
+                    )
+                } else {
+                    List {
+                        Section {
+                            ForEach(candidates) { candidate in
+                                candidateRow(for: candidate)
+                            }
+                        } header: {
+                            Text("The task you pick becomes a subtask of \"\(parent.title)\". It stays in its own project.")
+                                .textCase(nil)
+                        }
+                    }
+                }
             }
-            .sorted { $0.title.localizedCompare($1.title) == .orderedAscending }
-            .prefix(30)
-            .map { $0 }
+            .searchable(text: $searchText, prompt: "Search tasks")
+            .navigationTitle("Link Subtask")
+            #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+            #endif
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                    }
+                }
+        }
+        #if os(macOS)
+        .frame(minWidth: 400, minHeight: 440)
+        #endif
+    }
+
+    private func candidateRow(for candidate: VTask) -> some View {
+        Button {
+            guard !isLinking else { return }
+            isLinking = true
+            Task {
+                let linked = await appState.addSubtaskRelation(parentId: parent.id, childId: candidate.id)
+                isLinking = false
+                if linked { dismiss() }
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(candidate.title)
+                    .foregroundStyle(Color.primary)
+                Text(projectName(for: candidate))
+                    .font(.caption)
+                    .foregroundStyle(Color.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .disabled(isLinking)
+        .accessibilityLabel("Link \(candidate.title) as subtask")
+    }
+
+    private func projectName(for task: VTask) -> String {
+        appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Project \(task.projectId)"
     }
 }

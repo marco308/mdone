@@ -72,6 +72,32 @@ struct TaskListRow: Identifiable, Hashable {
     }
 }
 
+/// Filters and orders the tasks eligible to become subtasks of a given parent.
+/// Pure and view-independent so it can be unit-tested.
+enum SubtaskLinkCandidates {
+    /// Open tasks from ANY project (Vikunja allows cross-project relations)
+    /// that aren't the parent itself and aren't already directly related to
+    /// it. The parent's own project lists first, then everything else,
+    /// alphabetically within each group.
+    static func candidates(for parent: VTask, in tasks: [VTask]) -> [VTask] {
+        let subtaskIds = Set(parent.subtasks.map(\.id))
+        let parentIds = Set(parent.parentTasks.map(\.id))
+        return tasks
+            .filter {
+                !$0.done
+                    && $0.id != parent.id
+                    && !subtaskIds.contains($0.id)
+                    && !parentIds.contains($0.id)
+            }
+            .sorted { a, b in
+                let aInProject = a.projectId == parent.projectId
+                let bInProject = b.projectId == parent.projectId
+                if aInProject != bInProject { return aInProject }
+                return a.title.localizedCompare(b.title) == .orderedAscending
+            }
+    }
+}
+
 /// Orders a task list depth-first so each task's subtasks appear directly
 /// beneath it, indented. Pure and view-independent so it can be unit-tested.
 enum TaskNesting {
