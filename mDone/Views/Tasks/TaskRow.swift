@@ -12,6 +12,9 @@ struct TaskRow: View {
     /// When true, the row shows a progress bar and (when stalled) an idle badge.
     /// Used by the "Current" section.
     var showsProgress: Bool = false
+    /// Nesting depth when the row renders as a subtask beneath its parent
+    /// (0 = top level). Indentation is capped so deep trees stay readable.
+    var indentLevel: Int = 0
     @State private var showDetail = false
     @AppStorage("calmMode") private var calmMode = false
     @AppStorage("currentStallDays") private var stallDays = 7
@@ -150,6 +153,13 @@ struct TaskRow: View {
 
     private var rowContent: some View {
         HStack(spacing: 12) {
+            if indentLevel > 0 {
+                Image(systemName: "arrow.turn.down.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+
             RoundedRectangle(cornerRadius: 2)
                 .fill(accentColor)
                 .frame(width: 4, height: density.accentBarHeight)
@@ -202,6 +212,16 @@ struct TaskRow: View {
                         .foregroundStyle(.secondary)
                     }
 
+                    if let counts = task.subtaskCounts {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checklist")
+                            Text("\(counts.done)/\(counts.total)")
+                                .monospacedDigit()
+                        }
+                        .font(density.metadataFont)
+                        .foregroundStyle(counts.done == counts.total ? Color.green : Color.secondary)
+                    }
+
                     if let labels = task.labels, !labels.isEmpty {
                         HStack(spacing: 4) {
                             ForEach(labels.prefix(3)) { label in
@@ -232,6 +252,7 @@ struct TaskRow: View {
             }
             #endif
         }
+        .padding(.leading, CGFloat(min(indentLevel, 4)) * 16)
         .padding(.vertical, density.rowVerticalPadding)
         .opacity(task.done ? 0.6 : 1)
         .accessibilityElement(children: .combine)
@@ -241,8 +262,14 @@ struct TaskRow: View {
     private var taskAccessibilityLabel: String {
         var parts: [String] = []
         parts.append(task.title)
+        if indentLevel > 0 {
+            parts.append("subtask")
+        }
         if task.done {
             parts.append("completed")
+        }
+        if let counts = task.subtaskCounts {
+            parts.append("\(counts.done) of \(counts.total) subtasks done")
         }
         if task.priority > 0 {
             parts.append("priority \(task.priorityLevel.label)")

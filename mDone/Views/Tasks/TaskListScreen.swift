@@ -116,18 +116,22 @@ struct TaskListScreen: View {
                                 )
                             }
                         } else {
+                            let rows = TaskNesting.rows(for: projectTasks)
+                            let hasNesting = rows.contains { $0.depth > 0 }
                             Section {
-                                if readOnly {
-                                    ForEach(projectTasks) { task in
-                                        TaskRow(task: task, readOnly: true)
-                                    }
-                                } else {
-                                    ForEach(projectTasks) { task in
-                                        TaskRow(task: task)
-                                    }
-                                    .onMove { source, destination in
-                                        handleMove(tasks: projectTasks, from: source, to: destination)
-                                    }
+                                // Single ForEach for flat and nested display so
+                                // row identity survives the list gaining/losing
+                                // nesting (else a presented detail sheet gets
+                                // dismissed when the first subtask is linked).
+                                // Reorder is flat-only; when flat, `rows`
+                                // preserves `projectTasks`' order so the move
+                                // indices line up.
+                                ForEach(rows) { row in
+                                    TaskRow(task: row.task, readOnly: readOnly, indentLevel: row.depth)
+                                        .moveDisabled(readOnly || hasNesting)
+                                }
+                                .onMove { source, destination in
+                                    handleMove(tasks: projectTasks, from: source, to: destination)
                                 }
                             }
                         }

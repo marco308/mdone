@@ -9,10 +9,20 @@ struct SmartListSection: View {
     var showsProgress: Bool = false
 
     var body: some View {
+        let rows = TaskNesting.rows(for: tasks)
+        let hasNesting = rows.contains { $0.depth > 0 }
         Section {
-            ForEach(tasks) { task in
-                TaskRow(task: task, showsProgress: showsProgress)
-                    .tag(task)
+            // One ForEach for both flat and nested display, so a row's
+            // identity survives the list gaining/losing nesting — otherwise a
+            // detail sheet presented from a row gets torn down the moment its
+            // task's first subtask is linked. Reorder stays flat-only (nested
+            // visual order doesn't match Vikunja's flat position order);
+            // when flat, `rows` preserves `tasks`' order so `handleMove`
+            // indices line up.
+            ForEach(rows) { row in
+                TaskRow(task: row.task, showsProgress: showsProgress, indentLevel: row.depth)
+                    .tag(row.task)
+                    .moveDisabled(hasNesting)
             }
             .onMove { source, destination in
                 handleMove(from: source, to: destination)

@@ -134,6 +134,8 @@ struct TaskDetailSheet: View {
                     }
                 }
 
+                TaskRelationsSections(task: task)
+
                 Section {
                     Toggle("Due Date", isOn: $hasDueDate.animation())
 

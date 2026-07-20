@@ -67,4 +67,24 @@ final class MockURLProtocol: URLProtocol {
         config.protocolClasses = [MockURLProtocol.self]
         return URLSession(configuration: config)
     }
+
+    /// Returns a request's body. URLSession hands URLProtocol the body as a
+    /// stream (`httpBody` is nil by the time the request reaches the handler),
+    /// so tests asserting on request bodies must go through this.
+    static func bodyData(from request: URLRequest) -> Data? {
+        if let body = request.httpBody { return body }
+        guard let stream = request.httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        let bufferSize = 4096
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: bufferSize)
+            guard read > 0 else { break }
+            data.append(buffer, count: read)
+        }
+        return data
+    }
 }

@@ -7,10 +7,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
-- The "Quick Add Task" action in the Shortcuts app now works. It opens mDone with the quick-add bar focused and ready to type. Previously the action always failed with "an internal error occurred" because it ran from the widget extension instead of the app (#121).
+- Rescheduling a task via the long-press "Schedule" menu no longer drops it from the **Current** section until the next refresh (the same server-response quirk fixed for other edits in 1.7.0).
 
 ### Added
+- **Subtasks**: tasks with subtasks now show them indented underneath in every list (Inbox sections, project lists, and the Mac task list), with a "2/5" progress badge on the parent row showing how many are done. Checking a subtask off updates the parent's count immediately (#1).
+- Manage subtasks from a task's detail view: add a new subtask by typing its title, or tap "Link Existing Task" to pick any open task — searchable, from any project, with each task's project shown — and make it a subtask. Check subtasks off or unlink them (unlinking never deletes the task). Tasks that are subtasks also show their parent, and any other relations created in Vikunja (Blocked By, Precedes, Duplicates, …) are listed and can be removed (#1).
+
+## [1.9.0] - 2026-07-20
+
+### Added
+- You can now choose how big tasks appear in your lists: Settings > Appearance > **Task row size** offers Compact, Standard, and Large. Compact shrinks the text and tightens the rows so more tasks fit on screen, Large makes them easier to read, and Standard keeps the app's original look (and stays the default). Applies to the Inbox, project lists, the calendar's day list, and the Mac task list, matching the size options the widgets already offer (#122).
 - "Quick Add Task" is now a proper App Shortcut: it appears automatically in the Shortcuts app, can be run by voice with Siri ("Add a task in mDone"), and works on Mac as well as iPhone.
+
+### Fixed
+- The "Quick Add Task" action in the Shortcuts app now works. It opens mDone with the quick-add bar focused and ready to type. Previously the action always failed with "an internal error occurred" because it ran from the widget extension instead of the app (#121).
 
 ### Removed
 - The "Open Task" action no longer appears in the Shortcuts app. It never worked (it failed with the same internal error as Quick Add Task) and offered no way to pick a task, so it has been removed rather than left broken.
@@ -18,7 +28,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [1.8.0] - 2026-07-13
 
 ### Added
-- You can now choose how big tasks appear in your lists: Settings > Appearance > **Task row size** offers Compact, Standard, and Large. Compact shrinks the text and tightens the rows so more tasks fit on screen, Large makes them easier to read, and Standard keeps the app's original look (and stays the default). Applies to the Inbox, project lists, the calendar's day list, and the Mac task list, matching the size options the widgets already offer (#122).
 - Projects now display as a hierarchy: sub-projects nest under their parent with an indent and an expand/collapse chevron, matching Vikunja's folder structure on the web. Both the iPhone project list and the Mac sidebar are sorted by each project's position (then name), so the ordering is stable instead of showing sub-projects jumbled at the top. Collapsed projects stay collapsed across app launches (#118).
 - You can now build and rearrange that hierarchy from the app: pick a **Parent Project** when creating or editing a project, and **Move to…** a project under a different parent (or back to the top level) from its right-click / long-press menu. Options that would create a loop (moving a project under itself or one of its own sub-projects) are hidden (#118).
 - Tasks now show the color you assign them in Vikunja. Each colored task tints its leading accent bar and completion circle with its hex color, so color-coded contexts (work, personal, clients) are visible at a glance in every list. Uncolored tasks are unchanged (#112).

@@ -43,6 +43,23 @@ actor TaskService {
         try await apiClient.sendExpectingEmpty(Endpoint.updateTaskPosition(taskId: taskId), body: request)
     }
 
+    /// Links `otherTaskId` to `taskId` with the given relation kind — e.g.
+    /// `.subtask` makes `otherTaskId` a subtask of `taskId`. The server creates
+    /// the inverse relation on the other task automatically.
+    @discardableResult
+    func createRelation(taskId: Int64, otherTaskId: Int64, kind: RelationKind) async throws -> TaskRelation {
+        let request = TaskRelationRequest(otherTaskId: otherTaskId, relationKind: kind)
+        return try await apiClient.send(Endpoint.createTaskRelation(taskId: taskId), body: request)
+    }
+
+    /// Removes the `kind` relation between `taskId` and `otherTaskId`; the
+    /// server drops the inverse relation as well.
+    func deleteRelation(taskId: Int64, otherTaskId: Int64, kind: RelationKind) async throws {
+        try await apiClient.delete(
+            Endpoint.deleteTaskRelation(taskId: taskId, relationKind: kind.rawValue, otherTaskId: otherTaskId)
+        )
+    }
+
     /// Moves a task into a kanban bucket (column) within a project view.
     func moveTaskToBucket(taskId: Int64, projectId: Int64, viewId: Int64, bucketId: Int64) async throws {
         let request = TaskBucketRequest(taskId: taskId)

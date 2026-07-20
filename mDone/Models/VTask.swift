@@ -28,9 +28,42 @@ struct VTask: Codable, Identifiable, Hashable {
     var updated: Date?
     var bucketId: Int64?
     var coverImageAttachmentId: Int64?
+    /// Tasks related to this one, keyed by the raw relation kind (`"subtask"`,
+    /// `"parenttask"`, `"blocking"`, …). Kept as raw strings so a kind added
+    /// by a future server version can't fail decoding. The embedded tasks are
+    /// snapshots without their own relations (`related_tasks` is `null` one
+    /// level down — the server doesn't recurse).
+    var relatedTasks: [String: [VTask]]?
 
     var priorityLevel: PriorityLevel {
         PriorityLevel(rawValue: Int(priority)) ?? .none
+    }
+
+    /// The related tasks of one kind, in server order. Empty when none.
+    func relatedTasks(of kind: RelationKind) -> [VTask] {
+        relatedTasks?[kind.rawValue] ?? []
+    }
+
+    /// Direct subtasks of this task (including completed ones).
+    var subtasks: [VTask] {
+        relatedTasks(of: .subtask)
+    }
+
+    /// Tasks this one is a subtask of. Vikunja allows more than one parent.
+    var parentTasks: [VTask] {
+        relatedTasks(of: .parenttask)
+    }
+
+    var hasParentTask: Bool {
+        !parentTasks.isEmpty
+    }
+
+    /// Completed/total counts across direct subtasks, driving the "2/5 done"
+    /// badge. `nil` when the task has no subtasks.
+    var subtaskCounts: (done: Int, total: Int)? {
+        let subs = subtasks
+        guard !subs.isEmpty else { return nil }
+        return (subs.filter(\.done).count, subs.count)
     }
 
     var isRepeating: Bool {
