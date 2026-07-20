@@ -261,8 +261,8 @@ final class TaskRelationTests: XCTestCase {
     }
 
     func testNestingLeavesOrphanedSubtaskAtTopLevel() {
-        // Parent (id 9) is not in the visible list — e.g. filtered into another
-        // smart section — so the subtask must not disappear.
+        // Parent (id 9) is not in the visible list (e.g. filtered into another
+        // smart section), so the subtask must not disappear.
         let tasks = [
             makeTask(id: 2, title: "Child", relatedTasks: ["parenttask": [makeTask(id: 9)]]),
             makeTask(id: 3),

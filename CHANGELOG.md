@@ -11,7 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - **Subtasks**: tasks with subtasks now show them indented underneath in every list (Inbox sections, project lists, and the Mac task list), with a "2/5" progress badge on the parent row showing how many are done. Checking a subtask off updates the parent's count immediately (#1).
-- Manage subtasks from a task's detail view: add a new subtask by typing its title, or tap "Link Existing Task" to pick any open task — searchable, from any project, with each task's project shown — and make it a subtask. Check subtasks off or unlink them (unlinking never deletes the task). Tasks that are subtasks also show their parent, and any other relations created in Vikunja (Blocked By, Precedes, Duplicates, …) are listed and can be removed (#1).
+- Manage subtasks from a task's detail view: add a new subtask by typing its title, or tap "Link Existing Task" to pick any open task (searchable, from any project, with each task's project shown) and make it a subtask. Check subtasks off or unlink them (unlinking never deletes the task). Tasks that are subtasks also show their parent, and any other relations created in Vikunja (Blocked By, Precedes, Duplicates, …) are listed and can be removed (#1).
 
 ## [1.9.0] - 2026-07-20
 

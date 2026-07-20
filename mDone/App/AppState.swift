@@ -568,7 +568,7 @@ final class AppState {
     /// `related_tasks: null` (it doesn't echo either). Replacing the local task
     /// wholesale with that response would drop its labels until the next full
     /// refresh, which made a Current task vanish from its section the moment
-    /// you edited it (e.g. changed its progress) — and would likewise wipe its
+    /// you edited it (e.g. changed its progress), and would likewise wipe its
     /// subtask list and count. Carry both forward when the response omits them.
     /// Neither is edited via the task-update endpoint (labels use the label
     /// endpoints, relations the relation endpoints), so this can't mask a user
@@ -591,8 +591,8 @@ final class AppState {
                 tasks[index] = updated
             } else {
                 // Subtasks toggled from a parent's detail view may not be in
-                // the live list (some server versions omit done tasks) —
-                // insert so subsequent toggles and counts see fresh state.
+                // the live list (some server versions omit done tasks),
+                // so insert it here to keep later toggles and counts fresh.
                 tasks.append(updated)
             }
             syncEmbeddedRelations(with: updated)
@@ -804,7 +804,7 @@ final class AppState {
 
     /// Removes the `kind` relation between `taskId` and `otherTaskId` (the
     /// server drops the inverse too), then refreshes both tasks. Removing a
-    /// `subtask` relation only unlinks the tasks — neither is deleted.
+    /// `subtask` relation only unlinks the tasks; neither is deleted.
     @MainActor
     func removeRelation(taskId: Int64, otherTaskId: Int64, kind: RelationKind) async {
         do {
@@ -834,7 +834,7 @@ final class AppState {
 
     /// Mirrors an updated task into the embedded related-task snapshots other
     /// tasks hold (`relatedTasks` copies), so subtask counts and nested rows
-    /// stay fresh without a refetch — e.g. checking a subtask off updates its
+    /// stay fresh without a refetch: checking a subtask off updates its
     /// parent's "2/5 done" badge immediately.
     @MainActor
     private func syncEmbeddedRelations(with updatedTask: VTask) {

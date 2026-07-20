@@ -43,7 +43,7 @@ actor TaskService {
         try await apiClient.sendExpectingEmpty(Endpoint.updateTaskPosition(taskId: taskId), body: request)
     }
 
-    /// Links `otherTaskId` to `taskId` with the given relation kind — e.g.
+    /// Links `otherTaskId` to `taskId` with the given relation kind, e.g.
     /// `.subtask` makes `otherTaskId` a subtask of `taskId`. The server creates
     /// the inverse relation on the other task automatically.
     @discardableResult
