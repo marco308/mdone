@@ -88,7 +88,7 @@ This is a private test server maintained by the developer for App Store review p
 Subtasks: break big tasks into steps.
 
 - Tasks now show their subtasks nested underneath in every list, with a progress badge on the parent (e.g. 2/5 done).
-- Add subtasks from a task's detail view, or link any existing task — from any project — as a subtask, with search.
+- Add subtasks from a task's detail view, or link any existing task from any project as a subtask, with search.
 - Tick subtasks off right from the parent task's detail view; the progress badge updates instantly.
 - Relations created in Vikunja on the web (Blocked By, Precedes, Duplicates and more) now show on the task and can be removed.
 - Available on both iPhone and Mac.

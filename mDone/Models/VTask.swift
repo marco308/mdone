@@ -32,7 +32,7 @@ struct VTask: Codable, Identifiable, Hashable {
     /// `"parenttask"`, `"blocking"`, …). Kept as raw strings so a kind added
     /// by a future server version can't fail decoding. The embedded tasks are
     /// snapshots without their own relations (`related_tasks` is `null` one
-    /// level down — the server doesn't recurse).
+    /// level down; the server doesn't recurse).
     var relatedTasks: [String: [VTask]]?
 
     var priorityLevel: PriorityLevel {

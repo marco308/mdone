@@ -2,7 +2,7 @@ import Foundation
 
 /// The kinds of relations Vikunja supports between two tasks.
 /// Raw values match the API's `relation_kind` strings exactly (all lowercase,
-/// no underscores — so they survive the snake-case key decoding untouched).
+/// no underscores, so they survive the snake-case key decoding untouched).
 enum RelationKind: String, Codable, CaseIterable, Identifiable {
     case unknown
     case subtask
@@ -142,7 +142,7 @@ enum TaskNesting {
             emit(task, depth: 0)
         }
         // Tasks unreachable from any top-level task (their parents form a
-        // cycle) still need to show up — surface them flat.
+        // cycle) still need to show up; surface them flat.
         for task in tasks {
             emit(task, depth: 0)
         }

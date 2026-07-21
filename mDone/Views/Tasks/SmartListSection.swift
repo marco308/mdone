@@ -13,7 +13,7 @@ struct SmartListSection: View {
         let hasNesting = rows.contains { $0.depth > 0 }
         Section {
             // One ForEach for both flat and nested display, so a row's
-            // identity survives the list gaining/losing nesting — otherwise a
+            // identity survives the list gaining/losing nesting; otherwise a
             // detail sheet presented from a row gets torn down the moment its
             // task's first subtask is linked. Reorder stays flat-only (nested
             // visual order doesn't match Vikunja's flat position order);
