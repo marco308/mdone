@@ -54,9 +54,13 @@ struct Endpoint {
     // MARK: - Kanban Buckets
 
     /// Lists the buckets (columns) of a project's kanban view, with each
-    /// bucket's tasks embedded.
-    static func projectBuckets(projectId: Int64, viewId: Int64, page: Int = 1, perPage: Int = 100) -> Endpoint {
-        Endpoint(path: "/api/v1/projects/\(projectId)/views/\(viewId)/buckets", queryItems: [
+    /// bucket's tasks embedded. Since Vikunja v0.24 this is the *view tasks*
+    /// endpoint: for a kanban view it returns buckets populated with tasks,
+    /// while `/views/{view}/buckets` returns bucket metadata only.
+    /// `page`/`per_page` paginate the tasks *within each bucket*, not the
+    /// buckets themselves — every bucket is always returned.
+    static func kanbanBuckets(projectId: Int64, viewId: Int64, page: Int = 1, perPage: Int = 50) -> Endpoint {
+        Endpoint(path: "/api/v1/projects/\(projectId)/views/\(viewId)/tasks", queryItems: [
             URLQueryItem(name: "page", value: "\(page)"),
             URLQueryItem(name: "per_page", value: "\(perPage)"),
         ])

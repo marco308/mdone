@@ -20,9 +20,11 @@ actor ProjectService {
     }
 
     /// Fetches the kanban buckets (columns) for a project view, each with its
-    /// embedded tasks.
+    /// embedded tasks. Uses the view *tasks* endpoint: for a kanban view it
+    /// returns bucket objects with tasks inside (the `/buckets` endpoint stopped
+    /// embedding tasks in Vikunja v0.24).
     func fetchBuckets(projectId: Int64, viewId: Int64) async throws -> [Bucket] {
-        try await apiClient.fetch(Endpoint.projectBuckets(projectId: projectId, viewId: viewId))
+        try await apiClient.fetch(Endpoint.kanbanBuckets(projectId: projectId, viewId: viewId))
     }
 
     func createProject(_ request: ProjectCreateRequest) async throws -> Project {

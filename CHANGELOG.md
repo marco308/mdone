@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- The Kanban board now shows your tasks again. Columns loaded but sat empty on current Vikunja servers (v0.24 and later, including 2.x) because the app still read tasks from an endpoint that stopped including them; the board now loads columns and cards the way modern Vikunja expects (#130).
 - Rescheduling a task via the long-press "Schedule" menu no longer drops it from the **Current** section until the next refresh (the same server-response quirk fixed for other edits in 1.7.0).
 
 ### Added

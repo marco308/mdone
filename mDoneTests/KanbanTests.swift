@@ -100,8 +100,11 @@ final class KanbanTests: XCTestCase {
     // MARK: - Endpoints
 
     func testBucketEndpointPaths() {
-        let read = Endpoint.projectBuckets(projectId: 7, viewId: 3)
-        XCTAssertEqual(read.path, "/api/v1/projects/7/views/3/buckets")
+        // Regression for #130: buckets with tasks come from the view *tasks*
+        // endpoint. `/views/{view}/buckets` returns metadata only since
+        // Vikunja v0.24, which left every board column empty.
+        let read = Endpoint.kanbanBuckets(projectId: 7, viewId: 3)
+        XCTAssertEqual(read.path, "/api/v1/projects/7/views/3/tasks")
         XCTAssertEqual(read.method, .GET)
 
         let move = Endpoint.moveTaskToBucket(projectId: 7, viewId: 3, bucketId: 9)
@@ -116,24 +119,31 @@ final class KanbanTests: XCTestCase {
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         let service = ProjectService(apiClient: client)
 
+        // Shaped like a real v2.x kanban view-tasks response: `tasks` is
+        // omitted for empty buckets, and `count`/`limit` are always present.
         let bucketsJSON = """
         [
-            {"id": 1, "title": "Backlog", "project_view_id": 3, "position": 1.0, "tasks": []},
-            {"id": 2, "title": "Done", "project_view_id": 3, "position": 2.0, "tasks": [
-                {"id": 50, "title": "Ship it", "done": false, "priority": 0, "project_id": 7}
+            {"id": 1, "title": "Backlog", "project_view_id": 3, "limit": 0, "count": 0, "position": 1.0},
+            {"id": 2, "title": "Done", "project_view_id": 3, "limit": 0, "count": 1, "position": 2.0, "tasks": [
+                {"id": 50, "title": "Ship it", "done": false, "priority": 0, "project_id": 7, "bucket_id": 2}
             ]}
         ]
         """.data(using: .utf8)!
 
         MockURLProtocol.requestHandler = { request in
-            XCTAssertEqual(request.url?.path, "/api/v1/projects/7/views/3/buckets")
+            // Must be the view-tasks endpoint — the buckets endpoint stopped
+            // embedding tasks in Vikunja v0.24 (#130).
+            XCTAssertEqual(request.url?.path, "/api/v1/projects/7/views/3/tasks")
             XCTAssertEqual(request.httpMethod, "GET")
             return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), bucketsJSON)
         }
 
         let buckets = try await service.fetchBuckets(projectId: 7, viewId: 3)
         XCTAssertEqual(buckets.map(\.title), ["Backlog", "Done"])
+        XCTAssertNil(buckets[0].tasks)
+        XCTAssertTrue(buckets[0].activeTasks.isEmpty)
         XCTAssertEqual(buckets[1].tasks?.first?.id, 50)
+        XCTAssertEqual(buckets[1].tasks?.first?.bucketId, 2)
     }
 
     // MARK: - TaskService.moveTaskToBucket
@@ -155,6 +165,59 @@ final class KanbanTests: XCTestCase {
         let body = try XCTUnwrap(request.bodyStreamData() ?? request.httpBody)
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
         XCTAssertEqual(object["task_id"] as? Int, 42)
+    }
+
+    // MARK: - AppState.fetchBuckets
+
+    @MainActor
+    func testAppStateFetchBucketsSortsAndMergesTasks() async {
+        let client = APIClient(session: MockURLProtocol.mockSession())
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+        let appState = AppState(projectService: ProjectService(apiClient: client))
+
+        let project = Project(
+            id: 7,
+            title: "Work",
+            views: [ProjectView(id: 3, title: "Kanban", projectId: 7, viewKind: "kanban")]
+        )
+
+        let bucketsJSON = """
+        [
+            {"id": 2, "title": "Doing", "project_view_id": 3, "limit": 0, "count": 1, "position": 2.0, "tasks": [
+                {"id": 50, "title": "Ship it", "done": false, "priority": 0, "project_id": 7, "bucket_id": 2}
+            ]},
+            {"id": 1, "title": "Backlog", "project_view_id": 3, "limit": 0, "count": 0, "position": 1.0}
+        ]
+        """.data(using: .utf8)!
+
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.url?.path, "/api/v1/projects/7/views/3/tasks")
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), bucketsJSON)
+        }
+
+        let buckets = await appState.fetchBuckets(project: project)
+        XCTAssertEqual(buckets.map(\.title), ["Backlog", "Doing"])
+        // Embedded tasks are merged into the global task list.
+        XCTAssertEqual(appState.tasks.map(\.id), [50])
+    }
+
+    @MainActor
+    func testAppStateFetchBucketsWithoutKanbanViewReturnsEmpty() async {
+        let appState = AppState()
+        let project = Project(
+            id: 7,
+            title: "Work",
+            views: [ProjectView(id: 100, title: "List", projectId: 7, viewKind: "list")]
+        )
+
+        MockURLProtocol.requestHandler = { _ in
+            XCTFail("A project without a kanban view must not hit the network")
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: nil), Data())
+        }
+
+        let buckets = await appState.fetchBuckets(project: project)
+        XCTAssertTrue(buckets.isEmpty)
+        XCTAssertTrue(MockURLProtocol.capturedRequests.isEmpty)
     }
 
     // MARK: - AppState.moveTask(toBucket:)
