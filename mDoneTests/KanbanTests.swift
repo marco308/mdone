@@ -131,7 +131,7 @@ final class KanbanTests: XCTestCase {
         """.data(using: .utf8)!
 
         MockURLProtocol.requestHandler = { request in
-            // Must be the view-tasks endpoint — the buckets endpoint stopped
+            // Must be the view-tasks endpoint: the buckets endpoint stopped
             // embedding tasks in Vikunja v0.24 (#130).
             XCTAssertEqual(request.url?.path, "/api/v1/projects/7/views/3/tasks")
             XCTAssertEqual(request.httpMethod, "GET")

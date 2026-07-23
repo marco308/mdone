@@ -58,7 +58,7 @@ struct Endpoint {
     /// endpoint: for a kanban view it returns buckets populated with tasks,
     /// while `/views/{view}/buckets` returns bucket metadata only.
     /// `page`/`per_page` paginate the tasks *within each bucket*, not the
-    /// buckets themselves — every bucket is always returned.
+    /// buckets themselves; every bucket is always returned.
     static func kanbanBuckets(projectId: Int64, viewId: Int64, page: Int = 1, perPage: Int = 50) -> Endpoint {
         Endpoint(path: "/api/v1/projects/\(projectId)/views/\(viewId)/tasks", queryItems: [
             URLQueryItem(name: "page", value: "\(page)"),
