@@ -1,9 +1,10 @@
 import Foundation
 
 /// A Kanban column. In Vikunja, buckets belong to a project's *kanban* view and
-/// carry the tasks placed in that column. The view-tasks endpoint embeds each
-/// bucket's tasks directly (`tasks`), so a single buckets fetch is enough to
-/// render a board.
+/// carry the tasks placed in that column. The view-tasks endpoint
+/// (`/views/{view}/tasks`) returns these buckets with their tasks embedded
+/// (`tasks`), so a single fetch is enough to render a board. `tasks` is omitted
+/// entirely for empty buckets (Vikunja marshals it with `omitempty`).
 struct Bucket: Codable, Identifiable, Hashable {
     let id: Int64
     var title: String
