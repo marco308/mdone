@@ -126,6 +126,13 @@ struct VTask: Codable, Identifiable, Hashable {
         return dueDate
     }
 
+    /// Returns nil for Vikunja's zero-date sentinel (year 1).
+    var effectiveStartDate: Date? {
+        guard let startDate else { return nil }
+        if Calendar.current.component(.year, from: startDate) <= 1 { return nil }
+        return startDate
+    }
+
     /// Whether this task's inclusive start/end range contains the given local calendar day.
     func occurs(on date: Date, calendar: Calendar = .current) -> Bool {
         guard let startDate, let endDate else { return false }
