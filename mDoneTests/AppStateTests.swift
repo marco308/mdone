@@ -629,7 +629,15 @@ final class AppStateTests: XCTestCase {
             repeatAfter: 86_400,
             repeatMode: 1
         )
-        appState.tasks = []
+        let parent = VTask(
+            id: 900,
+            title: "Parent",
+            done: false,
+            priority: 0,
+            projectId: 1,
+            relatedTasks: ["subtask": [task]]
+        )
+        appState.tasks = [parent]
         MockURLProtocol.requestHandler = { request in
             let json = #"{"id":83,"title":"Embedded","done":true,"priority":0,"project_id":1}"#
                 .data(using: .utf8)!
@@ -638,7 +646,10 @@ final class AppStateTests: XCTestCase {
 
         await appState.toggleTaskDone(task)
 
-        let updated = try XCTUnwrap(appState.tasks.first)
+        let updated = try XCTUnwrap(
+            appState.tasks.first(where: { $0.id == parent.id })?
+                .relatedTasks?["subtask"]?.first
+        )
         XCTAssertEqual(updated.dueDate, due)
         XCTAssertEqual(updated.startDate, start)
         XCTAssertEqual(updated.endDate, end)
@@ -650,7 +661,22 @@ final class AppStateTests: XCTestCase {
         let appState = await makeMockedAppState()
         let start = Date(timeIntervalSince1970: 1_799_900_000)
         let end = Date(timeIntervalSince1970: 1_800_100_000)
-        appState.tasks = []
+        let embedded = VTask(
+            id: 84,
+            title: "Embedded",
+            done: false,
+            priority: 0,
+            projectId: 1
+        )
+        let parent = VTask(
+            id: 901,
+            title: "Parent",
+            done: false,
+            priority: 0,
+            projectId: 1,
+            relatedTasks: ["subtask": [embedded]]
+        )
+        appState.tasks = [parent]
         MockURLProtocol.requestHandler = { request in
             let json = #"{"id":84,"title":"Embedded","done":false,"priority":0,"project_id":1}"#
                 .data(using: .utf8)!
@@ -662,7 +688,10 @@ final class AppStateTests: XCTestCase {
             request: TaskUpdateRequest(startDate: start, endDate: end, repeatAfter: 86_400)
         )
 
-        let updated = try XCTUnwrap(appState.tasks.first)
+        let updated = try XCTUnwrap(
+            appState.tasks.first(where: { $0.id == parent.id })?
+                .relatedTasks?["subtask"]?.first
+        )
         XCTAssertEqual(updated.startDate, start)
         XCTAssertEqual(updated.endDate, end)
         XCTAssertEqual(updated.repeatAfter, 86_400)
