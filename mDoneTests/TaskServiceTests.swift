@@ -499,7 +499,21 @@ final class TaskServiceTests: XCTestCase {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let originalTask = VTask(id: 7, title: "Toggle Me", done: false, priority: 1, projectId: 1)
+        let due = Date(timeIntervalSince1970: 1_800_000_000)
+        let start = Date(timeIntervalSince1970: 1_799_900_000)
+        let end = Date(timeIntervalSince1970: 1_800_100_000)
+        let originalTask = VTask(
+            id: 7,
+            title: "Toggle Me",
+            done: false,
+            dueDate: due,
+            startDate: start,
+            endDate: end,
+            priority: 1,
+            projectId: 1,
+            repeatAfter: 86_400,
+            repeatMode: 1
+        )
 
         let responseJSON = """
         {"id": 7, "title": "Toggle Me", "done": true, "priority": 1, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-20T10:00:00Z"}
@@ -514,6 +528,11 @@ final class TaskServiceTests: XCTestCase {
                let bodyJSON = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
             {
                 XCTAssertEqual(bodyJSON["done"] as? Bool, true)
+                XCTAssertNotNil(bodyJSON["due_date"])
+                XCTAssertNotNil(bodyJSON["start_date"])
+                XCTAssertNotNil(bodyJSON["end_date"])
+                XCTAssertEqual(bodyJSON["repeat_after"] as? Int, 86_400)
+                XCTAssertEqual(bodyJSON["repeat_mode"] as? Int, 1)
             }
 
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
