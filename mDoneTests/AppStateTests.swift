@@ -612,6 +612,62 @@ final class AppStateTests: XCTestCase {
         )
     }
 
+    func testTogglePreservesScheduleWhenTaskOnlyExistsAsEmbeddedSnapshot() async throws {
+        let appState = await makeMockedAppState()
+        let due = Date(timeIntervalSince1970: 1_800_000_000)
+        let start = Date(timeIntervalSince1970: 1_799_900_000)
+        let end = Date(timeIntervalSince1970: 1_800_100_000)
+        let task = VTask(
+            id: 83,
+            title: "Embedded",
+            done: false,
+            dueDate: due,
+            startDate: start,
+            endDate: end,
+            priority: 0,
+            projectId: 1,
+            repeatAfter: 86_400,
+            repeatMode: 1
+        )
+        appState.tasks = []
+        MockURLProtocol.requestHandler = { request in
+            let json = #"{"id":83,"title":"Embedded","done":true,"priority":0,"project_id":1}"#
+                .data(using: .utf8)!
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), json)
+        }
+
+        await appState.toggleTaskDone(task)
+
+        let updated = try XCTUnwrap(appState.tasks.first)
+        XCTAssertEqual(updated.dueDate, due)
+        XCTAssertEqual(updated.startDate, start)
+        XCTAssertEqual(updated.endDate, end)
+        XCTAssertEqual(updated.repeatAfter, 86_400)
+        XCTAssertEqual(updated.repeatMode, 1)
+    }
+
+    func testUpdateTaskPreservesRequestedScheduleWithoutTopLevelTask() async throws {
+        let appState = await makeMockedAppState()
+        let start = Date(timeIntervalSince1970: 1_799_900_000)
+        let end = Date(timeIntervalSince1970: 1_800_100_000)
+        appState.tasks = []
+        MockURLProtocol.requestHandler = { request in
+            let json = #"{"id":84,"title":"Embedded","done":false,"priority":0,"project_id":1}"#
+                .data(using: .utf8)!
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), json)
+        }
+
+        await appState.updateTask(
+            id: 84,
+            request: TaskUpdateRequest(startDate: start, endDate: end, repeatAfter: 86_400)
+        )
+
+        let updated = try XCTUnwrap(appState.tasks.first)
+        XCTAssertEqual(updated.startDate, start)
+        XCTAssertEqual(updated.endDate, end)
+        XCTAssertEqual(updated.repeatAfter, 86_400)
+    }
+
     func testPreservingScheduleHonorsExplicitClearOverStaleResponse() {
         let due = Date(timeIntervalSince1970: 1_800_000_000)
         let start = Date(timeIntervalSince1970: 1_799_900_000)
