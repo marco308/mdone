@@ -524,16 +524,16 @@ final class TaskServiceTests: XCTestCase {
             XCTAssertEqual(request.httpMethod, "POST")
 
             // Verify the body contains done: true (toggled from false)
-            if let bodyData = request.httpBody,
-               let bodyJSON = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
-            {
-                XCTAssertEqual(bodyJSON["done"] as? Bool, true)
-                XCTAssertNotNil(bodyJSON["due_date"])
-                XCTAssertNotNil(bodyJSON["start_date"])
-                XCTAssertNotNil(bodyJSON["end_date"])
-                XCTAssertEqual(bodyJSON["repeat_after"] as? Int, 86_400)
-                XCTAssertEqual(bodyJSON["repeat_mode"] as? Int, 1)
+            guard let bodyJSON = request.decodedJSONBody else {
+                XCTFail("Expected a JSON request body")
+                return (MockURLProtocol.makeResponse(statusCode: 500, url: request.url), Data())
             }
+            XCTAssertEqual(bodyJSON["done"] as? Bool, true)
+            XCTAssertNotNil(bodyJSON["due_date"])
+            XCTAssertNotNil(bodyJSON["start_date"])
+            XCTAssertNotNil(bodyJSON["end_date"])
+            XCTAssertEqual(bodyJSON["repeat_after"] as? Int, 86_400)
+            XCTAssertEqual(bodyJSON["repeat_mode"] as? Int, 1)
 
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             return (response, responseJSON)
@@ -735,5 +735,32 @@ final class TaskServiceTests: XCTestCase {
         XCTAssertEqual(request.repeatAfter, 86_400)
         XCTAssertEqual(request.repeatMode, 1)
         XCTAssertEqual(request.reminders, [reminder])
+    }
+}
+
+private extension URLRequest {
+    /// MockURLProtocol commonly represents request bodies as streams.
+    var decodedJSONBody: [String: Any]? {
+        let data: Data?
+        if let body = httpBody {
+            data = body
+        } else if let stream = httpBodyStream {
+            stream.open()
+            defer { stream.close() }
+            var buffer = Data()
+            let size = 1024
+            let pointer = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
+            defer { pointer.deallocate() }
+            while stream.hasBytesAvailable {
+                let count = stream.read(pointer, maxLength: size)
+                if count <= 0 { break }
+                buffer.append(pointer, count: count)
+            }
+            data = buffer.isEmpty ? nil : buffer
+        } else {
+            data = nil
+        }
+        guard let data else { return nil }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 }
