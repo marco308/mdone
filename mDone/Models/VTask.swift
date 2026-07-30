@@ -245,21 +245,27 @@ struct TaskUpdateRequest: Encodable {
     var description: String?
     var done: Bool?
     var dueDate: Date?
+    var startDate: Date?
+    var endDate: Date?
     var priority: Int64?
     var projectId: Int64?
     var labels: [LabelRef]?
     var repeatAfter: Int64?
+    var repeatMode: Int64?
     var reminders: [TaskReminder]?
     /// Completion progress, 0...1. Drives the Current section's progress bar.
     var percentDone: Double?
     var clearDueDate: Bool?
+    var clearStartDate: Bool?
+    var clearEndDate: Bool?
 
     struct LabelRef: Encodable {
         var id: Int64
     }
 
     private enum CodingKeys: String, CodingKey {
-        case title, description, done, dueDate, priority, projectId, labels, repeatAfter, reminders, percentDone
+        case title, description, done, dueDate, startDate, endDate, priority, projectId, labels
+        case repeatAfter, repeatMode, reminders, percentDone
     }
 
     func encode(to encoder: Encoder) throws {
@@ -272,11 +278,47 @@ struct TaskUpdateRequest: Encodable {
         } else {
             try container.encodeIfPresent(dueDate, forKey: .dueDate)
         }
+        if clearStartDate == true {
+            try container.encode(Date.distantPast, forKey: .startDate)
+        } else {
+            try container.encodeIfPresent(startDate, forKey: .startDate)
+        }
+        if clearEndDate == true {
+            try container.encode(Date.distantPast, forKey: .endDate)
+        } else {
+            try container.encodeIfPresent(endDate, forKey: .endDate)
+        }
         try container.encodeIfPresent(priority, forKey: .priority)
         try container.encodeIfPresent(projectId, forKey: .projectId)
         try container.encodeIfPresent(labels, forKey: .labels)
         try container.encodeIfPresent(repeatAfter, forKey: .repeatAfter)
+        try container.encodeIfPresent(repeatMode, forKey: .repeatMode)
         try container.encodeIfPresent(reminders, forKey: .reminders)
         try container.encodeIfPresent(percentDone, forKey: .percentDone)
+    }
+
+    /// Carries schedule fields forward for Vikunja task updates, which can
+    /// otherwise clear omitted values on partial mutations such as Done or Progress.
+    func preservingSchedule(from task: VTask) -> TaskUpdateRequest {
+        var request = self
+        if request.dueDate == nil, request.clearDueDate != true {
+            request.dueDate = task.effectiveDueDate
+        }
+        if request.startDate == nil, request.clearStartDate != true {
+            request.startDate = task.effectiveStartDate
+        }
+        if request.endDate == nil, request.clearEndDate != true {
+            request.endDate = task.effectiveEndDate
+        }
+        if request.repeatAfter == nil {
+            request.repeatAfter = task.repeatAfter
+        }
+        if request.repeatMode == nil {
+            request.repeatMode = task.repeatMode
+        }
+        if request.reminders == nil {
+            request.reminders = task.reminders
+        }
+        return request
     }
 }
