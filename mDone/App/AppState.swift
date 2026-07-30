@@ -589,17 +589,20 @@ final class AppState {
         request: TaskUpdateRequest
     ) -> VTask {
         var result = preservingRelations(existing: existing, response: response)
-        if result.effectiveDueDate == nil {
-            result.dueDate = request.clearDueDate == true
-                ? nil : (request.dueDate ?? existing.effectiveDueDate)
+        if request.clearDueDate == true {
+            result.dueDate = nil
+        } else if result.effectiveDueDate == nil {
+            result.dueDate = request.dueDate ?? existing.effectiveDueDate
         }
-        if result.effectiveStartDate == nil {
-            result.startDate = request.clearStartDate == true
-                ? nil : (request.startDate ?? existing.effectiveStartDate)
+        if request.clearStartDate == true {
+            result.startDate = nil
+        } else if result.effectiveStartDate == nil {
+            result.startDate = request.startDate ?? existing.effectiveStartDate
         }
-        if result.effectiveEndDate == nil {
-            result.endDate = request.clearEndDate == true
-                ? nil : (request.endDate ?? existing.effectiveEndDate)
+        if request.clearEndDate == true {
+            result.endDate = nil
+        } else if result.effectiveEndDate == nil {
+            result.endDate = request.endDate ?? existing.effectiveEndDate
         }
         if result.repeatAfter == nil {
             result.repeatAfter = request.repeatAfter ?? existing.repeatAfter
