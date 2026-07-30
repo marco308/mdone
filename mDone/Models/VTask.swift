@@ -142,11 +142,17 @@ struct VTask: Codable, Identifiable, Hashable {
 
     /// Whether this task's inclusive start/end range contains the given local calendar day.
     func occurs(on date: Date, calendar: Calendar = .current) -> Bool {
-        guard let startDate, let endDate else { return false }
         let day = calendar.startOfDay(for: date)
-        let firstDay = calendar.startOfDay(for: startDate)
-        let lastDay = calendar.startOfDay(for: endDate)
-        return day >= firstDay && day <= lastDay
+        switch (effectiveStartDate, effectiveEndDate) {
+        case let (startDate?, endDate?):
+            let firstDay = calendar.startOfDay(for: startDate)
+            let lastDay = calendar.startOfDay(for: endDate)
+            return day >= firstDay && day <= lastDay
+        case let (startDate?, nil):
+            return calendar.isDate(startDate, inSameDayAs: day)
+        default:
+            return false
+        }
     }
 
     var isOverdue: Bool {
