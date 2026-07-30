@@ -612,6 +612,49 @@ final class AppStateTests: XCTestCase {
         )
     }
 
+    func testUpdateTaskPreservesScheduleWhenResponseOmitsIt() async {
+        let appState = await makeMockedAppState()
+        let due = Date(timeIntervalSince1970: 1_800_000_000)
+        let start = Date(timeIntervalSince1970: 1_799_900_000)
+        let end = Date(timeIntervalSince1970: 1_800_100_000)
+        let task = VTask(
+            id: 52,
+            title: "Scheduled",
+            done: false,
+            dueDate: due,
+            startDate: start,
+            endDate: end,
+            priority: 1,
+            projectId: 4,
+            repeatAfter: 86_400,
+            repeatMode: 1
+        )
+        appState.tasks = [task]
+        var capturedBody: [String: Any]?
+
+        MockURLProtocol.requestHandler = { request in
+            capturedBody = request.decodedJSONBody
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url!)
+            let json = """
+            {"id": 52, "title": "Updated", "done": false, "priority": 1, "project_id": 4}
+            """
+            return (response, Data(json.utf8))
+        }
+
+        await appState.updateTask(id: task.id, request: TaskUpdateRequest(title: "Updated"))
+
+        XCTAssertNotNil(capturedBody?["due_date"])
+        XCTAssertNotNil(capturedBody?["start_date"])
+        XCTAssertNotNil(capturedBody?["end_date"])
+        XCTAssertEqual(capturedBody?["repeat_after"] as? Int, 86_400)
+        XCTAssertEqual(capturedBody?["repeat_mode"] as? Int, 1)
+        XCTAssertEqual(appState.tasks.first?.dueDate, due)
+        XCTAssertEqual(appState.tasks.first?.startDate, start)
+        XCTAssertEqual(appState.tasks.first?.endDate, end)
+        XCTAssertEqual(appState.tasks.first?.repeatAfter, 86_400)
+        XCTAssertEqual(appState.tasks.first?.repeatMode, 1)
+    }
+
     func testRescheduleTaskRollsBackOnFailure() async {
         let appState = await makeMockedAppState()
         let original = Date(timeIntervalSince1970: 1_700_000_000)
