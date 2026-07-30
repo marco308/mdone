@@ -30,7 +30,7 @@ actor TaskService {
     }
 
     func toggleDone(task: VTask) async throws -> VTask {
-        let request = TaskUpdateRequest(done: !task.done)
+        let request = TaskUpdateRequest(done: !task.done).preservingSchedule(from: task)
         return try await apiClient.send(Endpoint.updateTask(id: task.id), body: request)
     }
 
