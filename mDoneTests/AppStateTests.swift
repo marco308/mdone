@@ -661,12 +661,20 @@ final class AppStateTests: XCTestCase {
         let appState = await makeMockedAppState()
         let start = Date(timeIntervalSince1970: 1_799_900_000)
         let end = Date(timeIntervalSince1970: 1_800_100_000)
+        let reminder = TaskReminder(
+            reminder: Date(timeIntervalSince1970: 1_800_050_000),
+            relativePeriod: nil,
+            relativeTo: nil
+        )
         let embedded = VTask(
             id: 84,
             title: "Embedded",
             done: false,
             priority: 0,
-            projectId: 1
+            projectId: 1,
+            repeatAfter: 2_592_000,
+            repeatMode: 1,
+            reminders: [reminder]
         )
         let parent = VTask(
             id: 901,
@@ -677,7 +685,9 @@ final class AppStateTests: XCTestCase {
             relatedTasks: ["subtask": [embedded]]
         )
         appState.tasks = [parent]
+        var capturedBody: [String: Any]?
         MockURLProtocol.requestHandler = { request in
+            capturedBody = request.decodedJSONBody
             let json = #"{"id":84,"title":"Embedded","done":false,"priority":0,"project_id":1}"#
                 .data(using: .utf8)!
             return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), json)
@@ -685,16 +695,20 @@ final class AppStateTests: XCTestCase {
 
         await appState.updateTask(
             id: 84,
-            request: TaskUpdateRequest(startDate: start, endDate: end, repeatAfter: 86_400)
+            request: TaskUpdateRequest(startDate: start, endDate: end, repeatAfter: 2_592_000)
         )
 
         let updated = try XCTUnwrap(
             appState.tasks.first(where: { $0.id == parent.id })?
                 .relatedTasks?["subtask"]?.first
         )
+        XCTAssertEqual(capturedBody?["repeat_mode"] as? Int, 1)
+        XCTAssertNotNil(capturedBody?["reminders"])
         XCTAssertEqual(updated.startDate, start)
         XCTAssertEqual(updated.endDate, end)
-        XCTAssertEqual(updated.repeatAfter, 86_400)
+        XCTAssertEqual(updated.repeatAfter, 2_592_000)
+        XCTAssertEqual(updated.repeatMode, 1)
+        XCTAssertEqual(updated.reminders, [reminder])
     }
 
     func testPreservingScheduleHonorsExplicitClearOverStaleResponse() {

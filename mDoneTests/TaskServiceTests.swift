@@ -307,7 +307,23 @@ final class TaskServiceTests: XCTestCase {
 
         XCTAssertFalse(TaskScheduleEditor.isValid(startDate: start, endDate: end))
         XCTAssertTrue(TaskScheduleEditor.isValid(startDate: start, endDate: nil))
+        XCTAssertTrue(TaskScheduleEditor.isValid(startDate: nil, endDate: end))
         XCTAssertTrue(TaskScheduleEditor.isValid(startDate: start, endDate: start))
+    }
+
+    func testRepeatModeUsesFixedIntervalWhenEditorChangesInterval() {
+        let task = VTask(
+            id: 16,
+            title: "Calendar monthly",
+            done: false,
+            priority: 0,
+            projectId: 1,
+            repeatAfter: 2_592_000,
+            repeatMode: 1
+        )
+
+        XCTAssertEqual(task.repeatMode(forEditedRepeatAfter: 2_592_000), 1)
+        XCTAssertEqual(task.repeatMode(forEditedRepeatAfter: 604_800), 0)
     }
 
     // MARK: - VTask isRepeating
