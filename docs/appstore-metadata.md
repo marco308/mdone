@@ -83,6 +83,14 @@ Steps to test:
 
 This is a private test server maintained by the developer for App Store review purposes.
 
+## What's New (v1.11.0)
+
+Hide all-day calendar events, plus a Kanban fix.
+
+- New setting to hide all-day calendar events: Settings > Calendar > "Show all-day events". Turn it off to keep day-long events out of your Calendar and Today views. It stays on by default, so nothing changes unless you flip it.
+- The Kanban board shows your tasks again on current Vikunja servers (v0.24 and later). Columns previously loaded but sat empty.
+- Available on both iPhone and Mac.
+
 ## What's New (v1.10.0)
 
 Subtasks: break big tasks into steps.
