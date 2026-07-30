@@ -581,6 +581,38 @@ final class AppState {
         return result
     }
 
+    /// Merges an update response without losing schedule fields Vikunja may omit.
+    /// Explicit clear flags still win over both the response and the old value.
+    static func preservingSchedule(
+        existing: VTask,
+        response: VTask,
+        request: TaskUpdateRequest
+    ) -> VTask {
+        var result = preservingRelations(existing: existing, response: response)
+        if result.effectiveDueDate == nil {
+            result.dueDate = request.clearDueDate == true
+                ? nil : (request.dueDate ?? existing.effectiveDueDate)
+        }
+        if result.effectiveStartDate == nil {
+            result.startDate = request.clearStartDate == true
+                ? nil : (request.startDate ?? existing.effectiveStartDate)
+        }
+        if result.effectiveEndDate == nil {
+            result.endDate = request.clearEndDate == true
+                ? nil : (request.endDate ?? existing.effectiveEndDate)
+        }
+        if result.repeatAfter == nil {
+            result.repeatAfter = request.repeatAfter ?? existing.repeatAfter
+        }
+        if result.repeatMode == nil {
+            result.repeatMode = request.repeatMode ?? existing.repeatMode
+        }
+        if result.reminders == nil {
+            result.reminders = request.reminders ?? existing.reminders
+        }
+        return result
+    }
+
     @MainActor
     func toggleTaskDone(_ task: VTask) async {
         do {
@@ -755,10 +787,13 @@ final class AppState {
 
     @MainActor
     func updateTask(id: Int64, request: TaskUpdateRequest) async {
+        let existing = tasks.first(where: { $0.id == id })
+        let safeRequest = existing.map { request.preservingSchedule(from: $0) } ?? request
         do {
-            let response = try await taskService.updateTask(id: id, request: request)
-            let updated = tasks.first(where: { $0.id == response.id })
-                .map { Self.preservingRelations(existing: $0, response: response) } ?? response
+            let response = try await taskService.updateTask(id: id, request: safeRequest)
+            let updated = existing.map {
+                Self.preservingSchedule(existing: $0, response: response, request: safeRequest)
+            } ?? response
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
