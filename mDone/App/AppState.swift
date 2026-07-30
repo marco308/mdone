@@ -1385,10 +1385,7 @@ final class AppState {
 
     func tasksForDate(_ date: Date) -> [VTask] {
         let calendar = Calendar.current
-        return tasks.filter { task in
-            guard let dueDate = task.effectiveDueDate else { return false }
-            return calendar.isDate(dueDate, inSameDayAs: date)
-        }
+        return tasks.filter { $0.occurs(on: date, calendar: calendar) }
     }
 
     // MARK: - Notifications
@@ -1471,18 +1468,19 @@ final class AppState {
 
     func datesWithTasks(in month: Date) -> [Date: [VTask]] {
         let calendar = Calendar.current
-        guard calendar.range(of: .day, in: .month, for: month) != nil else { return [:] }
+        guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: month)),
+              let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart)
+        else { return [:] }
+
         var result: [Date: [VTask]] = [:]
-
-        for task in tasks {
-            guard let dueDate = task.effectiveDueDate else { continue }
-            guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: month)),
-                  let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else { continue }
-
-            if dueDate >= monthStart, dueDate < monthEnd {
-                let dayStart = calendar.startOfDay(for: dueDate)
-                result[dayStart, default: []].append(task)
+        var day = monthStart
+        while day < monthEnd {
+            let matchingTasks = tasks.filter { $0.occurs(on: day, calendar: calendar) }
+            if !matchingTasks.isEmpty {
+                result[day] = matchingTasks
             }
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = nextDay
         }
         return result
     }
