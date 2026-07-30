@@ -126,6 +126,15 @@ struct VTask: Codable, Identifiable, Hashable {
         return dueDate
     }
 
+    /// Whether this task's inclusive start/end range contains the given local calendar day.
+    func occurs(on date: Date, calendar: Calendar = .current) -> Bool {
+        guard let startDate, let endDate else { return false }
+        let day = calendar.startOfDay(for: date)
+        let firstDay = calendar.startOfDay(for: startDate)
+        let lastDay = calendar.startOfDay(for: endDate)
+        return day >= firstDay && day <= lastDay
+    }
+
     var isOverdue: Bool {
         guard let dueDate = effectiveDueDate, !done else { return false }
         // Date-only tasks (time = 00:00) should only count as overdue once
