@@ -584,34 +584,36 @@ final class AppState {
     /// Merges an update response without losing schedule fields Vikunja may omit.
     /// Explicit clear flags still win over both the response and the old value.
     static func preservingSchedule(
-        existing: VTask,
+        existing: VTask?,
         response: VTask,
         request: TaskUpdateRequest
     ) -> VTask {
-        var result = preservingRelations(existing: existing, response: response)
+        var result = existing.map {
+            preservingRelations(existing: $0, response: response)
+        } ?? response
         if request.clearDueDate == true {
             result.dueDate = nil
         } else if result.effectiveDueDate == nil {
-            result.dueDate = request.dueDate ?? existing.effectiveDueDate
+            result.dueDate = request.dueDate ?? existing?.effectiveDueDate
         }
         if request.clearStartDate == true {
             result.startDate = nil
         } else if result.effectiveStartDate == nil {
-            result.startDate = request.startDate ?? existing.effectiveStartDate
+            result.startDate = request.startDate ?? existing?.effectiveStartDate
         }
         if request.clearEndDate == true {
             result.endDate = nil
         } else if result.effectiveEndDate == nil {
-            result.endDate = request.endDate ?? existing.effectiveEndDate
+            result.endDate = request.endDate ?? existing?.effectiveEndDate
         }
         if result.repeatAfter == nil {
-            result.repeatAfter = request.repeatAfter ?? existing.repeatAfter
+            result.repeatAfter = request.repeatAfter ?? existing?.repeatAfter
         }
         if result.repeatMode == nil {
-            result.repeatMode = request.repeatMode ?? existing.repeatMode
+            result.repeatMode = request.repeatMode ?? existing?.repeatMode
         }
         if result.reminders == nil {
-            result.reminders = request.reminders ?? existing.reminders
+            result.reminders = request.reminders ?? existing?.reminders
         }
         return result
     }
@@ -621,8 +623,12 @@ final class AppState {
         let request = TaskUpdateRequest(done: !task.done).preservingSchedule(from: task)
         do {
             let response = try await taskService.toggleDone(task: task)
-            let updated = tasks.first(where: { $0.id == response.id })
-                .map { Self.preservingSchedule(existing: $0, response: response, request: request) } ?? response
+            let existing = tasks.first(where: { $0.id == response.id }) ?? task
+            let updated = Self.preservingSchedule(
+                existing: existing,
+                response: response,
+                request: request
+            )
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             } else {
@@ -798,9 +804,11 @@ final class AppState {
         let safeRequest = existing.map { request.preservingSchedule(from: $0) } ?? request
         do {
             let response = try await taskService.updateTask(id: id, request: safeRequest)
-            let updated = existing.map {
-                Self.preservingSchedule(existing: $0, response: response, request: safeRequest)
-            } ?? response
+            let updated = Self.preservingSchedule(
+                existing: existing,
+                response: response,
+                request: safeRequest
+            )
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
