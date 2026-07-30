@@ -678,6 +678,37 @@ final class AppStateTests: XCTestCase {
         )
     }
 
+    // MARK: - Calendar ranges (#17)
+
+    func testCalendarIncludesTaskOnEveryDayOfRange() async throws {
+        let appState = await makeMockedAppState()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Zurich"))
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 24, hour: 9
+        )))
+        let middle = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 25, hour: 12
+        )))
+        let end = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 26, hour: 17
+        )))
+        let task = VTask(
+            id: 90,
+            title: "Conference",
+            done: false,
+            startDate: start,
+            endDate: end,
+            priority: 0,
+            projectId: 1
+        )
+        appState.tasks = [task]
+
+        XCTAssertEqual(appState.tasksForDate(middle).map(\.id), [90])
+        let dayKey = Calendar.current.startOfDay(for: middle)
+        XCTAssertEqual(appState.datesWithTasks(in: middle)[dayKey]?.map(\.id), [90])
+    }
+
     // MARK: - Calm Mode (#68)
 
     /// Seeds a deterministic spread of due dates: overdue, due-today,
