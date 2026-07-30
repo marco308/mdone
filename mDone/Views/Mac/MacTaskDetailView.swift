@@ -7,7 +7,8 @@ struct MacTaskDetailView: View {
     @State private var title: String
     @State private var descriptionText: String
     @State private var dueDate: Date?
-    @State private var hasDueDate: Bool
+    @State private var startDate: Date?
+    @State private var endDate: Date?
     @State private var priority: Int64
     @State private var selectedProjectId: Int64
     @State private var repeatInterval: Int64
@@ -22,8 +23,9 @@ struct MacTaskDetailView: View {
         let initialDescription = task.userVisibleDescription ?? ""
         _title = State(initialValue: task.title)
         _descriptionText = State(initialValue: initialDescription)
-        _dueDate = State(initialValue: task.dueDate)
-        _hasDueDate = State(initialValue: task.dueDate != nil)
+        _dueDate = State(initialValue: task.effectiveDueDate)
+        _startDate = State(initialValue: task.effectiveStartDate)
+        _endDate = State(initialValue: task.effectiveEndDate)
         _priority = State(initialValue: task.priority)
         _selectedProjectId = State(initialValue: task.projectId)
         _repeatInterval = State(initialValue: task.repeatAfter ?? 0)
@@ -116,20 +118,11 @@ struct MacTaskDetailView: View {
 
             TaskRelationsSections(task: task)
 
-            Section("Due Date") {
-                Toggle("Has due date", isOn: $hasDueDate.animation())
-
-                if hasDueDate {
-                    DatePicker(
-                        "Date",
-                        selection: Binding(
-                            get: { dueDate ?? Date() },
-                            set: { dueDate = $0 }
-                        ),
-                        displayedComponents: [.date, .hourAndMinute]
-                    )
-                }
-            }
+            TaskScheduleEditor(
+                dueDate: $dueDate,
+                startDate: $startDate,
+                endDate: $endDate
+            )
 
             Section {
                 EstimatePicker(estimateSeconds: $estimateSeconds)
@@ -219,7 +212,12 @@ struct MacTaskDetailView: View {
             ToolbarItem(placement: .primaryAction) {
                 Button("Save") { saveTask() }
                     .keyboardShortcut("s", modifiers: .command)
-                    .disabled(title.isEmpty)
+                    .disabled(
+                        title.isEmpty || !TaskScheduleEditor.isValid(
+                            startDate: startDate,
+                            endDate: endDate
+                        )
+                    )
             }
         }
         .alert("Delete Task?", isPresented: $showDeleteConfirm) {
@@ -234,8 +232,9 @@ struct MacTaskDetailView: View {
             title = newTask.title
             let newDescription = newTask.userVisibleDescription ?? ""
             descriptionText = newDescription
-            dueDate = newTask.dueDate
-            hasDueDate = newTask.dueDate != nil
+            dueDate = newTask.effectiveDueDate
+            startDate = newTask.effectiveStartDate
+            endDate = newTask.effectiveEndDate
             priority = newTask.priority
             selectedProjectId = newTask.projectId
             repeatInterval = newTask.repeatAfter ?? 0
@@ -252,13 +251,17 @@ struct MacTaskDetailView: View {
         let request = TaskUpdateRequest(
             title: title,
             description: composedDescription,
-            dueDate: hasDueDate ? (dueDate ?? Date()) : nil,
+            dueDate: dueDate,
+            startDate: startDate,
+            endDate: endDate,
             priority: priority,
             projectId: selectedProjectId,
             repeatAfter: repeatInterval,
             reminders: reminders,
             percentDone: percentDone,
-            clearDueDate: !hasDueDate
+            clearDueDate: dueDate == nil,
+            clearStartDate: startDate == nil,
+            clearEndDate: endDate == nil
         )
         Task {
             await appState.updateTask(id: task.id, request: request)

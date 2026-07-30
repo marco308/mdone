@@ -270,6 +270,15 @@ final class TaskServiceTests: XCTestCase {
         XCTAssertTrue(task.occurs(on: middle, calendar: calendar))
     }
 
+    func testTaskScheduleValidationRejectsEndBeforeStart() {
+        let start = Date(timeIntervalSince1970: 200)
+        let end = Date(timeIntervalSince1970: 100)
+
+        XCTAssertFalse(TaskScheduleEditor.isValid(startDate: start, endDate: end))
+        XCTAssertTrue(TaskScheduleEditor.isValid(startDate: start, endDate: nil))
+        XCTAssertTrue(TaskScheduleEditor.isValid(startDate: start, endDate: start))
+    }
+
     // MARK: - VTask isRepeating
 
     func testIsRepeatingTrue() {
