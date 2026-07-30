@@ -126,6 +126,41 @@ final class TaskServiceTests: XCTestCase {
         XCTAssertNil(task.effectiveDueDate)
     }
 
+    // MARK: - VTask date ranges
+
+    func testTaskOccursOnEveryDayInInclusiveDateRange() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Zurich"))
+
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 24, hour: 9
+        )))
+        let end = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 26, hour: 17
+        )))
+        let task = VTask(
+            id: 1,
+            title: "Conference",
+            done: false,
+            startDate: start,
+            endDate: end,
+            priority: 0,
+            projectId: 1
+        )
+
+        for day in 24 ... 26 {
+            let date = try XCTUnwrap(calendar.date(from: DateComponents(
+                year: 2026, month: 10, day: day, hour: 12
+            )))
+            XCTAssertTrue(task.occurs(on: date, calendar: calendar))
+        }
+
+        let dayAfter = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 27, hour: 12
+        )))
+        XCTAssertFalse(task.occurs(on: dayAfter, calendar: calendar))
+    }
+
     // MARK: - VTask isRepeating
 
     func testIsRepeatingTrue() {
