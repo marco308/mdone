@@ -322,8 +322,8 @@ final class TaskServiceTests: XCTestCase {
             repeatMode: 1
         )
 
-        XCTAssertEqual(task.repeatMode(forEditedRepeatAfter: 2_592_000), 1)
-        XCTAssertEqual(task.repeatMode(forEditedRepeatAfter: 604_800), 0)
+        XCTAssertEqual(task.repeatModeForEditedRepeatAfter(2_592_000), 1)
+        XCTAssertEqual(task.repeatModeForEditedRepeatAfter(604_800), 0)
     }
 
     // MARK: - VTask isRepeating

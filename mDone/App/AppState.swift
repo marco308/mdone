@@ -581,6 +581,21 @@ final class AppState {
         return result
     }
 
+    private func taskSnapshot(id: Int64) -> VTask? {
+        if let task = tasks.first(where: { $0.id == id }) {
+            return task
+        }
+        for task in tasks {
+            guard let groups = task.relatedTasks else { continue }
+            for relatedTasks in groups.values {
+                if let related = relatedTasks.first(where: { $0.id == id }) {
+                    return related
+                }
+            }
+        }
+        return nil
+    }
+
     /// Merges an update response without losing schedule fields Vikunja may omit.
     /// Explicit clear flags still win over both the response and the old value.
     static func preservingSchedule(
@@ -623,7 +638,7 @@ final class AppState {
         let request = TaskUpdateRequest(done: !task.done).preservingSchedule(from: task)
         do {
             let response = try await taskService.toggleDone(task: task)
-            let existing = tasks.first(where: { $0.id == response.id }) ?? task
+            let existing = taskSnapshot(id: response.id) ?? task
             let updated = Self.preservingSchedule(
                 existing: existing,
                 response: response,
@@ -800,7 +815,7 @@ final class AppState {
 
     @MainActor
     func updateTask(id: Int64, request: TaskUpdateRequest) async {
-        let existing = tasks.first(where: { $0.id == id })
+        let existing = taskSnapshot(id: id)
         let safeRequest = existing.map { request.preservingSchedule(from: $0) } ?? request
         do {
             let response = try await taskService.updateTask(id: id, request: safeRequest)

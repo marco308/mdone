@@ -70,6 +70,12 @@ struct VTask: Codable, Identifiable, Hashable {
         (repeatAfter ?? 0) > 0
     }
 
+    /// The interval picker edits fixed-second recurrences. Preserve Vikunja's
+    /// mode only when the interval itself was not changed.
+    func repeatModeForEditedRepeatAfter(_ editedRepeatAfter: Int64) -> Int64? {
+        editedRepeatAfter == (repeatAfter ?? 0) ? repeatMode : 0
+    }
+
     /// The user-assigned task color from Vikunja, normalized for display.
     /// Returns `nil` when Vikunja sends no color (an empty string) or a value
     /// that isn't a valid 3/6/8-digit hex, so uncolored tasks fall back to the

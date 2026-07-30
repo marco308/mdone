@@ -255,6 +255,7 @@ struct TaskDetailSheet: View {
             priority: priority,
             projectId: selectedProjectId,
             repeatAfter: repeatInterval,
+            repeatMode: task.repeatModeForEditedRepeatAfter(repeatInterval),
             reminders: reminders,
             percentDone: percentDone,
             clearDueDate: dueDate == nil,
