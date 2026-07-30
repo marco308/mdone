@@ -662,4 +662,59 @@ final class TaskServiceTests: XCTestCase {
         // When clearDueDate is true, due_date should be encoded as distantPast
         XCTAssertNotNil(json?["due_date"])
     }
+
+    func testTaskUpdateRequestEncodesStartAndEndDates() throws {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let end = Date(timeIntervalSince1970: 1_800_003_600)
+        let request = TaskUpdateRequest(startDate: start, endDate: end)
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(request)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+
+        XCTAssertNotNil(json?["start_date"])
+        XCTAssertNotNil(json?["end_date"])
+    }
+
+    func testTaskUpdateRequestClearsStartAndEndDates() throws {
+        let request = TaskUpdateRequest(clearStartDate: true, clearEndDate: true)
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(request)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+
+        XCTAssertNotNil(json?["start_date"])
+        XCTAssertNotNil(json?["end_date"])
+    }
+
+    func testTaskUpdateRequestPreservesExistingSchedule() {
+        let due = Date(timeIntervalSince1970: 1_800_000_000)
+        let start = Date(timeIntervalSince1970: 1_799_900_000)
+        let end = Date(timeIntervalSince1970: 1_800_100_000)
+        let reminder = TaskReminder(reminder: due, relativePeriod: nil, relativeTo: nil)
+        let task = VTask(
+            id: 1,
+            title: "Scheduled",
+            done: false,
+            dueDate: due,
+            startDate: start,
+            endDate: end,
+            priority: 0,
+            projectId: 1,
+            repeatAfter: 86_400,
+            repeatMode: 1,
+            reminders: [reminder]
+        )
+
+        let request = TaskUpdateRequest(done: true).preservingSchedule(from: task)
+
+        XCTAssertEqual(request.dueDate, due)
+        XCTAssertEqual(request.startDate, start)
+        XCTAssertEqual(request.endDate, end)
+        XCTAssertEqual(request.repeatAfter, 86_400)
+        XCTAssertEqual(request.repeatMode, 1)
+        XCTAssertEqual(request.reminders, [reminder])
+    }
 }
