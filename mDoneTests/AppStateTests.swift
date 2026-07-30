@@ -612,6 +612,38 @@ final class AppStateTests: XCTestCase {
         )
     }
 
+    func testPreservingScheduleHonorsExplicitClearOverStaleResponse() {
+        let due = Date(timeIntervalSince1970: 1_800_000_000)
+        let start = Date(timeIntervalSince1970: 1_799_900_000)
+        let end = Date(timeIntervalSince1970: 1_800_100_000)
+        let existing = VTask(
+            id: 82,
+            title: "Scheduled",
+            done: false,
+            dueDate: due,
+            startDate: start,
+            endDate: end,
+            priority: 0,
+            projectId: 1
+        )
+        let staleResponse = existing
+        let request = TaskUpdateRequest(
+            clearDueDate: true,
+            clearStartDate: true,
+            clearEndDate: true
+        )
+
+        let merged = AppState.preservingSchedule(
+            existing: existing,
+            response: staleResponse,
+            request: request
+        )
+
+        XCTAssertNil(merged.dueDate)
+        XCTAssertNil(merged.startDate)
+        XCTAssertNil(merged.endDate)
+    }
+
     func testUpdateTaskPreservesScheduleWhenResponseOmitsIt() async {
         let appState = await makeMockedAppState()
         let due = Date(timeIntervalSince1970: 1_800_000_000)
