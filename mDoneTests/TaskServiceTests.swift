@@ -227,6 +227,49 @@ final class TaskServiceTests: XCTestCase {
         XCTAssertFalse(task.occurs(on: previousDay, calendar: calendar))
     }
 
+    func testTaskWithOnlyDueDateOccursOnDueDay() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Zurich"))
+        let due = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 11, day: 3, hour: 14
+        )))
+        let task = VTask(
+            id: 1,
+            title: "Submit",
+            done: false,
+            dueDate: due,
+            priority: 0,
+            projectId: 1
+        )
+
+        XCTAssertTrue(task.occurs(on: due, calendar: calendar))
+    }
+
+    func testTaskWithReversedRangeStillOccursBetweenBoundaries() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Zurich"))
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 11, day: 5, hour: 9
+        )))
+        let end = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 11, day: 3, hour: 17
+        )))
+        let middle = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 11, day: 4, hour: 12
+        )))
+        let task = VTask(
+            id: 1,
+            title: "Imported invalid range",
+            done: false,
+            startDate: start,
+            endDate: end,
+            priority: 0,
+            projectId: 1
+        )
+
+        XCTAssertTrue(task.occurs(on: middle, calendar: calendar))
+    }
+
     // MARK: - VTask isRepeating
 
     func testIsRepeatingTrue() {
