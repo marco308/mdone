@@ -8,11 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - The Kanban board now shows your tasks again. Columns loaded but sat empty on current Vikunja servers (v0.24 and later, including 2.x) because the app still read tasks from an endpoint that stopped including them; the board now loads columns and cards the way modern Vikunja expects (#130).
-- Rescheduling a task via the long-press "Schedule" menu no longer drops it from the **Current** section until the next refresh (the same server-response quirk fixed for other edits in 1.7.0).
+
+### Added
+- You can now hide all-day calendar events: Settings > Calendar > **Show all-day events**. Turn it off to keep day-long events out of the Calendar and Today views. It stays on by default, so nothing changes unless you flip it (#133).
+
+## [1.10.0] - 2026-07-23
 
 ### Added
 - **Subtasks**: tasks with subtasks now show them indented underneath in every list (Inbox sections, project lists, and the Mac task list), with a "2/5" progress badge on the parent row showing how many are done. Checking a subtask off updates the parent's count immediately (#1).
 - Manage subtasks from a task's detail view: add a new subtask by typing its title, or tap "Link Existing Task" to pick any open task (searchable, from any project, with each task's project shown) and make it a subtask. Check subtasks off or unlink them (unlinking never deletes the task). Tasks that are subtasks also show their parent, and any other relations created in Vikunja (Blocked By, Precedes, Duplicates, …) are listed and can be removed (#1).
+
+### Fixed
+- Rescheduling a task via the long-press "Schedule" menu no longer drops it from the **Current** section until the next refresh (the same server-response quirk fixed for other edits in 1.7.0).
 
 ## [1.9.0] - 2026-07-20
 

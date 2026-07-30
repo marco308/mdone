@@ -11,7 +11,9 @@ enum WeekStartPreference: Int, CaseIterable, Identifiable {
 
     static let storageKey = "firstWeekday"
 
-    var id: Int { rawValue }
+    var id: Int {
+        rawValue
+    }
 
     var label: String {
         switch self {
@@ -33,5 +35,30 @@ extension Calendar {
             calendar.firstWeekday = stored
         }
         return calendar
+    }
+}
+
+/// Persists whether all-day calendar events appear in mDone.
+///
+/// We store the *hide* flag rather than a "show" flag so the natural `false`
+/// default for a missing key means all-day events keep showing, matching
+/// behaviour from before this setting existed.
+struct AllDayEventPreference {
+    static let storageKey = "hideAllDayEvents"
+
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    var hidesAllDayEvents: Bool {
+        defaults.bool(forKey: Self.storageKey)
+    }
+
+    /// Pure filter: strips all-day events when the user has hidden them.
+    func visibleEvents(_ events: [CalendarEvent]) -> [CalendarEvent] {
+        guard hidesAllDayEvents else { return events }
+        return events.filter { !$0.isAllDay }
     }
 }
