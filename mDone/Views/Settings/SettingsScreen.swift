@@ -9,6 +9,7 @@ struct SettingsScreen: View {
     @AppStorage(DefaultDueTimePreference.storageKey) private var defaultDueTime = DefaultDueTimePreference
         .defaultRawValue
     @AppStorage("calmMode") private var calmMode = false
+    @AppStorage(AllDayEventPreference.storageKey) private var hideAllDayEvents = false
     @AppStorage("currentStallDays") private var currentStallDays = 7
     @AppStorage(TaskListDensity.storageKey) private var taskListDensity = TaskListDensity.standard.rawValue
     @State private var showLogoutConfirm = false
@@ -94,12 +95,18 @@ struct SettingsScreen: View {
                 )
             }
 
-            Section("Calendar") {
+            Section {
                 NavigationLink {
                     CalendarSelectionView()
                 } label: {
                     Label("Calendars in mDone", systemImage: "calendar")
                 }
+
+                Toggle("Show all-day events", isOn: showAllDayEventsBinding)
+            } header: {
+                Text("Calendar")
+            } footer: {
+                Text("Turn off to hide all-day events from mDone's Calendar and Today views.")
             }
 
             Section("Notifications") {
@@ -186,6 +193,18 @@ struct SettingsScreen: View {
         } message: {
             Text("This will remove your server configuration. You'll need to reconnect.")
         }
+    }
+
+    /// The toggle reads positively ("show") while storage keeps the hide flag,
+    /// so a missing key defaults to showing all-day events.
+    private var showAllDayEventsBinding: Binding<Bool> {
+        Binding(
+            get: { !hideAllDayEvents },
+            set: { shown in
+                hideAllDayEvents = !shown
+                Task { await appState.calendarSelectionDidChange() }
+            }
+        )
     }
 
     private static var versionString: String {

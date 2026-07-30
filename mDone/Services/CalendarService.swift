@@ -4,9 +4,14 @@ import Foundation
 actor CalendarService {
     private let eventStore = EKEventStore()
     private let hiddenStore: HiddenCalendarStore
+    private let allDayPreference: AllDayEventPreference
 
-    init(hiddenStore: HiddenCalendarStore = HiddenCalendarStore()) {
+    init(
+        hiddenStore: HiddenCalendarStore = HiddenCalendarStore(),
+        allDayPreference: AllDayEventPreference = AllDayEventPreference()
+    ) {
         self.hiddenStore = hiddenStore
+        self.allDayPreference = allDayPreference
     }
 
     var authorizationStatus: EKAuthorizationStatus {
@@ -34,7 +39,7 @@ actor CalendarService {
         let ekEvents = eventStore.events(matching: predicate)
         let events = ekEvents.map { CalendarEvent(from: $0) }
             .sorted { $0.startDate < $1.startDate }
-        return hiddenStore.visibleEvents(events)
+        return allDayPreference.visibleEvents(hiddenStore.visibleEvents(events))
     }
 
     /// Fetch events for a single day
