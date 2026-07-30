@@ -187,6 +187,26 @@ final class TaskServiceTests: XCTestCase {
         XCTAssertFalse(task.occurs(on: dayAfter, calendar: calendar))
     }
 
+    func testTaskWithOnlyStartDateOccursOnStartDay() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Zurich"))
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 25, hour: 9
+        )))
+        let task = VTask(
+            id: 1,
+            title: "Kickoff",
+            done: false,
+            startDate: start,
+            priority: 0,
+            projectId: 1
+        )
+
+        XCTAssertTrue(task.occurs(on: start, calendar: calendar))
+        let nextDay = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: start))
+        XCTAssertFalse(task.occurs(on: nextDay, calendar: calendar))
+    }
+
     // MARK: - VTask isRepeating
 
     func testIsRepeatingTrue() {
