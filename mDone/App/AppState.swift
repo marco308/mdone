@@ -615,10 +615,11 @@ final class AppState {
 
     @MainActor
     func toggleTaskDone(_ task: VTask) async {
+        let request = TaskUpdateRequest(done: !task.done).preservingSchedule(from: task)
         do {
             let response = try await taskService.toggleDone(task: task)
             let updated = tasks.first(where: { $0.id == response.id })
-                .map { Self.preservingRelations(existing: $0, response: response) } ?? response
+                .map { Self.preservingSchedule(existing: $0, response: response, request: request) } ?? response
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             } else {
@@ -652,7 +653,8 @@ final class AppState {
         guard let target = undoableCompletion else { return }
         undoableCompletion = nil
         do {
-            _ = try await taskService.updateTask(id: target.id, request: TaskUpdateRequest(done: false))
+            let request = TaskUpdateRequest(done: false).preservingSchedule(from: target)
+            _ = try await taskService.updateTask(id: target.id, request: request)
             // Restore the task to its exact pre-completion state. We rebuild from
             // the stored snapshot rather than the update response because the
             // response can omit fields like the due date, which would land the
@@ -728,6 +730,7 @@ final class AppState {
     func postponeTask(_ task: VTask, byHours hours: Int) async {
         let baseDate = task.effectiveDueDate ?? Date()
         let newDate = Calendar.current.date(byAdding: .hour, value: hours, to: baseDate) ?? baseDate
+        let request = TaskUpdateRequest(dueDate: newDate).preservingSchedule(from: task)
 
         let originalDueDate: Date?
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
@@ -738,9 +741,9 @@ final class AppState {
         }
 
         do {
-            let response = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(dueDate: newDate))
+            let response = try await taskService.updateTask(id: task.id, request: request)
             let updated = tasks.first(where: { $0.id == response.id })
-                .map { Self.preservingRelations(existing: $0, response: response) } ?? response
+                .map { Self.preservingSchedule(existing: $0, response: response, request: request) } ?? response
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
@@ -759,6 +762,7 @@ final class AppState {
     /// Backs the quick-schedule long-press options (Today, Tomorrow, Next Week, …).
     @MainActor
     func rescheduleTask(_ task: VTask, to newDate: Date) async {
+        let request = TaskUpdateRequest(dueDate: newDate).preservingSchedule(from: task)
         let originalDueDate: Date?
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
             originalDueDate = tasks[index].dueDate
@@ -768,9 +772,9 @@ final class AppState {
         }
 
         do {
-            let response = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(dueDate: newDate))
+            let response = try await taskService.updateTask(id: task.id, request: request)
             let updated = tasks.first(where: { $0.id == response.id })
-                .map { Self.preservingRelations(existing: $0, response: response) } ?? response
+                .map { Self.preservingSchedule(existing: $0, response: response, request: request) } ?? response
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
@@ -991,6 +995,7 @@ final class AppState {
     @MainActor
     func setProgress(_ task: VTask, percent: Double) async {
         let clamped = min(max(percent, 0), 1)
+        let request = TaskUpdateRequest(percentDone: clamped).preservingSchedule(from: task)
         let original = tasks.first(where: { $0.id == task.id })?.percentDone
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
             tasks[index].percentDone = clamped
@@ -998,7 +1003,7 @@ final class AppState {
             syncService?.updateCachedTask(tasks[index])
         }
         do {
-            _ = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(percentDone: clamped))
+            _ = try await taskService.updateTask(id: task.id, request: request)
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
             if let index = tasks.firstIndex(where: { $0.id == task.id }) {
