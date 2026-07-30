@@ -141,6 +141,19 @@ final class TaskServiceTests: XCTestCase {
         XCTAssertNil(task.effectiveStartDate)
     }
 
+    func testEffectiveEndDateReturnsNilForVikunjaZeroDate() {
+        let task = VTask(
+            id: 1,
+            title: "T",
+            done: false,
+            endDate: .distantPast,
+            priority: 0,
+            projectId: 1
+        )
+
+        XCTAssertNil(task.effectiveEndDate)
+    }
+
     func testTaskOccursOnEveryDayInInclusiveDateRange() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Zurich"))
