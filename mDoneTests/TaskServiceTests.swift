@@ -245,6 +245,37 @@ final class TaskServiceTests: XCTestCase {
         XCTAssertTrue(task.occurs(on: due, calendar: calendar))
     }
 
+    func testDueDateAddsAnOccurrenceOutsideTheTaskRange() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Zurich"))
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 24, hour: 9
+        )))
+        let end = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 26, hour: 17
+        )))
+        let due = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 30, hour: 12
+        )))
+        let between = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 28, hour: 12
+        )))
+        let task = VTask(
+            id: 15,
+            title: "Range plus due",
+            done: false,
+            dueDate: due,
+            startDate: start,
+            endDate: end,
+            priority: 0,
+            projectId: 1
+        )
+
+        XCTAssertTrue(task.occurs(on: start, calendar: calendar))
+        XCTAssertTrue(task.occurs(on: due, calendar: calendar))
+        XCTAssertFalse(task.occurs(on: between, calendar: calendar))
+    }
+
     func testTaskWithReversedRangeStillOccursBetweenBoundaries() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Zurich"))
