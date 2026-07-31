@@ -1,5 +1,7 @@
 import Foundation
 
+private final class TaskDateRangeMetadataBundleToken {}
+
 struct TaskDateRangeMetadata: Equatable {
     let compactText: String
     let accessibilityText: String
@@ -40,12 +42,12 @@ struct TaskDateRangeMetadata: Equatable {
             let compactText = intervalFormatter.string(from: lowerBound, to: upperBound)
             let accessibilityText: String
             if start <= end {
-                let starts = String(localized: "starts", locale: locale)
-                let ends = String(localized: "ends", locale: locale)
+                let starts = String(localized: "starts", bundle: localizationBundle, locale: locale)
+                let ends = String(localized: "ends", bundle: localizationBundle, locale: locale)
                 accessibilityText = "\(starts) \(accessibilityFormatter.string(from: start)), \(ends) \(accessibilityFormatter.string(from: end))"
             } else {
-                let dateRange = String(localized: "date range", locale: locale)
-                let to = String(localized: "to", locale: locale)
+                let dateRange = String(localized: "date range", bundle: localizationBundle, locale: locale)
+                let to = String(localized: "to", bundle: localizationBundle, locale: locale)
                 accessibilityText = "\(dateRange) \(accessibilityFormatter.string(from: lowerBound)) \(to) \(accessibilityFormatter.string(from: upperBound))"
             }
             return TaskDateRangeMetadata(
@@ -54,16 +56,16 @@ struct TaskDateRangeMetadata: Equatable {
             )
 
         case let (start?, nil):
-            let starts = String(localized: "Starts", locale: locale)
-            let accessibilityStarts = String(localized: "starts", locale: locale)
+            let starts = String(localized: "Starts", bundle: localizationBundle, locale: locale)
+            let accessibilityStarts = String(localized: "starts", bundle: localizationBundle, locale: locale)
             return TaskDateRangeMetadata(
                 compactText: "\(starts) \(dateFormatter.string(from: start))",
                 accessibilityText: "\(accessibilityStarts) \(accessibilityFormatter.string(from: start))"
             )
 
         case let (nil, end?):
-            let ends = String(localized: "Ends", locale: locale)
-            let accessibilityEnds = String(localized: "ends", locale: locale)
+            let ends = String(localized: "Ends", bundle: localizationBundle, locale: locale)
+            let accessibilityEnds = String(localized: "ends", bundle: localizationBundle, locale: locale)
             return TaskDateRangeMetadata(
                 compactText: "\(ends) \(dateFormatter.string(from: end))",
                 accessibilityText: "\(accessibilityEnds) \(accessibilityFormatter.string(from: end))"
@@ -73,4 +75,6 @@ struct TaskDateRangeMetadata: Equatable {
             return nil
         }
     }
+
+    private static let localizationBundle = Bundle(for: TaskDateRangeMetadataBundleToken.self)
 }
