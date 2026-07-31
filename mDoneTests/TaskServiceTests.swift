@@ -752,7 +752,7 @@ final class TaskServiceTests: XCTestCase {
         XCTAssertNotNil(json?["end_date"])
     }
 
-    func testTaskUpdateRequestClearsStartAndEndDates() throws {
+    func testTaskUpdateRequestClearsStartAndEndDatesWithVikunjaZeroDate() throws {
         let request = TaskUpdateRequest(clearStartDate: true, clearEndDate: true)
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
@@ -760,8 +760,8 @@ final class TaskServiceTests: XCTestCase {
         let data = try encoder.encode(request)
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
 
-        XCTAssertNotNil(json?["start_date"])
-        XCTAssertNotNil(json?["end_date"])
+        XCTAssertEqual(json?["start_date"] as? String, "0001-01-01T00:00:00Z")
+        XCTAssertEqual(json?["end_date"] as? String, "0001-01-01T00:00:00Z")
     }
 
     func testTaskUpdateRequestPreservesExistingSchedule() {
