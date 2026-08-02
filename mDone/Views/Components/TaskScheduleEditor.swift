@@ -52,7 +52,9 @@ struct TaskScheduleEditor: View {
             isOn: Binding(
                 get: { date.wrappedValue != nil },
                 set: { enabled in
-                    date.wrappedValue = enabled ? (date.wrappedValue ?? defaultValue()) : nil
+                    withAnimation {
+                        date.wrappedValue = enabled ? (date.wrappedValue ?? defaultValue()) : nil
+                    }
                 }
             )
         )

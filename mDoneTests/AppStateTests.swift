@@ -626,7 +626,7 @@ final class AppStateTests: XCTestCase {
             endDate: end,
             priority: 0,
             projectId: 1,
-            repeatAfter: 86_400,
+            repeatAfter: 86400,
             repeatMode: 1
         )
         let parent = VTask(
@@ -653,7 +653,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(updated.dueDate, due)
         XCTAssertEqual(updated.startDate, start)
         XCTAssertEqual(updated.endDate, end)
-        XCTAssertEqual(updated.repeatAfter, 86_400)
+        XCTAssertEqual(updated.repeatAfter, 86400)
         XCTAssertEqual(updated.repeatMode, 1)
     }
 
@@ -757,7 +757,7 @@ final class AppStateTests: XCTestCase {
             endDate: end,
             priority: 1,
             projectId: 4,
-            repeatAfter: 86_400,
+            repeatAfter: 86400,
             repeatMode: 1
         )
         appState.tasks = [task]
@@ -777,12 +777,12 @@ final class AppStateTests: XCTestCase {
         XCTAssertNotNil(capturedBody?["due_date"])
         XCTAssertNotNil(capturedBody?["start_date"])
         XCTAssertNotNil(capturedBody?["end_date"])
-        XCTAssertEqual(capturedBody?["repeat_after"] as? Int, 86_400)
+        XCTAssertEqual(capturedBody?["repeat_after"] as? Int, 86400)
         XCTAssertEqual(capturedBody?["repeat_mode"] as? Int, 1)
         XCTAssertEqual(appState.tasks.first?.dueDate, due)
         XCTAssertEqual(appState.tasks.first?.startDate, start)
         XCTAssertEqual(appState.tasks.first?.endDate, end)
-        XCTAssertEqual(appState.tasks.first?.repeatAfter, 86_400)
+        XCTAssertEqual(appState.tasks.first?.repeatAfter, 86400)
         XCTAssertEqual(appState.tasks.first?.repeatMode, 1)
     }
 
@@ -927,32 +927,5 @@ final class AppStateTests: XCTestCase {
         SharedKeys.sharedDefaults.set(true, forKey: SharedKeys.calmModeKey)
         XCTAssertTrue(SharedKeys.sharedDefaults.bool(forKey: SharedKeys.calmModeKey))
         SharedKeys.sharedDefaults.removeObject(forKey: SharedKeys.calmModeKey)
-    }
-}
-
-private extension URLRequest {
-    /// MockURLProtocol delivers the body as a stream; read + decode it as JSON.
-    var decodedJSONBody: [String: Any]? {
-        let data: Data?
-        if let body = httpBody {
-            data = body
-        } else if let stream = httpBodyStream {
-            stream.open()
-            defer { stream.close() }
-            var buffer = Data()
-            let size = 1024
-            let ptr = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
-            defer { ptr.deallocate() }
-            while stream.hasBytesAvailable {
-                let read = stream.read(ptr, maxLength: size)
-                if read <= 0 { break }
-                buffer.append(ptr, count: read)
-            }
-            data = buffer.isEmpty ? nil : buffer
-        } else {
-            data = nil
-        }
-        guard let data else { return nil }
-        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 }

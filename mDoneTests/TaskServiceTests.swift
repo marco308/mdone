@@ -276,6 +276,45 @@ final class TaskServiceTests: XCTestCase {
         XCTAssertFalse(task.occurs(on: between, calendar: calendar))
     }
 
+    func testOccurrenceDaysExpandsRangePlusDueDateWithinWindow() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Zurich"))
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 24, hour: 9
+        )))
+        let end = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 26, hour: 17
+        )))
+        let due = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 30, hour: 12
+        )))
+        let task = VTask(
+            id: 17,
+            title: "Range plus due",
+            done: false,
+            dueDate: due,
+            startDate: start,
+            endDate: end,
+            priority: 0,
+            projectId: 1
+        )
+        let monthStart = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 1)))
+        let monthEnd = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 11, day: 1)))
+
+        let days = task.occurrenceDays(from: monthStart, before: monthEnd, calendar: calendar)
+
+        XCTAssertEqual(
+            days.map { calendar.component(.day, from: $0) },
+            [24, 25, 26, 30]
+        )
+        XCTAssertTrue(days.allSatisfy { calendar.startOfDay(for: $0) == $0 })
+
+        // A window that starts mid-range only reports the days inside it.
+        let lateWindowStart = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 26)))
+        let clamped = task.occurrenceDays(from: lateWindowStart, before: monthEnd, calendar: calendar)
+        XCTAssertEqual(clamped.map { calendar.component(.day, from: $0) }, [26, 30])
+    }
+
     func testTaskWithReversedRangeStillOccursBetweenBoundaries() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Zurich"))
@@ -386,7 +425,7 @@ final class TaskServiceTests: XCTestCase {
 
     // MARK: - VTask isOverdue end-of-day grace
 
-    func testDateOnlyTaskDueTodayIsNotOverdue() throws {
+    func testDateOnlyTaskDueTodayIsNotOverdue() {
         let calendar = Calendar.current
         let midnightToday = calendar.startOfDay(for: Date())
         let task = VTask(id: 1, title: "All-day today", done: false, dueDate: midnightToday, priority: 0, projectId: 1)
@@ -405,7 +444,11 @@ final class TaskServiceTests: XCTestCase {
         let calendar = Calendar.current
         let pastNoon = try XCTUnwrap(calendar.date(bySettingHour: 12, minute: 30, second: 0, of: Date()))
         // If the test happens to run before 12:30 local time, push to yesterday so the task is definitively overdue.
-        let dueDate = pastNoon < Date() ? pastNoon : try XCTUnwrap(calendar.date(byAdding: .day, value: -1, to: pastNoon))
+        let dueDate = pastNoon < Date() ? pastNoon : try XCTUnwrap(calendar.date(
+            byAdding: .day,
+            value: -1,
+            to: pastNoon
+        ))
         let task = VTask(id: 1, title: "Timed", done: false, dueDate: dueDate, priority: 0, projectId: 1)
         XCTAssertTrue(task.hasSpecificTime)
         XCTAssertTrue(task.isOverdue)
@@ -551,7 +594,7 @@ final class TaskServiceTests: XCTestCase {
         XCTAssertEqual(task.title, "Updated Task")
     }
 
-    func testToggleDoneFlipsState() async throws {
+    func testToggleRequestCarriesScheduleFields() async throws {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
@@ -567,7 +610,7 @@ final class TaskServiceTests: XCTestCase {
             endDate: end,
             priority: 1,
             projectId: 1,
-            repeatAfter: 86_400,
+            repeatAfter: 86400,
             repeatMode: 1
         )
 
@@ -588,18 +631,19 @@ final class TaskServiceTests: XCTestCase {
             XCTAssertNotNil(bodyJSON["due_date"])
             XCTAssertNotNil(bodyJSON["start_date"])
             XCTAssertNotNil(bodyJSON["end_date"])
-            XCTAssertEqual(bodyJSON["repeat_after"] as? Int, 86_400)
+            XCTAssertEqual(bodyJSON["repeat_after"] as? Int, 86400)
             XCTAssertEqual(bodyJSON["repeat_mode"] as? Int, 1)
 
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             return (response, responseJSON)
         }
 
-        let toggled = try await service.toggleDone(task: originalTask)
+        let request = TaskUpdateRequest(done: !originalTask.done).preservingSchedule(from: originalTask)
+        let toggled = try await service.updateTask(id: originalTask.id, request: request)
         XCTAssertTrue(toggled.done)
     }
 
-    func testToggleDoneFlipsFromDoneToUndone() async throws {
+    func testToggleRequestFlipsFromDoneToUndone() async throws {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
@@ -610,17 +654,18 @@ final class TaskServiceTests: XCTestCase {
         """.data(using: .utf8)!
 
         MockURLProtocol.requestHandler = { request in
-            if let bodyData = request.httpBody,
-               let bodyJSON = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
-            {
-                XCTAssertEqual(bodyJSON["done"] as? Bool, false)
+            guard let bodyJSON = request.decodedJSONBody else {
+                XCTFail("Expected a JSON request body")
+                return (MockURLProtocol.makeResponse(statusCode: 500, url: request.url), Data())
             }
+            XCTAssertEqual(bodyJSON["done"] as? Bool, false)
 
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             return (response, responseJSON)
         }
 
-        let toggled = try await service.toggleDone(task: originalTask)
+        let request = TaskUpdateRequest(done: !originalTask.done).preservingSchedule(from: originalTask)
+        let toggled = try await service.updateTask(id: originalTask.id, request: request)
         XCTAssertFalse(toggled.done)
     }
 
@@ -778,7 +823,7 @@ final class TaskServiceTests: XCTestCase {
             endDate: end,
             priority: 0,
             projectId: 1,
-            repeatAfter: 86_400,
+            repeatAfter: 86400,
             repeatMode: 1,
             reminders: [reminder]
         )
@@ -788,35 +833,8 @@ final class TaskServiceTests: XCTestCase {
         XCTAssertEqual(request.dueDate, due)
         XCTAssertEqual(request.startDate, start)
         XCTAssertEqual(request.endDate, end)
-        XCTAssertEqual(request.repeatAfter, 86_400)
+        XCTAssertEqual(request.repeatAfter, 86400)
         XCTAssertEqual(request.repeatMode, 1)
         XCTAssertEqual(request.reminders, [reminder])
-    }
-}
-
-private extension URLRequest {
-    /// MockURLProtocol commonly represents request bodies as streams.
-    var decodedJSONBody: [String: Any]? {
-        let data: Data?
-        if let body = httpBody {
-            data = body
-        } else if let stream = httpBodyStream {
-            stream.open()
-            defer { stream.close() }
-            var buffer = Data()
-            let size = 1024
-            let pointer = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
-            defer { pointer.deallocate() }
-            while stream.hasBytesAvailable {
-                let count = stream.read(pointer, maxLength: size)
-                if count <= 0 { break }
-                buffer.append(pointer, count: count)
-            }
-            data = buffer.isEmpty ? nil : buffer
-        } else {
-            data = nil
-        }
-        guard let data else { return nil }
-        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 }

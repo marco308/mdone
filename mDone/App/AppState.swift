@@ -635,9 +635,11 @@ final class AppState {
 
     @MainActor
     func toggleTaskDone(_ task: VTask) async {
+        // One request drives both the network call and the response merge, so
+        // the merge can never disagree with what was actually sent.
         let request = TaskUpdateRequest(done: !task.done).preservingSchedule(from: task)
         do {
-            let response = try await taskService.toggleDone(task: task)
+            let response = try await taskService.updateTask(id: task.id, request: request)
             let existing = taskSnapshot(id: response.id) ?? task
             let updated = Self.preservingSchedule(
                 existing: existing,
@@ -766,8 +768,11 @@ final class AppState {
 
         do {
             let response = try await taskService.updateTask(id: task.id, request: request)
-            let updated = tasks.first(where: { $0.id == response.id })
-                .map { Self.preservingSchedule(existing: $0, response: response, request: request) } ?? response
+            let updated = Self.preservingSchedule(
+                existing: taskSnapshot(id: response.id) ?? task,
+                response: response,
+                request: request
+            )
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
@@ -797,8 +802,11 @@ final class AppState {
 
         do {
             let response = try await taskService.updateTask(id: task.id, request: request)
-            let updated = tasks.first(where: { $0.id == response.id })
-                .map { Self.preservingSchedule(existing: $0, response: response, request: request) } ?? response
+            let updated = Self.preservingSchedule(
+                existing: taskSnapshot(id: response.id) ?? task,
+                response: response,
+                request: request
+            )
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
@@ -819,8 +827,10 @@ final class AppState {
         let safeRequest = existing.map { request.preservingSchedule(from: $0) } ?? request
         do {
             let response = try await taskService.updateTask(id: id, request: safeRequest)
+            // State can move while the request is in flight; merge into the
+            // freshest snapshot so a concurrent edit isn't rolled back.
             let updated = Self.preservingSchedule(
-                existing: existing,
+                existing: taskSnapshot(id: id) ?? existing,
                 response: response,
                 request: safeRequest
             )
@@ -1498,15 +1508,14 @@ final class AppState {
               let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart)
         else { return [:] }
 
+        // Expand each task's own occurrence days rather than testing every
+        // task against every day of the month; ranges rarely span many days,
+        // so this stays close to one pass over the task list.
         var result: [Date: [VTask]] = [:]
-        var day = monthStart
-        while day < monthEnd {
-            let matchingTasks = tasks.filter { $0.occurs(on: day, calendar: calendar) }
-            if !matchingTasks.isEmpty {
-                result[day] = matchingTasks
+        for task in tasks {
+            for day in task.occurrenceDays(from: monthStart, before: monthEnd, calendar: calendar) {
+                result[day, default: []].append(task)
             }
-            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else { break }
-            day = nextDay
         }
         return result
     }

@@ -88,3 +88,11 @@ final class MockURLProtocol: URLProtocol {
         return data
     }
 }
+
+extension URLRequest {
+    /// The request body decoded as a JSON object, for asserting on payloads.
+    var decodedJSONBody: [String: Any]? {
+        guard let data = MockURLProtocol.bodyData(from: self) else { return nil }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    }
+}

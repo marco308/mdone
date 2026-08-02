@@ -172,6 +172,44 @@ struct VTask: Codable, Identifiable, Hashable {
         }
     }
 
+    /// The start-of-day keys within [rangeStart, rangeEnd) on which this task
+    /// occurs, per the same rules as `occurs(on:)`. Both bounds are expected
+    /// to be day boundaries (e.g. a month's first midnights).
+    func occurrenceDays(from rangeStart: Date, before rangeEnd: Date, calendar: Calendar = .current) -> [Date] {
+        var days: Set<Date> = []
+
+        func insertDay(of date: Date) {
+            let day = calendar.startOfDay(for: date)
+            if day >= rangeStart, day < rangeEnd {
+                days.insert(day)
+            }
+        }
+
+        if let dueDate = effectiveDueDate {
+            insertDay(of: dueDate)
+        }
+
+        switch (effectiveStartDate, effectiveEndDate) {
+        case let (startDate?, endDate?):
+            let firstDay = calendar.startOfDay(for: min(startDate, endDate))
+            let lastDay = calendar.startOfDay(for: max(startDate, endDate))
+            var day = max(firstDay, rangeStart)
+            while day <= lastDay, day < rangeEnd {
+                days.insert(day)
+                guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+                day = nextDay
+            }
+        case let (startDate?, nil):
+            insertDay(of: startDate)
+        case let (nil, endDate?):
+            insertDay(of: endDate)
+        default:
+            break
+        }
+
+        return days.sorted()
+    }
+
     var isOverdue: Bool {
         guard let dueDate = effectiveDueDate, !done else { return false }
         // Date-only tasks (time = 00:00) should only count as overdue once
