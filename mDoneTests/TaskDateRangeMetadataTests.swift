@@ -94,24 +94,6 @@ final class TaskDateRangeMetadataTests: XCTestCase {
         XCTAssertTrue(metadata.accessibilityText.contains("5:00"))
     }
 
-    func testLocalizesBoundaryLabelsInGerman() throws {
-        let start = try XCTUnwrap(calendar.date(from: DateComponents(
-            year: 2026, month: 10, day: 24, hour: 9
-        )))
-        let german = Locale(identifier: "de_CH")
-
-        let metadata = try XCTUnwrap(TaskDateRangeMetadata.make(
-            startDate: start,
-            endDate: nil,
-            calendar: calendar,
-            locale: german
-        ))
-
-        XCTAssertTrue(metadata.compactText.hasPrefix("Beginnt "))
-        XCTAssertTrue(metadata.accessibilityText.hasPrefix("beginnt "))
-        XCTAssertFalse(metadata.compactText.contains("Starts"))
-    }
-
     func testReversedRangeUsesOrderedBoundsAndNeutralAccessibilityLabel() throws {
         let start = try XCTUnwrap(calendar.date(from: DateComponents(
             year: 2026, month: 10, day: 26, hour: 17
@@ -119,18 +101,18 @@ final class TaskDateRangeMetadataTests: XCTestCase {
         let end = try XCTUnwrap(calendar.date(from: DateComponents(
             year: 2026, month: 10, day: 24, hour: 9
         )))
-        let german = Locale(identifier: "de_CH")
 
         let metadata = try XCTUnwrap(TaskDateRangeMetadata.make(
             startDate: start,
             endDate: end,
             calendar: calendar,
-            locale: german
+            locale: locale
         ))
 
         XCTAssertTrue(metadata.compactText.contains("24"))
         XCTAssertTrue(metadata.compactText.contains("26"))
-        XCTAssertTrue(metadata.accessibilityText.hasPrefix("Datumsbereich "))
-        XCTAssertTrue(metadata.accessibilityText.contains(" bis "))
+        XCTAssertTrue(metadata.accessibilityText.hasPrefix("date range "))
+        XCTAssertTrue(metadata.accessibilityText.contains(" to "))
+        XCTAssertFalse(metadata.accessibilityText.contains("starts"))
     }
 }

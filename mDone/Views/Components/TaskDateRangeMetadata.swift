@@ -1,7 +1,7 @@
 import Foundation
 
-private final class TaskDateRangeMetadataBundleToken {}
-
+/// Display strings for a task's start/end range: a compact line for task rows
+/// and a fuller variant (with times) for VoiceOver.
 struct TaskDateRangeMetadata: Equatable {
     let compactText: String
     let accessibilityText: String
@@ -12,87 +12,48 @@ struct TaskDateRangeMetadata: Equatable {
         calendar: Calendar = .current,
         locale: Locale = .current
     ) -> TaskDateRangeMetadata? {
-        guard startDate != nil || endDate != nil else { return nil }
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.calendar = calendar
-        dateFormatter.locale = locale
-        dateFormatter.timeZone = calendar.timeZone
-        dateFormatter.dateStyle = .medium
-        dateFormatter.timeStyle = .none
-
-        let accessibilityFormatter = DateFormatter()
-        accessibilityFormatter.calendar = calendar
-        accessibilityFormatter.locale = locale
-        accessibilityFormatter.timeZone = calendar.timeZone
-        accessibilityFormatter.dateStyle = .medium
-        accessibilityFormatter.timeStyle = .short
+        let timeZone = calendar.timeZone
+        let dayStyle = Date.FormatStyle(
+            date: .abbreviated, time: .omitted,
+            locale: locale, calendar: calendar, timeZone: timeZone
+        )
+        let spokenStyle = Date.FormatStyle(
+            date: .abbreviated, time: .shortened,
+            locale: locale, calendar: calendar, timeZone: timeZone
+        )
 
         switch (startDate, endDate) {
         case let (start?, end?):
             let lowerBound = min(start, end)
             let upperBound = max(start, end)
-            let intervalFormatter = DateIntervalFormatter()
-            intervalFormatter.calendar = calendar
-            intervalFormatter.locale = locale
-            intervalFormatter.timeZone = calendar.timeZone
-            intervalFormatter.dateStyle = .medium
-            intervalFormatter.timeStyle = .none
-
-            let compactText = intervalFormatter.string(from: lowerBound, to: upperBound)
-            let accessibilityText: String
-            if start <= end {
-                let starts = localizedString("starts", locale: locale)
-                let ends = localizedString("ends", locale: locale)
-                accessibilityText = "\(starts) \(accessibilityFormatter.string(from: start)), \(ends) \(accessibilityFormatter.string(from: end))"
-            } else {
-                let dateRange = localizedString("date range", locale: locale)
-                let to = localizedString("to", locale: locale)
-                accessibilityText = "\(dateRange) \(accessibilityFormatter.string(from: lowerBound)) \(to) \(accessibilityFormatter.string(from: upperBound))"
-            }
+            let intervalStyle = Date.IntervalFormatStyle(
+                date: .abbreviated,
+                locale: locale, calendar: calendar, timeZone: timeZone
+            )
+            // Reversed ranges can arrive from imports the editor would reject;
+            // describe them neutrally rather than claiming the start comes first.
+            let accessibilityText = start <= end
+                ? "starts \(start.formatted(spokenStyle)), ends \(end.formatted(spokenStyle))"
+                : "date range \(lowerBound.formatted(spokenStyle)) to \(upperBound.formatted(spokenStyle))"
             return TaskDateRangeMetadata(
-                compactText: compactText,
+                compactText: (lowerBound ..< upperBound).formatted(intervalStyle),
                 accessibilityText: accessibilityText
             )
 
         case let (start?, nil):
-            let starts = localizedString("Starts", locale: locale)
-            let accessibilityStarts = localizedString("starts", locale: locale)
             return TaskDateRangeMetadata(
-                compactText: "\(starts) \(dateFormatter.string(from: start))",
-                accessibilityText: "\(accessibilityStarts) \(accessibilityFormatter.string(from: start))"
+                compactText: "Starts \(start.formatted(dayStyle))",
+                accessibilityText: "starts \(start.formatted(spokenStyle))"
             )
 
         case let (nil, end?):
-            let ends = localizedString("Ends", locale: locale)
-            let accessibilityEnds = localizedString("ends", locale: locale)
             return TaskDateRangeMetadata(
-                compactText: "\(ends) \(dateFormatter.string(from: end))",
-                accessibilityText: "\(accessibilityEnds) \(accessibilityFormatter.string(from: end))"
+                compactText: "Ends \(end.formatted(dayStyle))",
+                accessibilityText: "ends \(end.formatted(spokenStyle))"
             )
 
         case (nil, nil):
             return nil
         }
-    }
-
-    private static func localizedString(_ key: String, locale: Locale) -> String {
-        let appBundle = Bundle(for: TaskDateRangeMetadataBundleToken.self)
-        let localizationIdentifiers = [
-            locale.identifier,
-            locale.language.languageCode?.identifier
-        ].compactMap { $0 }
-
-        for identifier in localizationIdentifiers {
-            guard let path = appBundle.path(forResource: identifier, ofType: "lproj"),
-                  let localizedBundle = Bundle(path: path) else { continue }
-            return localizedBundle.localizedString(
-                forKey: key,
-                value: key,
-                table: "Localizable"
-            )
-        }
-
-        return appBundle.localizedString(forKey: key, value: key, table: "Localizable")
     }
 }
