@@ -7,8 +7,18 @@ final class MockURLProtocol: URLProtocol {
     /// Set this before each test to control the mock response.
     static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
 
+    /// Non-blocking variant for tests that need more than one request in flight.
+    /// The handler must finish the request through `complete`.
+    static var asynchronousRequestHandler: ((URLRequest, MockURLProtocol) -> Void)?
+
     /// Records all requests made so tests can verify endpoints, headers, etc.
-    static var capturedRequests: [URLRequest] = []
+    private static let capturedRequestsLock = NSLock()
+    private static var storedCapturedRequests: [URLRequest] = []
+    static var capturedRequests: [URLRequest] {
+        capturedRequestsLock.lock()
+        defer { capturedRequestsLock.unlock() }
+        return storedCapturedRequests
+    }
 
     // swiftlint:disable:next static_over_final_class
     override class func canInit(with request: URLRequest) -> Bool {
@@ -21,7 +31,12 @@ final class MockURLProtocol: URLProtocol {
     }
 
     override func startLoading() {
-        MockURLProtocol.capturedRequests.append(request)
+        MockURLProtocol.capture(request)
+
+        if let handler = MockURLProtocol.asynchronousRequestHandler {
+            handler(request, self)
+            return
+        }
 
         guard let handler = MockURLProtocol.requestHandler else {
             let error = NSError(domain: "MockURLProtocol", code: -1, userInfo: [
@@ -46,7 +61,22 @@ final class MockURLProtocol: URLProtocol {
     /// Resets all state. Call in setUp/tearDown.
     static func reset() {
         requestHandler = nil
-        capturedRequests = []
+        asynchronousRequestHandler = nil
+        capturedRequestsLock.lock()
+        storedCapturedRequests = []
+        capturedRequestsLock.unlock()
+    }
+
+    private static func capture(_ request: URLRequest) {
+        capturedRequestsLock.lock()
+        defer { capturedRequestsLock.unlock() }
+        storedCapturedRequests.append(request)
+    }
+
+    func complete(response: HTTPURLResponse, data: Data) {
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: data)
+        client?.urlProtocolDidFinishLoading(self)
     }
 
     // MARK: - Convenience Helpers

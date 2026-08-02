@@ -558,6 +558,44 @@ final class AppStateTests: XCTestCase {
         )
     }
 
+    func testUndoPreservesScheduleChangedAfterCompletion() async throws {
+        let appState = await makeMockedAppState()
+        let originalStart = Date(timeIntervalSince1970: 1_750_000_000)
+        let latestStart = Date(timeIntervalSince1970: 1_850_000_000)
+        let undoTarget = VTask(
+            id: 100,
+            title: "Scheduled task",
+            done: false,
+            startDate: originalStart,
+            priority: 0,
+            projectId: 5
+        )
+        let current = VTask(
+            id: 100,
+            title: "Scheduled task",
+            done: true,
+            startDate: latestStart,
+            priority: 0,
+            projectId: 5
+        )
+        appState.tasks = [current]
+        appState.recordCompletionForUndo(undoTarget)
+
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url!)
+            let json = """
+            {"id":100,"title":"Scheduled task","done":false,"priority":0,"project_id":5}
+            """
+            return (response, Data(json.utf8))
+        }
+
+        await appState.undoLastCompletion()
+
+        let restored = try XCTUnwrap(appState.tasks.first)
+        XCTAssertFalse(restored.done)
+        XCTAssertEqual(restored.startDate, latestStart)
+    }
+
     func testUndoKeepsTargetWhenRequestFails() async {
         let appState = await makeMockedAppState()
         let task = VTask(id: 11, title: "Flaky", done: true, priority: 0, projectId: 1)
@@ -784,6 +822,103 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(appState.tasks.first?.endDate, end)
         XCTAssertEqual(appState.tasks.first?.repeatAfter, 86400)
         XCTAssertEqual(appState.tasks.first?.repeatMode, 1)
+    }
+
+    func testConcurrentUpdatesForSameTaskPreserveLatestSchedule() async throws {
+        let appState = await makeMockedAppState()
+        let originalStart = Date(timeIntervalSince1970: 1_799_900_000)
+        let originalEnd = Date(timeIntervalSince1970: 1_800_100_000)
+        let latestStart = Date(timeIntervalSince1970: 1_809_900_000)
+        let latestEnd = Date(timeIntervalSince1970: 1_810_100_000)
+        let task = VTask(
+            id: 53,
+            title: "Concurrent",
+            done: false,
+            startDate: originalStart,
+            endDate: originalEnd,
+            priority: 0,
+            projectId: 4
+        )
+        appState.tasks = [task]
+
+        let firstRequestStarted = expectation(description: "first request started")
+        let stateLock = NSLock()
+        var requestCount = 0
+        var completeFirstRequest: (() -> Void)?
+        func withStateLock<T>(_ body: () -> T) -> T {
+            stateLock.lock()
+            defer { stateLock.unlock() }
+            return body()
+        }
+
+        MockURLProtocol.asynchronousRequestHandler = { request, protocolInstance in
+            let currentRequest = withStateLock {
+                requestCount += 1
+                return requestCount
+            }
+
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url!)
+            let title = currentRequest == 1 ? "First update" : "Latest update"
+            let json = """
+            {"id":53,"title":"\(title)","done":false,"priority":0,"project_id":4}
+            """
+            let completion = {
+                protocolInstance.complete(response: response, data: Data(json.utf8))
+            }
+
+            if currentRequest == 1 {
+                withStateLock { completeFirstRequest = completion }
+                firstRequestStarted.fulfill()
+            } else {
+                completion()
+            }
+        }
+
+        let firstUpdate = Task {
+            await appState.updateTask(
+                id: task.id,
+                request: TaskUpdateRequest(title: "First update")
+            )
+        }
+        await fulfillment(of: [firstRequestStarted], timeout: 1)
+
+        let latestUpdate = Task {
+            await appState.updateTask(
+                id: task.id,
+                request: TaskUpdateRequest(
+                    title: "Latest update",
+                    startDate: latestStart,
+                    endDate: latestEnd
+                )
+            )
+        }
+        let cancelledUpdate = Task {
+            await appState.updateTask(
+                id: task.id,
+                request: TaskUpdateRequest(title: "Cancelled update")
+            )
+        }
+
+        // Without per-task serialization, the second response completes while
+        // the first request is pending and increments this count to two.
+        try await Task.sleep(for: .milliseconds(250))
+        // A cancelled waiter must release its inherited slot without sending.
+        cancelledUpdate.cancel()
+        let (requestsBeforeFirstCompletion, finishFirst) = withStateLock {
+            (requestCount, completeFirstRequest)
+        }
+        XCTAssertEqual(requestsBeforeFirstCompletion, 1)
+        let finish = try XCTUnwrap(finishFirst)
+        finish()
+        await firstUpdate.value
+        await latestUpdate.value
+        await cancelledUpdate.value
+
+        let updated = try XCTUnwrap(appState.tasks.first)
+        XCTAssertEqual(updated.title, "Latest update")
+        XCTAssertEqual(updated.startDate, latestStart)
+        XCTAssertEqual(updated.endDate, latestEnd)
+        XCTAssertEqual(withStateLock { requestCount }, 2)
     }
 
     func testRescheduleTaskRollsBackOnFailure() async {
