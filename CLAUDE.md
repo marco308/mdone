@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-mDone is a native iOS/macOS task management app that connects to a self-hosted **Vikunja** server via its REST API (v2.1.0). Pure Swift with SwiftUI, no external dependencies.
+mDone is a native iOS/macOS task management app that connects to a self-hosted **Vikunja** server via its **v1** REST API (`/api/v1`, verified against Vikunja v2.5.0). Pure Swift with SwiftUI, no external dependencies. Vikunja 2.4.0 added a parallel `/api/v2` that upstream recommends for new clients; mDone has not migrated. See `docs/vikunja-api-inventory.md`.
 
 Beyond plain task CRUD the app also covers: focus sessions with a Live Activity, Kanban boards, subtasks and task relations, calendar (EventKit) overlay, home/lock screen widgets, Shortcuts and Siri actions, and offline caching with a pending-operation queue.
 
