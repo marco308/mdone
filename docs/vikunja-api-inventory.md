@@ -824,6 +824,11 @@ Use `order_by` parameter: `asc` (default) or `desc`. Can specify multiple: `sort
 - `x-pagination-total-pages` -- Total number of pages
 - `x-pagination-result-count` -- Number of items in this response
 
+**Gotchas** (verified against a local v2.5.0 with 64 projects and 63 labels, 2026-08-07):
+
+- `per_page` is clamped server-side to `maxitemsperpage` (50 by default), so asking for a bigger page does not avoid paging. Always loop until `page >= x-pagination-total-pages`.
+- `GET /projects` appends the caller's **pseudo-projects** (negative ids, e.g. `-2` "My Open Tasks") to *every* page, and they are excluded from `x-pagination-result-count`. Page 1 returned 51 objects with a result count of 50. Anything that concatenates pages must de-duplicate by `id` or it gets one copy of each pseudo-project per page. `GET /labels` does not do this.
+
 ---
 
 ## 16. Migration

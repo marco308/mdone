@@ -59,6 +59,122 @@ final class ProjectServiceTests: XCTestCase {
         XCTAssertTrue(projects.isEmpty)
     }
 
+    // MARK: - fetchProjects Pagination (issue #139)
+
+    /// A page of projects with the given ids, plus the `-2` pseudo-project
+    /// ("My Open Tasks") that Vikunja appends to *every* page outside the
+    /// pagination count. Shape taken from a live v2.5.0 response.
+    private static func projectsPage(ids: ClosedRange<Int>, includePseudo: Bool = true) -> Data {
+        // `##"…"##`: the payload contains `"#4772FA"`, and the `"#` in that
+        // would close a single-hash raw string.
+        var objects = ids.map { id in
+            ##"{"id": \##(id), "title": "Project \##(id)", "hex_color": "#4772FA", "is_archived": false, "is_favorite": false, "position": \##(id), "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"}"##
+        }
+        if includePseudo {
+            objects.append(
+                ##"{"id": -2, "title": "My Open Tasks", "hex_color": "", "is_archived": false, "is_favorite": false, "position": 0, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"}"##
+            )
+        }
+        return "[\(objects.joined(separator: ","))]".data(using: .utf8)!
+    }
+
+    private static func pageParam(of request: URLRequest) -> Int {
+        guard let url = request.url,
+              let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
+              let raw = items.first(where: { $0.name == "page" })?.value,
+              let page = Int(raw)
+        else { return 1 }
+        return page
+    }
+
+    /// Before the fix a single request was issued, so every project past the
+    /// first page was silently missing from the sidebar, pickers and sync.
+    func testFetchProjectsFollowsPaginationAcrossPages() async throws {
+        let (service, client) = makeTestService()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+
+        MockURLProtocol.requestHandler = { request in
+            let body = Self.pageParam(of: request) == 1
+                ? Self.projectsPage(ids: 1 ... 50)
+                : Self.projectsPage(ids: 51 ... 65)
+            let response = MockURLProtocol.makeResponse(
+                statusCode: 200,
+                url: request.url,
+                headers: ["x-pagination-total-pages": "2"]
+            )
+            return (response, body)
+        }
+
+        let projects = try await service.fetchProjects()
+
+        XCTAssertEqual(MockURLProtocol.capturedRequests.count, 2)
+        // 65 real projects + a single copy of the pseudo-project.
+        XCTAssertEqual(projects.count, 66)
+        XCTAssertTrue(projects.contains { $0.id == 65 }, "projects on the last page must survive")
+    }
+
+    /// Vikunja repeats its pseudo-projects on every page, so naively
+    /// concatenating pages yields duplicate ids, which is undefined behaviour
+    /// in the `ForEach`es that render `projects`.
+    func testFetchProjectsDeduplicatesPseudoProjectRepeatedOnEveryPage() async throws {
+        let (service, client) = makeTestService()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+
+        MockURLProtocol.requestHandler = { request in
+            let body = Self.pageParam(of: request) == 1
+                ? Self.projectsPage(ids: 1 ... 3)
+                : Self.projectsPage(ids: 4 ... 6)
+            let response = MockURLProtocol.makeResponse(
+                statusCode: 200,
+                url: request.url,
+                headers: ["x-pagination-total-pages": "3"]
+            )
+            return (response, body)
+        }
+
+        let projects = try await service.fetchProjects()
+
+        XCTAssertEqual(projects.filter { $0.id == -2 }.count, 1, "pseudo-project must appear once, not once per page")
+        XCTAssertEqual(Set(projects.map(\.id)).count, projects.count, "duplicate ids break SwiftUI ForEach")
+    }
+
+    /// Servers (or proxies) that drop the pagination header must not send us
+    /// into a request loop: one page and stop, which is the old behaviour.
+    func testFetchProjectsStopsAtOnePageWhenHeaderIsMissing() async throws {
+        let (service, client) = makeTestService()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+
+        MockURLProtocol.requestHandler = { request in
+            (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), Self.projectsPage(ids: 1 ... 3))
+        }
+
+        let projects = try await service.fetchProjects()
+
+        XCTAssertEqual(MockURLProtocol.capturedRequests.count, 1)
+        XCTAssertEqual(projects.count, 4)
+    }
+
+    func testFetchProjectsKeepsIncludeArchivedOnEveryPage() async throws {
+        let (service, client) = makeTestService()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(
+                statusCode: 200,
+                url: request.url,
+                headers: ["x-pagination-total-pages": "2"]
+            )
+            return (response, Self.projectsPage(ids: 1 ... 2, includePseudo: false))
+        }
+
+        _ = try await service.fetchProjects(includeArchived: true)
+
+        XCTAssertEqual(MockURLProtocol.capturedRequests.count, 2)
+        for request in MockURLProtocol.capturedRequests {
+            XCTAssertEqual(request.url?.query?.contains("is_archived=true"), true)
+        }
+    }
+
     // MARK: - fetchProject
 
     func testFetchProjectReturnsProject() async throws {

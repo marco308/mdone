@@ -14,6 +14,14 @@ actor LabelService {
         self.apiClient = apiClient
     }
 
+    /// Fetches every label, following pagination to the last page. Same
+    /// truncation problem as projects: one request is one page (issue #139).
+    func fetchLabels(perPage: Int = 100) async throws -> [VLabel] {
+        try await apiClient.fetchAllPages({ page, pp in
+            Endpoint.labels(page: page, perPage: pp)
+        }, perPage: perPage)
+    }
+
     func createLabel(_ request: LabelCreateRequest) async throws -> VLabel {
         try await apiClient.send(Endpoint.createLabel(), body: request)
     }
