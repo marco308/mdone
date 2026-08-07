@@ -344,7 +344,9 @@ final class AppState {
         await registerAPIClientHandlers()
         await APIClient.shared.configure(serverURL: serverURL, token: token)
 
-        // Validate by fetching projects — works with both JWT and API tokens
+        // Validate by fetching projects: works with both JWT and API tokens.
+        // One page is enough to prove the credentials are good; the full
+        // paginated list is loaded by refreshAll().
         #if DEBUG
         print("[mDone] Fetching projects to validate...")
         #endif
@@ -389,7 +391,7 @@ final class AppState {
             refreshToken: capturedRefreshToken
         )
 
-        // Validate
+        // Validate. One page is enough here too, see login().
         let projects: [Project] = try await APIClient.shared.fetch(Endpoint.projects())
         #if DEBUG
         print("[mDone] Validation OK - got \(projects.count) projects")
@@ -481,8 +483,7 @@ final class AppState {
             print("[mDone] refreshAll: got \(projects.count) projects")
             #endif
 
-            let labelsResult: [VLabel] = try await APIClient.shared.fetch(Endpoint.labels())
-            labels = labelsResult
+            labels = try await labelService.fetchLabels()
             #if DEBUG
             print("[mDone] refreshAll: got \(labels.count) labels")
             #endif

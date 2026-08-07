@@ -7,8 +7,25 @@ actor ProjectService {
         self.apiClient = apiClient
     }
 
-    func fetchProjects(page: Int = 1, includeArchived: Bool = false) async throws -> [Project] {
-        try await apiClient.fetch(Endpoint.projects(page: page, includeArchived: includeArchived))
+    /// Fetches every project, following pagination to the last page.
+    ///
+    /// A single request only ever returns one page, so anyone with more
+    /// projects than the page size lost the rest silently (issue #139).
+    /// Raising `per_page` alone is not enough: Vikunja clamps it server-side
+    /// to `maxitemsperpage` (50 by default), so the loop is what guarantees
+    /// completeness.
+    func fetchProjects(perPage: Int = 100, includeArchived: Bool = false) async throws -> [Project] {
+        let paged: [Project] = try await apiClient.fetchAllPages({ page, pp in
+            Endpoint.projects(page: page, perPage: pp, includeArchived: includeArchived)
+        }, perPage: perPage)
+
+        // Vikunja appends its pseudo-projects (negative ids, e.g. -2 "My Open
+        // Tasks") to *every* page and leaves them out of the pagination count,
+        // so combining pages hands back one copy per page. `Project` is
+        // Identifiable and the sidebar renders it in a ForEach, where duplicate
+        // ids are undefined behaviour. Keep the first occurrence of each id.
+        var seen = Set<Int64>()
+        return paged.filter { seen.insert($0.id).inserted }
     }
 
     func fetchProject(id: Int64) async throws -> Project {
