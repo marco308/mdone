@@ -1,10 +1,41 @@
-# Vikunja v2.1.0 REST API -- Complete Inventory
+# Vikunja v1 REST API -- Complete Inventory
 
-> Compiled 2026-03-15 from OpenAPI spec, source code (routes.go, models/*.go, events.go), and official documentation.
+> Verified 2026-08-06 against Vikunja **v2.5.0** (released 2026-08-04), from source code (routes.go, models/*.go, events.go) and official documentation.
 > Base path: `/api/v1`
 > Auth: `Authorization: Bearer <token>` (API token or JWT)
 > Pagination headers: `x-pagination-total-pages`, `x-pagination-result-count`
 > Permission header: `x-max-permission` (0=Read, 1=Read&Write, 2=Admin) on single-item responses
+
+## API version status
+
+Vikunja ships two parallel HTTP APIs. This document inventories **v1**, which is what mDone uses today.
+
+| API | Base path | Status |
+|-----|-----------|--------|
+| v1 | `/api/v1` | Fully supported, but on a sunset path. What mDone currently calls. |
+| v2 | `/api/v2` | Added in Vikunja 2.4.0 (2026-07-19). Upstream recommends it for new client work. |
+
+The v2 API adds structured error responses, `PATCH` for partial updates, and `?format=markdown` to
+exchange rich-text fields as Markdown rather than HTML. It lives in `pkg/routes/api/v2/` upstream and
+is documented separately at `/api/v2/docs` -- it is **not** in `docs.json`, which remains v1-only.
+
+Upstream's 2.4.0 release notes state that v1 stays fully supported for now but will eventually be
+removed, and that new client work should target v2. mDone has not begun a migration; there is no v2
+usage anywhere in the codebase. Between v2.1.0 and v2.5.0 the v1 surface was purely additive
+(26 route registrations added in `routes.go`, **none removed**), so nothing here is at risk in the
+near term.
+
+### A note on refreshing this document
+
+`docs.json` (the Swagger/OpenAPI spec) is **not** a complete record of Vikunja's routes -- a number of
+real, working endpoints never appear in it. Refreshing this inventory from the spec alone will
+produce false "corrections" to correct rows. Treat `pkg/routes/routes.go` as authoritative and use the
+spec only as a cross-check.
+
+Endpoints that are absent from `docs.json` but verified correct in `routes.go`: `POST /labels/:label`,
+`GET /projects/:project/tasks`, `GET /backgrounds/unsplash/images/:image`, `GET /avatar/:username`,
+`GET`+`POST /token/test`, `GET /user/sessions`, `DELETE /user/sessions/:session`, `GET /health`,
+`GET /docs`, `GET /docs.json`.
 
 ---
 
@@ -21,8 +52,9 @@
 | GET | `/tasks` | Get ALL tasks across all projects (with filtering) |
 | GET | `/projects/:project/views/:view/tasks` | Get tasks in a project view (supports filtering, sorting, pagination) |
 | GET | `/projects/:project/tasks` | Get tasks in a project (without view context) |
+| GET | `/projects/:project/tasks/by-index/:index` | Get a task by its per-project index (added 2.4.0) |
 | POST | `/tasks/bulk` | Bulk update multiple tasks |
-| PUT | `/tasks/:projecttask/duplicate` | Duplicate a task |
+| PUT | `/tasks/:projecttask/duplicate` | Duplicate a task (added 2.2.0) |
 
 ### 1.2 Task Model Fields
 
@@ -64,6 +96,8 @@ All JSON field names (snake_case):
 | `created_by` | User | Creator user object |
 | `created` | datetime | Creation timestamp |
 | `updated` | datetime | Last update timestamp |
+| `deleted_at` | datetime (omitzero) | Soft-delete timestamp, read-only. Soft-deleted tasks are purged after 30 days |
+| `time_entries_count` | int64 (optional) | Number of time entries (Pro). Only with `expand=time_entries_count` |
 
 ### 1.3 Task Query Parameters (for list endpoints)
 
@@ -75,7 +109,7 @@ All JSON field names (snake_case):
 | `filter` | string | Filter query string (see Section 14) |
 | `filter_timezone` | string | Timezone for date comparisons |
 | `filter_include_nulls` | bool | Include null values in filter results |
-| `expand[]` | string | Expand related data. Values: `subtasks`, `buckets`, `reactions`, `comments`, `comment_count`, `is_unread` |
+| `expand[]` | string | Expand related data. Values: `subtasks`, `buckets`, `reactions`, `comments`, `comment_count`, `time_entries_count`, `is_unread` |
 | `page` | int | Page number |
 | `per_page` | int | Items per page |
 
@@ -455,6 +489,18 @@ Saved filters appear as virtual projects with negative IDs (calculated as `-(fil
 
 **APIToken fields:** `id`, `title`, `permissions` (map of route groups to allowed methods), `expires_at`, `last_used_at`, `created`
 
+### 6.6a Bot Users (added 2.4.0)
+
+Machine accounts owned by a user, for automation that should not use the owner's own credentials.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/user/bots` | List your bot users |
+| PUT | `/user/bots` | Create a bot user |
+| GET | `/user/bots/:bot` | Get a single bot user |
+| POST | `/user/bots/:bot` | Update a bot user |
+| DELETE | `/user/bots/:bot` | Delete a bot user |
+
 ### 6.7 Account Deletion
 
 | Method | Path | Description |
@@ -809,19 +855,36 @@ These require a two-step OAuth flow (get auth URL, then migrate with code):
 
 ### 16.2 File-Based Migrations
 
-These accept file uploads directly:
+These accept file uploads directly (multipart field name: `import`).
+
+Note the method: file migrators register their migrate route with **`PUT`**, not `POST`
+(`pkg/modules/migration/handler/handler_file.go`). Only the OAuth migrators in 16.1 use `POST`.
 
 **TickTick:**
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/migration/ticktick/migrate` | Import from TickTick CSV backup |
+| PUT | `/migration/ticktick/migrate` | Import from TickTick CSV backup |
 | GET | `/migration/ticktick/status` | Check migration status |
 
 **Vikunja (data export):**
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/migration/vikunja-file/migrate` | Import from Vikunja ZIP export |
+| PUT | `/migration/vikunja-file/migrate` | Import from Vikunja ZIP export |
 | GET | `/migration/vikunja-file/status` | Check migration status |
+
+**WeKan** (added 2.3.0):
+| Method | Path | Description |
+|--------|------|-------------|
+| PUT | `/migration/wekan/migrate` | Import from WeKan export |
+| GET | `/migration/wekan/status` | Check migration status |
+
+**CSV** (added 2.3.0, generic importer, always enabled):
+| Method | Path | Description |
+|--------|------|-------------|
+| PUT | `/migration/csv/detect` | Detect column mapping from an uploaded CSV |
+| PUT | `/migration/csv/preview` | Preview the parsed result before importing |
+| PUT | `/migration/csv/migrate` | Run the import |
+| GET | `/migration/csv/status` | Check migration status |
 
 ---
 
@@ -849,6 +912,42 @@ Reaction body: `{"value": "emoji_string"}` -- the emoji character or shortcode.
 | GET | `/docs.json` | OpenAPI/Swagger specification (JSON) |
 | GET | `/docs` | Interactive API documentation (ReDoc UI) |
 | GET | `/health` | Health check (outside /api/v1, at root) |
+| GET | `/ws` | WebSocket upgrade for real-time updates (added 2.4.0) |
+| GET | `/feeds/notifications.atom` | Atom feed of user notifications (added 2.4.0, at root, HTTP Basic auth) |
+
+The WebSocket endpoint authenticates via its first message rather than the `Authorization` header, and
+is exempt from the group's JWT middleware. It is a plain echo route, so it does not appear in the
+OpenAPI spec. Potentially interesting for mDone as an alternative to poll-based refresh.
+
+### 18.1 OAuth2 Provider
+
+Vikunja can act as an OAuth2 *provider* (distinct from the OIDC client config used to log in to
+Vikunja, and distinct from the migration OAuth flows in section 16.1).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/oauth/authorize` | Authorization endpoint (added 2.3.0) |
+| POST | `/oauth/token` | Token endpoint (added 2.3.0, unauthenticated, rate-limited) |
+
+---
+
+## 19. Instance Administration (not usable by mDone)
+
+Added in Vikunja 2.4.0. Listed for completeness only -- **do not build against these**. The whole
+group is gated by `RequireFeature(license.FeatureAdminPanel)` (a Pro licence feature) *and*
+`RequireInstanceAdmin()`, so it is unreachable for an ordinary user's token, which is the only kind
+of credential mDone holds.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/overview` | Instance overview stats |
+| GET | `/admin/users` | List all users on the instance |
+| POST | `/admin/users` | Create a user |
+| DELETE | `/admin/users/:id` | Delete a user |
+| PATCH | `/admin/users/:id/admin` | Grant or revoke instance-admin |
+| PATCH | `/admin/users/:id/status` | Change a user's status |
+| GET | `/admin/projects` | List all projects on the instance |
+| PATCH | `/admin/projects/:id/owner` | Reassign a project's owner |
 
 ---
 
