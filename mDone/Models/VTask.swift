@@ -70,6 +70,12 @@ struct VTask: Codable, Identifiable, Hashable {
         (repeatAfter ?? 0) > 0
     }
 
+    /// The interval picker edits fixed-second recurrences. Preserve Vikunja's
+    /// mode only when the interval itself was not changed.
+    func repeatModeForEditedRepeatAfter(_ editedRepeatAfter: Int64) -> Int64? {
+        editedRepeatAfter == (repeatAfter ?? 0) ? repeatMode : 0
+    }
+
     /// The user-assigned task color from Vikunja, normalized for display.
     /// Returns `nil` when Vikunja sends no color (an empty string) or a value
     /// that isn't a valid 3/6/8-digit hex, so uncolored tasks fall back to the
@@ -124,6 +130,84 @@ struct VTask: Codable, Identifiable, Hashable {
         guard let dueDate else { return nil }
         if Calendar.current.component(.year, from: dueDate) <= 1 { return nil }
         return dueDate
+    }
+
+    /// Returns nil for Vikunja's zero-date sentinel (year 1).
+    var effectiveStartDate: Date? {
+        guard let startDate else { return nil }
+        if Calendar.current.component(.year, from: startDate) <= 1 { return nil }
+        return startDate
+    }
+
+    /// Returns nil for Vikunja's zero-date sentinel (year 1).
+    var effectiveEndDate: Date? {
+        guard let endDate else { return nil }
+        if Calendar.current.component(.year, from: endDate) <= 1 { return nil }
+        return endDate
+    }
+
+    /// Whether this task is scheduled for the given local calendar day.
+    /// Start/end ranges are inclusive; due dates add another matching day.
+    func occurs(on date: Date, calendar: Calendar = .current) -> Bool {
+        let day = calendar.startOfDay(for: date)
+        if let dueDate = effectiveDueDate,
+           calendar.isDate(dueDate, inSameDayAs: day)
+        {
+            return true
+        }
+
+        switch (effectiveStartDate, effectiveEndDate) {
+        case let (startDate?, endDate?):
+            let startDay = calendar.startOfDay(for: startDate)
+            let endDay = calendar.startOfDay(for: endDate)
+            let firstDay = min(startDay, endDay)
+            let lastDay = max(startDay, endDay)
+            return day >= firstDay && day <= lastDay
+        case let (startDate?, nil):
+            return calendar.isDate(startDate, inSameDayAs: day)
+        case let (nil, endDate?):
+            return calendar.isDate(endDate, inSameDayAs: day)
+        default:
+            return false
+        }
+    }
+
+    /// The start-of-day keys within [rangeStart, rangeEnd) on which this task
+    /// occurs, per the same rules as `occurs(on:)`. Both bounds are expected
+    /// to be day boundaries (e.g. a month's first midnights).
+    func occurrenceDays(from rangeStart: Date, before rangeEnd: Date, calendar: Calendar = .current) -> [Date] {
+        var days: Set<Date> = []
+
+        func insertDay(of date: Date) {
+            let day = calendar.startOfDay(for: date)
+            if day >= rangeStart, day < rangeEnd {
+                days.insert(day)
+            }
+        }
+
+        if let dueDate = effectiveDueDate {
+            insertDay(of: dueDate)
+        }
+
+        switch (effectiveStartDate, effectiveEndDate) {
+        case let (startDate?, endDate?):
+            let firstDay = calendar.startOfDay(for: min(startDate, endDate))
+            let lastDay = calendar.startOfDay(for: max(startDate, endDate))
+            var day = max(firstDay, rangeStart)
+            while day <= lastDay, day < rangeEnd {
+                days.insert(day)
+                guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+                day = nextDay
+            }
+        case let (startDate?, nil):
+            insertDay(of: startDate)
+        case let (nil, endDate?):
+            insertDay(of: endDate)
+        default:
+            break
+        }
+
+        return days.sorted()
     }
 
     var isOverdue: Bool {
@@ -205,21 +289,27 @@ struct TaskUpdateRequest: Encodable {
     var description: String?
     var done: Bool?
     var dueDate: Date?
+    var startDate: Date?
+    var endDate: Date?
     var priority: Int64?
     var projectId: Int64?
     var labels: [LabelRef]?
     var repeatAfter: Int64?
+    var repeatMode: Int64?
     var reminders: [TaskReminder]?
     /// Completion progress, 0...1. Drives the Current section's progress bar.
     var percentDone: Double?
     var clearDueDate: Bool?
+    var clearStartDate: Bool?
+    var clearEndDate: Bool?
 
     struct LabelRef: Encodable {
         var id: Int64
     }
 
     private enum CodingKeys: String, CodingKey {
-        case title, description, done, dueDate, priority, projectId, labels, repeatAfter, reminders, percentDone
+        case title, description, done, dueDate, startDate, endDate, priority, projectId, labels
+        case repeatAfter, repeatMode, reminders, percentDone
     }
 
     func encode(to encoder: Encoder) throws {
@@ -232,11 +322,47 @@ struct TaskUpdateRequest: Encodable {
         } else {
             try container.encodeIfPresent(dueDate, forKey: .dueDate)
         }
+        if clearStartDate == true {
+            try container.encode(Date.distantPast, forKey: .startDate)
+        } else {
+            try container.encodeIfPresent(startDate, forKey: .startDate)
+        }
+        if clearEndDate == true {
+            try container.encode(Date.distantPast, forKey: .endDate)
+        } else {
+            try container.encodeIfPresent(endDate, forKey: .endDate)
+        }
         try container.encodeIfPresent(priority, forKey: .priority)
         try container.encodeIfPresent(projectId, forKey: .projectId)
         try container.encodeIfPresent(labels, forKey: .labels)
         try container.encodeIfPresent(repeatAfter, forKey: .repeatAfter)
+        try container.encodeIfPresent(repeatMode, forKey: .repeatMode)
         try container.encodeIfPresent(reminders, forKey: .reminders)
         try container.encodeIfPresent(percentDone, forKey: .percentDone)
+    }
+
+    /// Carries schedule fields forward for Vikunja task updates, which can
+    /// otherwise clear omitted values on partial mutations such as Done or Progress.
+    func preservingSchedule(from task: VTask) -> TaskUpdateRequest {
+        var request = self
+        if request.dueDate == nil, request.clearDueDate != true {
+            request.dueDate = task.effectiveDueDate
+        }
+        if request.startDate == nil, request.clearStartDate != true {
+            request.startDate = task.effectiveStartDate
+        }
+        if request.endDate == nil, request.clearEndDate != true {
+            request.endDate = task.effectiveEndDate
+        }
+        if request.repeatAfter == nil {
+            request.repeatAfter = task.repeatAfter
+        }
+        if request.repeatMode == nil {
+            request.repeatMode = task.repeatMode
+        }
+        if request.reminders == nil {
+            request.reminders = task.reminders
+        }
+        return request
     }
 }

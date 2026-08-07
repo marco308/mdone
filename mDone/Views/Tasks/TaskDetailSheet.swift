@@ -11,7 +11,8 @@ struct TaskDetailSheet: View {
     @State private var title: String
     @State private var description: String
     @State private var dueDate: Date?
-    @State private var hasDueDate: Bool
+    @State private var startDate: Date?
+    @State private var endDate: Date?
     @State private var priority: Int64
     @State private var selectedProjectId: Int64
     @State private var repeatInterval: Int64
@@ -28,7 +29,8 @@ struct TaskDetailSheet: View {
         _title = State(initialValue: task.title)
         _description = State(initialValue: initialDescription)
         _dueDate = State(initialValue: task.effectiveDueDate)
-        _hasDueDate = State(initialValue: task.effectiveDueDate != nil)
+        _startDate = State(initialValue: task.effectiveStartDate)
+        _endDate = State(initialValue: task.effectiveEndDate)
         _priority = State(initialValue: task.priority)
         _selectedProjectId = State(initialValue: task.projectId)
         _repeatInterval = State(initialValue: task.repeatAfter ?? 0)
@@ -136,20 +138,11 @@ struct TaskDetailSheet: View {
 
                 TaskRelationsSections(task: task)
 
-                Section {
-                    Toggle("Due Date", isOn: $hasDueDate.animation())
-
-                    if hasDueDate {
-                        DatePicker(
-                            "Date",
-                            selection: Binding(
-                                get: { dueDate ?? Date() },
-                                set: { dueDate = $0 }
-                            ),
-                            displayedComponents: [.date, .hourAndMinute]
-                        )
-                    }
-                }
+                TaskScheduleEditor(
+                    dueDate: $dueDate,
+                    startDate: $startDate,
+                    endDate: $endDate
+                )
 
                 Section {
                     EstimatePicker(estimateSeconds: $estimateSeconds)
@@ -222,7 +215,12 @@ struct TaskDetailSheet: View {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Save") { saveTask() }
                             .fontWeight(.semibold)
-                            .disabled(title.isEmpty)
+                            .disabled(
+                                title.isEmpty || !TaskScheduleEditor.isValid(
+                                    startDate: startDate,
+                                    endDate: endDate
+                                )
+                            )
                     }
                 }
                 .alert("Delete Task?", isPresented: $showDeleteConfirm) {
@@ -251,13 +249,18 @@ struct TaskDetailSheet: View {
         let request = TaskUpdateRequest(
             title: title,
             description: composedDescription,
-            dueDate: hasDueDate ? (dueDate ?? Date()) : nil,
+            dueDate: dueDate,
+            startDate: startDate,
+            endDate: endDate,
             priority: priority,
             projectId: selectedProjectId,
             repeatAfter: repeatInterval,
+            repeatMode: task.repeatModeForEditedRepeatAfter(repeatInterval),
             reminders: reminders,
             percentDone: percentDone,
-            clearDueDate: !hasDueDate
+            clearDueDate: dueDate == nil,
+            clearStartDate: startDate == nil,
+            clearEndDate: endDate == nil
         )
         Task {
             await appState.updateTask(id: task.id, request: request)

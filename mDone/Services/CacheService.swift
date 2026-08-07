@@ -9,6 +9,8 @@ final class CachedTask {
     var done: Bool
     var doneAt: Date?
     var dueDate: Date?
+    var startDate: Date?
+    var endDate: Date?
     var priority: Int64
     var projectId: Int64
     var hexColor: String?
@@ -25,6 +27,8 @@ final class CachedTask {
         done = task.done
         doneAt = task.doneAt
         dueDate = task.dueDate
+        startDate = task.startDate
+        endDate = task.endDate
         priority = task.priority
         projectId = task.projectId
         hexColor = task.hexColor
@@ -49,6 +53,8 @@ final class CachedTask {
             done: done,
             doneAt: doneAt,
             dueDate: dueDate,
+            startDate: startDate,
+            endDate: endDate,
             priority: priority,
             projectId: projectId,
             hexColor: hexColor,
@@ -66,6 +72,8 @@ final class CachedTask {
         done = task.done
         doneAt = task.doneAt
         dueDate = task.dueDate
+        startDate = task.startDate
+        endDate = task.endDate
         priority = task.priority
         projectId = task.projectId
         hexColor = task.hexColor

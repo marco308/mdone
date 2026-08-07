@@ -187,6 +187,19 @@ struct TaskRow: View {
                     .foregroundStyle(task.done ? .secondary : .primary)
                     .lineLimit(density.titleLineLimit)
 
+                if let dateRangeMetadata {
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar.badge.clock")
+                            .accessibilityHidden(true)
+                        Text(dateRangeMetadata.compactText)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    .font(density.metadataFont)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                }
+
                 HStack(spacing: 8) {
                     if let dueDate = task.effectiveDueDate {
                         HStack(spacing: 4) {
@@ -274,6 +287,9 @@ struct TaskRow: View {
         if task.priority > 0 {
             parts.append("priority \(task.priorityLevel.label)")
         }
+        if let dateRangeMetadata {
+            parts.append(dateRangeMetadata.accessibilityText)
+        }
         if let dueDate = task.effectiveDueDate {
             if task.isOverdue {
                 parts.append("overdue")
@@ -288,6 +304,13 @@ struct TaskRow: View {
             parts.append("labels: \(labelNames)")
         }
         return parts.joined(separator: ", ")
+    }
+
+    private var dateRangeMetadata: TaskDateRangeMetadata? {
+        TaskDateRangeMetadata.make(
+            startDate: task.effectiveStartDate,
+            endDate: task.effectiveEndDate
+        )
     }
 
     /// Days since the task was last touched, but only once it exceeds the

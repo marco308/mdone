@@ -558,6 +558,44 @@ final class AppStateTests: XCTestCase {
         )
     }
 
+    func testUndoPreservesScheduleChangedAfterCompletion() async throws {
+        let appState = await makeMockedAppState()
+        let originalStart = Date(timeIntervalSince1970: 1_750_000_000)
+        let latestStart = Date(timeIntervalSince1970: 1_850_000_000)
+        let undoTarget = VTask(
+            id: 100,
+            title: "Scheduled task",
+            done: false,
+            startDate: originalStart,
+            priority: 0,
+            projectId: 5
+        )
+        let current = VTask(
+            id: 100,
+            title: "Scheduled task",
+            done: true,
+            startDate: latestStart,
+            priority: 0,
+            projectId: 5
+        )
+        appState.tasks = [current]
+        appState.recordCompletionForUndo(undoTarget)
+
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url!)
+            let json = """
+            {"id":100,"title":"Scheduled task","done":false,"priority":0,"project_id":5}
+            """
+            return (response, Data(json.utf8))
+        }
+
+        await appState.undoLastCompletion()
+
+        let restored = try XCTUnwrap(appState.tasks.first)
+        XCTAssertFalse(restored.done)
+        XCTAssertEqual(restored.startDate, latestStart)
+    }
+
     func testUndoKeepsTargetWhenRequestFails() async {
         let appState = await makeMockedAppState()
         let task = VTask(id: 11, title: "Flaky", done: true, priority: 0, projectId: 1)
@@ -612,6 +650,277 @@ final class AppStateTests: XCTestCase {
         )
     }
 
+    func testTogglePreservesScheduleWhenTaskOnlyExistsAsEmbeddedSnapshot() async throws {
+        let appState = await makeMockedAppState()
+        let due = Date(timeIntervalSince1970: 1_800_000_000)
+        let start = Date(timeIntervalSince1970: 1_799_900_000)
+        let end = Date(timeIntervalSince1970: 1_800_100_000)
+        let task = VTask(
+            id: 83,
+            title: "Embedded",
+            done: false,
+            dueDate: due,
+            startDate: start,
+            endDate: end,
+            priority: 0,
+            projectId: 1,
+            repeatAfter: 86400,
+            repeatMode: 1
+        )
+        let parent = VTask(
+            id: 900,
+            title: "Parent",
+            done: false,
+            priority: 0,
+            projectId: 1,
+            relatedTasks: ["subtask": [task]]
+        )
+        appState.tasks = [parent]
+        MockURLProtocol.requestHandler = { request in
+            let json = #"{"id":83,"title":"Embedded","done":true,"priority":0,"project_id":1}"#
+                .data(using: .utf8)!
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), json)
+        }
+
+        await appState.toggleTaskDone(task)
+
+        let updated = try XCTUnwrap(
+            appState.tasks.first(where: { $0.id == parent.id })?
+                .relatedTasks?["subtask"]?.first
+        )
+        XCTAssertEqual(updated.dueDate, due)
+        XCTAssertEqual(updated.startDate, start)
+        XCTAssertEqual(updated.endDate, end)
+        XCTAssertEqual(updated.repeatAfter, 86400)
+        XCTAssertEqual(updated.repeatMode, 1)
+    }
+
+    func testUpdateTaskPreservesRequestedScheduleWithoutTopLevelTask() async throws {
+        let appState = await makeMockedAppState()
+        let start = Date(timeIntervalSince1970: 1_799_900_000)
+        let end = Date(timeIntervalSince1970: 1_800_100_000)
+        let reminder = TaskReminder(
+            reminder: Date(timeIntervalSince1970: 1_800_050_000),
+            relativePeriod: nil,
+            relativeTo: nil
+        )
+        let embedded = VTask(
+            id: 84,
+            title: "Embedded",
+            done: false,
+            priority: 0,
+            projectId: 1,
+            repeatAfter: 2_592_000,
+            repeatMode: 1,
+            reminders: [reminder]
+        )
+        let parent = VTask(
+            id: 901,
+            title: "Parent",
+            done: false,
+            priority: 0,
+            projectId: 1,
+            relatedTasks: ["subtask": [embedded]]
+        )
+        appState.tasks = [parent]
+        var capturedBody: [String: Any]?
+        MockURLProtocol.requestHandler = { request in
+            capturedBody = request.decodedJSONBody
+            let json = #"{"id":84,"title":"Embedded","done":false,"priority":0,"project_id":1}"#
+                .data(using: .utf8)!
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), json)
+        }
+
+        await appState.updateTask(
+            id: 84,
+            request: TaskUpdateRequest(startDate: start, endDate: end, repeatAfter: 2_592_000)
+        )
+
+        let updated = try XCTUnwrap(
+            appState.tasks.first(where: { $0.id == parent.id })?
+                .relatedTasks?["subtask"]?.first
+        )
+        XCTAssertEqual(capturedBody?["repeat_mode"] as? Int, 1)
+        XCTAssertNotNil(capturedBody?["reminders"])
+        XCTAssertEqual(updated.startDate, start)
+        XCTAssertEqual(updated.endDate, end)
+        XCTAssertEqual(updated.repeatAfter, 2_592_000)
+        XCTAssertEqual(updated.repeatMode, 1)
+        XCTAssertEqual(updated.reminders, [reminder])
+    }
+
+    func testPreservingScheduleHonorsExplicitClearOverStaleResponse() {
+        let due = Date(timeIntervalSince1970: 1_800_000_000)
+        let start = Date(timeIntervalSince1970: 1_799_900_000)
+        let end = Date(timeIntervalSince1970: 1_800_100_000)
+        let existing = VTask(
+            id: 82,
+            title: "Scheduled",
+            done: false,
+            dueDate: due,
+            startDate: start,
+            endDate: end,
+            priority: 0,
+            projectId: 1
+        )
+        let staleResponse = existing
+        let request = TaskUpdateRequest(
+            clearDueDate: true,
+            clearStartDate: true,
+            clearEndDate: true
+        )
+
+        let merged = AppState.preservingSchedule(
+            existing: existing,
+            response: staleResponse,
+            request: request
+        )
+
+        XCTAssertNil(merged.dueDate)
+        XCTAssertNil(merged.startDate)
+        XCTAssertNil(merged.endDate)
+    }
+
+    func testUpdateTaskPreservesScheduleWhenResponseOmitsIt() async {
+        let appState = await makeMockedAppState()
+        let due = Date(timeIntervalSince1970: 1_800_000_000)
+        let start = Date(timeIntervalSince1970: 1_799_900_000)
+        let end = Date(timeIntervalSince1970: 1_800_100_000)
+        let task = VTask(
+            id: 52,
+            title: "Scheduled",
+            done: false,
+            dueDate: due,
+            startDate: start,
+            endDate: end,
+            priority: 1,
+            projectId: 4,
+            repeatAfter: 86400,
+            repeatMode: 1
+        )
+        appState.tasks = [task]
+        var capturedBody: [String: Any]?
+
+        MockURLProtocol.requestHandler = { request in
+            capturedBody = request.decodedJSONBody
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url!)
+            let json = """
+            {"id": 52, "title": "Updated", "done": false, "priority": 1, "project_id": 4}
+            """
+            return (response, Data(json.utf8))
+        }
+
+        await appState.updateTask(id: task.id, request: TaskUpdateRequest(title: "Updated"))
+
+        XCTAssertNotNil(capturedBody?["due_date"])
+        XCTAssertNotNil(capturedBody?["start_date"])
+        XCTAssertNotNil(capturedBody?["end_date"])
+        XCTAssertEqual(capturedBody?["repeat_after"] as? Int, 86400)
+        XCTAssertEqual(capturedBody?["repeat_mode"] as? Int, 1)
+        XCTAssertEqual(appState.tasks.first?.dueDate, due)
+        XCTAssertEqual(appState.tasks.first?.startDate, start)
+        XCTAssertEqual(appState.tasks.first?.endDate, end)
+        XCTAssertEqual(appState.tasks.first?.repeatAfter, 86400)
+        XCTAssertEqual(appState.tasks.first?.repeatMode, 1)
+    }
+
+    func testConcurrentUpdatesForSameTaskPreserveLatestSchedule() async throws {
+        let appState = await makeMockedAppState()
+        let originalStart = Date(timeIntervalSince1970: 1_799_900_000)
+        let originalEnd = Date(timeIntervalSince1970: 1_800_100_000)
+        let latestStart = Date(timeIntervalSince1970: 1_809_900_000)
+        let latestEnd = Date(timeIntervalSince1970: 1_810_100_000)
+        let task = VTask(
+            id: 53,
+            title: "Concurrent",
+            done: false,
+            startDate: originalStart,
+            endDate: originalEnd,
+            priority: 0,
+            projectId: 4
+        )
+        appState.tasks = [task]
+
+        let firstRequestStarted = expectation(description: "first request started")
+        let stateLock = NSLock()
+        var requestCount = 0
+        var completeFirstRequest: (() -> Void)?
+        func withStateLock<T>(_ body: () -> T) -> T {
+            stateLock.lock()
+            defer { stateLock.unlock() }
+            return body()
+        }
+
+        MockURLProtocol.asynchronousRequestHandler = { request, protocolInstance in
+            let currentRequest = withStateLock {
+                requestCount += 1
+                return requestCount
+            }
+
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url!)
+            let title = currentRequest == 1 ? "First update" : "Latest update"
+            let json = """
+            {"id":53,"title":"\(title)","done":false,"priority":0,"project_id":4}
+            """
+            let completion = {
+                protocolInstance.complete(response: response, data: Data(json.utf8))
+            }
+
+            if currentRequest == 1 {
+                withStateLock { completeFirstRequest = completion }
+                firstRequestStarted.fulfill()
+            } else {
+                completion()
+            }
+        }
+
+        let firstUpdate = Task {
+            await appState.updateTask(
+                id: task.id,
+                request: TaskUpdateRequest(title: "First update")
+            )
+        }
+        await fulfillment(of: [firstRequestStarted], timeout: 1)
+
+        let latestUpdate = Task {
+            await appState.updateTask(
+                id: task.id,
+                request: TaskUpdateRequest(
+                    title: "Latest update",
+                    startDate: latestStart,
+                    endDate: latestEnd
+                )
+            )
+        }
+        let cancelledUpdate = Task {
+            await appState.updateTask(
+                id: task.id,
+                request: TaskUpdateRequest(title: "Cancelled update")
+            )
+        }
+
+        // Without per-task serialization, the second response completes while
+        // the first request is pending and increments this count to two.
+        try await Task.sleep(for: .milliseconds(250))
+        // A cancelled waiter must release its inherited slot without sending.
+        cancelledUpdate.cancel()
+        let (requestsBeforeFirstCompletion, finishFirst) = withStateLock {
+            (requestCount, completeFirstRequest)
+        }
+        XCTAssertEqual(requestsBeforeFirstCompletion, 1)
+        let finish = try XCTUnwrap(finishFirst)
+        finish()
+        await firstUpdate.value
+        await latestUpdate.value
+        await cancelledUpdate.value
+
+        let updated = try XCTUnwrap(appState.tasks.first)
+        XCTAssertEqual(updated.title, "Latest update")
+        XCTAssertEqual(updated.startDate, latestStart)
+        XCTAssertEqual(updated.endDate, latestEnd)
+        XCTAssertEqual(withStateLock { requestCount }, 2)
+    }
+
     func testRescheduleTaskRollsBackOnFailure() async {
         let appState = await makeMockedAppState()
         let original = Date(timeIntervalSince1970: 1_700_000_000)
@@ -633,6 +942,37 @@ final class AppStateTests: XCTestCase {
             original,
             "A failed reschedule must restore the original due date"
         )
+    }
+
+    // MARK: - Calendar ranges (#17)
+
+    func testCalendarIncludesTaskOnEveryDayOfRange() async throws {
+        let appState = await makeMockedAppState()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Zurich"))
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 24, hour: 9
+        )))
+        let middle = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 25, hour: 12
+        )))
+        let end = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 26, hour: 17
+        )))
+        let task = VTask(
+            id: 90,
+            title: "Conference",
+            done: false,
+            startDate: start,
+            endDate: end,
+            priority: 0,
+            projectId: 1
+        )
+        appState.tasks = [task]
+
+        XCTAssertEqual(appState.tasksForDate(middle).map(\.id), [90])
+        let dayKey = Calendar.current.startOfDay(for: middle)
+        XCTAssertEqual(appState.datesWithTasks(in: middle)[dayKey]?.map(\.id), [90])
     }
 
     // MARK: - Calm Mode (#68)
@@ -722,32 +1062,5 @@ final class AppStateTests: XCTestCase {
         SharedKeys.sharedDefaults.set(true, forKey: SharedKeys.calmModeKey)
         XCTAssertTrue(SharedKeys.sharedDefaults.bool(forKey: SharedKeys.calmModeKey))
         SharedKeys.sharedDefaults.removeObject(forKey: SharedKeys.calmModeKey)
-    }
-}
-
-private extension URLRequest {
-    /// MockURLProtocol delivers the body as a stream; read + decode it as JSON.
-    var decodedJSONBody: [String: Any]? {
-        let data: Data?
-        if let body = httpBody {
-            data = body
-        } else if let stream = httpBodyStream {
-            stream.open()
-            defer { stream.close() }
-            var buffer = Data()
-            let size = 1024
-            let ptr = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
-            defer { ptr.deallocate() }
-            while stream.hasBytesAvailable {
-                let read = stream.read(ptr, maxLength: size)
-                if read <= 0 { break }
-                buffer.append(ptr, count: read)
-            }
-            data = buffer.isEmpty ? nil : buffer
-        } else {
-            data = nil
-        }
-        guard let data else { return nil }
-        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 }

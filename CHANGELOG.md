@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The Kanban board now shows your tasks again. Columns loaded but sat empty on current Vikunja servers (v0.24 and later, including 2.x) because the app still read tasks from an endpoint that stopped including them; the board now loads columns and cards the way modern Vikunja expects (#130).
 
 ### Added
+- You can now set optional start and end dates from a task's detail view on iPhone and Mac. Tasks spanning several days appear on every included day in the calendar while their due date remains an additional occurrence, and synchronized ranges remain available from the offline cache (#17).
 - You can now hide all-day calendar events: Settings > Calendar > **Show all-day events**. Turn it off to keep day-long events out of the Calendar and Today views. It stays on by default, so nothing changes unless you flip it (#133).
 
 ## [1.10.0] - 2026-07-23

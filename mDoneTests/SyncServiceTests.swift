@@ -6,12 +6,16 @@ final class SyncServiceTests: XCTestCase {
     // MARK: - CachedTask Round Trip
 
     func testCachedTaskRoundTrip() {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let end = Date(timeIntervalSince1970: 1_800_086_400)
         let task = VTask(
             id: 42,
             title: "Test Task",
             description: "A test description",
             done: false,
             dueDate: Date(),
+            startDate: start,
+            endDate: end,
             priority: 3,
             projectId: 1,
             hexColor: "#FF0000",
@@ -28,6 +32,8 @@ final class SyncServiceTests: XCTestCase {
         XCTAssertFalse(cached.done)
         XCTAssertEqual(cached.priority, 3)
         XCTAssertEqual(cached.projectId, 1)
+        XCTAssertEqual(cached.startDate, start)
+        XCTAssertEqual(cached.endDate, end)
 
         let restored = cached.toVTask()
         XCTAssertEqual(restored.id, task.id)
@@ -35,6 +41,8 @@ final class SyncServiceTests: XCTestCase {
         XCTAssertEqual(restored.description, task.description)
         XCTAssertEqual(restored.done, task.done)
         XCTAssertEqual(restored.priority, task.priority)
+        XCTAssertEqual(restored.startDate, start)
+        XCTAssertEqual(restored.endDate, end)
     }
 
     func testCachedProjectRoundTrip() {

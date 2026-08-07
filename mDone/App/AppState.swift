@@ -127,6 +127,8 @@ final class AppState {
     private var networkMonitor: NetworkMonitor?
     private var wasDisconnected: Bool = false
     private var temporaryIdCounter: Int64 = 0
+    @ObservationIgnored private var activeTaskUpdates: Set<Int64> = []
+    @ObservationIgnored private var taskUpdateWaiters: [Int64: [CheckedContinuation<Void, Never>]] = [:]
 
     var isOffline: Bool {
         !(networkMonitor?.isConnected ?? true)
@@ -581,12 +583,110 @@ final class AppState {
         return result
     }
 
+    private func taskSnapshot(id: Int64) -> VTask? {
+        if let task = tasks.first(where: { $0.id == id }) {
+            return task
+        }
+        for task in tasks {
+            guard let groups = task.relatedTasks else { continue }
+            for relatedTasks in groups.values {
+                if let related = relatedTasks.first(where: { $0.id == id }) {
+                    return related
+                }
+            }
+        }
+        return nil
+    }
+
+    /// Serializes full-replace updates for one task while allowing different
+    /// tasks to update concurrently. Vikunja has no field-level conflict
+    /// resolution, so overlapping requests for the same task can otherwise
+    /// apply stale preserved fields after a newer edit.
+    @MainActor
+    private func acquireTaskUpdateSlot(id: Int64) async -> Bool {
+        guard !Task.isCancelled else { return false }
+        if activeTaskUpdates.insert(id).inserted { return true }
+        await withCheckedContinuation { continuation in
+            taskUpdateWaiters[id, default: []].append(continuation)
+        }
+        guard !Task.isCancelled else {
+            releaseTaskUpdateSlot(id: id)
+            return false
+        }
+        return true
+    }
+
+    @MainActor
+    private func releaseTaskUpdateSlot(id: Int64) {
+        guard var waiters = taskUpdateWaiters[id], !waiters.isEmpty else {
+            activeTaskUpdates.remove(id)
+            taskUpdateWaiters.removeValue(forKey: id)
+            return
+        }
+
+        let next = waiters.removeFirst()
+        if waiters.isEmpty {
+            taskUpdateWaiters.removeValue(forKey: id)
+        } else {
+            taskUpdateWaiters[id] = waiters
+        }
+        next.resume()
+    }
+
+    /// Merges an update response without losing schedule fields Vikunja may omit.
+    /// Explicit clear flags still win over both the response and the old value.
+    static func preservingSchedule(
+        existing: VTask?,
+        response: VTask,
+        request: TaskUpdateRequest
+    ) -> VTask {
+        var result = existing.map {
+            preservingRelations(existing: $0, response: response)
+        } ?? response
+        if request.clearDueDate == true {
+            result.dueDate = nil
+        } else if result.effectiveDueDate == nil {
+            result.dueDate = request.dueDate ?? existing?.effectiveDueDate
+        }
+        if request.clearStartDate == true {
+            result.startDate = nil
+        } else if result.effectiveStartDate == nil {
+            result.startDate = request.startDate ?? existing?.effectiveStartDate
+        }
+        if request.clearEndDate == true {
+            result.endDate = nil
+        } else if result.effectiveEndDate == nil {
+            result.endDate = request.endDate ?? existing?.effectiveEndDate
+        }
+        if result.repeatAfter == nil {
+            result.repeatAfter = request.repeatAfter ?? existing?.repeatAfter
+        }
+        if result.repeatMode == nil {
+            result.repeatMode = request.repeatMode ?? existing?.repeatMode
+        }
+        if result.reminders == nil {
+            result.reminders = request.reminders ?? existing?.reminders
+        }
+        return result
+    }
+
     @MainActor
     func toggleTaskDone(_ task: VTask) async {
+        guard await acquireTaskUpdateSlot(id: task.id) else { return }
+        defer { releaseTaskUpdateSlot(id: task.id) }
+
+        // One request drives both the network call and the response merge, so
+        // the merge can never disagree with what was actually sent.
+        let current = taskSnapshot(id: task.id) ?? task
+        let request = TaskUpdateRequest(done: !current.done).preservingSchedule(from: current)
         do {
-            let response = try await taskService.toggleDone(task: task)
-            let updated = tasks.first(where: { $0.id == response.id })
-                .map { Self.preservingRelations(existing: $0, response: response) } ?? response
+            let response = try await taskService.updateTask(id: task.id, request: request)
+            let existing = taskSnapshot(id: response.id) ?? current
+            let updated = Self.preservingSchedule(
+                existing: existing,
+                response: response,
+                request: request
+            )
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             } else {
@@ -598,7 +698,7 @@ final class AppState {
             syncEmbeddedRelations(with: updated)
             syncService?.updateCachedTask(updated)
             if updated.done {
-                recordCompletionForUndo(task)
+                recordCompletionForUndo(current)
                 onTaskCompleted?(updated.id)
             } else {
                 clearUndoIfMatches(id: updated.id)
@@ -619,16 +719,20 @@ final class AppState {
     func undoLastCompletion() async {
         guard let target = undoableCompletion else { return }
         undoableCompletion = nil
+        guard await acquireTaskUpdateSlot(id: target.id) else {
+            if undoableCompletion == nil { undoableCompletion = target }
+            return
+        }
+        defer { releaseTaskUpdateSlot(id: target.id) }
+        let current = taskSnapshot(id: target.id) ?? target
         do {
-            _ = try await taskService.updateTask(id: target.id, request: TaskUpdateRequest(done: false))
-            // Restore the task to its exact pre-completion state. We rebuild from
-            // the stored snapshot rather than the update response because the
-            // response can omit fields like the due date, which would land the
-            // task in the wrong Inbox section (e.g. "No Date" instead of "Today").
-            // The completed task may also have been dropped from `tasks` by a
-            // refresh (the all-tasks fetch returns only undone tasks), so re-insert
-            // it when it's no longer present rather than silently doing nothing.
-            var restored = target
+            let request = TaskUpdateRequest(done: false).preservingSchedule(from: current)
+            _ = try await taskService.updateTask(id: target.id, request: request)
+            // Restore from the freshest local snapshot rather than the update
+            // response because Vikunja can omit fields such as the due date.
+            // When a refresh has dropped the completed task, `current` falls
+            // back to the pre-completion snapshot and is re-inserted below.
+            var restored = current
             restored.done = false
             if let index = tasks.firstIndex(where: { $0.id == restored.id }) {
                 tasks[index] = restored
@@ -694,8 +798,13 @@ final class AppState {
 
     @MainActor
     func postponeTask(_ task: VTask, byHours hours: Int) async {
-        let baseDate = task.effectiveDueDate ?? Date()
+        guard await acquireTaskUpdateSlot(id: task.id) else { return }
+        defer { releaseTaskUpdateSlot(id: task.id) }
+
+        let current = taskSnapshot(id: task.id) ?? task
+        let baseDate = current.effectiveDueDate ?? Date()
         let newDate = Calendar.current.date(byAdding: .hour, value: hours, to: baseDate) ?? baseDate
+        let request = TaskUpdateRequest(dueDate: newDate).preservingSchedule(from: current)
 
         let originalDueDate: Date?
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
@@ -706,9 +815,12 @@ final class AppState {
         }
 
         do {
-            let response = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(dueDate: newDate))
-            let updated = tasks.first(where: { $0.id == response.id })
-                .map { Self.preservingRelations(existing: $0, response: response) } ?? response
+            let response = try await taskService.updateTask(id: task.id, request: request)
+            let updated = Self.preservingSchedule(
+                existing: taskSnapshot(id: response.id) ?? current,
+                response: response,
+                request: request
+            )
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
@@ -727,6 +839,11 @@ final class AppState {
     /// Backs the quick-schedule long-press options (Today, Tomorrow, Next Week, …).
     @MainActor
     func rescheduleTask(_ task: VTask, to newDate: Date) async {
+        guard await acquireTaskUpdateSlot(id: task.id) else { return }
+        defer { releaseTaskUpdateSlot(id: task.id) }
+
+        let current = taskSnapshot(id: task.id) ?? task
+        let request = TaskUpdateRequest(dueDate: newDate).preservingSchedule(from: current)
         let originalDueDate: Date?
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
             originalDueDate = tasks[index].dueDate
@@ -736,9 +853,12 @@ final class AppState {
         }
 
         do {
-            let response = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(dueDate: newDate))
-            let updated = tasks.first(where: { $0.id == response.id })
-                .map { Self.preservingRelations(existing: $0, response: response) } ?? response
+            let response = try await taskService.updateTask(id: task.id, request: request)
+            let updated = Self.preservingSchedule(
+                existing: taskSnapshot(id: response.id) ?? current,
+                response: response,
+                request: request
+            )
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
@@ -755,10 +875,20 @@ final class AppState {
 
     @MainActor
     func updateTask(id: Int64, request: TaskUpdateRequest) async {
+        guard await acquireTaskUpdateSlot(id: id) else { return }
+        defer { releaseTaskUpdateSlot(id: id) }
+
+        let existing = taskSnapshot(id: id)
+        let safeRequest = existing.map { request.preservingSchedule(from: $0) } ?? request
         do {
-            let response = try await taskService.updateTask(id: id, request: request)
-            let updated = tasks.first(where: { $0.id == response.id })
-                .map { Self.preservingRelations(existing: $0, response: response) } ?? response
+            let response = try await taskService.updateTask(id: id, request: safeRequest)
+            // Preserve relations from the latest local snapshot when Vikunja
+            // omits them; schedule intent remains authoritative via safeRequest.
+            let updated = Self.preservingSchedule(
+                existing: taskSnapshot(id: id) ?? existing,
+                response: response,
+                request: safeRequest
+            )
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
@@ -955,15 +1085,20 @@ final class AppState {
     /// marker.
     @MainActor
     func setProgress(_ task: VTask, percent: Double) async {
+        guard await acquireTaskUpdateSlot(id: task.id) else { return }
+        defer { releaseTaskUpdateSlot(id: task.id) }
+
+        let current = taskSnapshot(id: task.id) ?? task
         let clamped = min(max(percent, 0), 1)
-        let original = tasks.first(where: { $0.id == task.id })?.percentDone
+        let request = TaskUpdateRequest(percentDone: clamped).preservingSchedule(from: current)
+        let original = current.percentDone
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
             tasks[index].percentDone = clamped
             tasks[index].updated = Date()
             syncService?.updateCachedTask(tasks[index])
         }
         do {
-            _ = try await taskService.updateTask(id: task.id, request: TaskUpdateRequest(percentDone: clamped))
+            _ = try await taskService.updateTask(id: task.id, request: request)
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
             if let index = tasks.firstIndex(where: { $0.id == task.id }) {
@@ -1345,10 +1480,7 @@ final class AppState {
 
     func tasksForDate(_ date: Date) -> [VTask] {
         let calendar = Calendar.current
-        return tasks.filter { task in
-            guard let dueDate = task.effectiveDueDate else { return false }
-            return calendar.isDate(dueDate, inSameDayAs: date)
-        }
+        return tasks.filter { $0.occurs(on: date, calendar: calendar) }
     }
 
     // MARK: - Notifications
@@ -1431,17 +1563,17 @@ final class AppState {
 
     func datesWithTasks(in month: Date) -> [Date: [VTask]] {
         let calendar = Calendar.current
-        guard calendar.range(of: .day, in: .month, for: month) != nil else { return [:] }
+        guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: month)),
+              let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart)
+        else { return [:] }
+
+        // Expand each task's own occurrence days rather than testing every
+        // task against every day of the month; ranges rarely span many days,
+        // so this stays close to one pass over the task list.
         var result: [Date: [VTask]] = [:]
-
         for task in tasks {
-            guard let dueDate = task.effectiveDueDate else { continue }
-            guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: month)),
-                  let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else { continue }
-
-            if dueDate >= monthStart, dueDate < monthEnd {
-                let dayStart = calendar.startOfDay(for: dueDate)
-                result[dayStart, default: []].append(task)
+            for day in task.occurrenceDays(from: monthStart, before: monthEnd, calendar: calendar) {
+                result[day, default: []].append(task)
             }
         }
         return result

@@ -126,6 +126,245 @@ final class TaskServiceTests: XCTestCase {
         XCTAssertNil(task.effectiveDueDate)
     }
 
+    // MARK: - VTask date ranges
+
+    func testEffectiveStartDateReturnsNilForVikunjaZeroDate() {
+        let task = VTask(
+            id: 1,
+            title: "T",
+            done: false,
+            startDate: .distantPast,
+            priority: 0,
+            projectId: 1
+        )
+
+        XCTAssertNil(task.effectiveStartDate)
+    }
+
+    func testEffectiveEndDateReturnsNilForVikunjaZeroDate() {
+        let task = VTask(
+            id: 1,
+            title: "T",
+            done: false,
+            endDate: .distantPast,
+            priority: 0,
+            projectId: 1
+        )
+
+        XCTAssertNil(task.effectiveEndDate)
+    }
+
+    func testTaskOccursOnEveryDayInInclusiveDateRange() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Zurich"))
+
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 24, hour: 9
+        )))
+        let end = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 26, hour: 17
+        )))
+        let task = VTask(
+            id: 1,
+            title: "Conference",
+            done: false,
+            startDate: start,
+            endDate: end,
+            priority: 0,
+            projectId: 1
+        )
+
+        for day in 24 ... 26 {
+            let date = try XCTUnwrap(calendar.date(from: DateComponents(
+                year: 2026, month: 10, day: day, hour: 12
+            )))
+            XCTAssertTrue(task.occurs(on: date, calendar: calendar))
+        }
+
+        let dayAfter = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 27, hour: 12
+        )))
+        XCTAssertFalse(task.occurs(on: dayAfter, calendar: calendar))
+    }
+
+    func testTaskWithOnlyStartDateOccursOnStartDay() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Zurich"))
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 25, hour: 9
+        )))
+        let task = VTask(
+            id: 1,
+            title: "Kickoff",
+            done: false,
+            startDate: start,
+            priority: 0,
+            projectId: 1
+        )
+
+        XCTAssertTrue(task.occurs(on: start, calendar: calendar))
+        let nextDay = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: start))
+        XCTAssertFalse(task.occurs(on: nextDay, calendar: calendar))
+    }
+
+    func testTaskWithOnlyEndDateOccursOnEndDay() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Zurich"))
+        let end = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 25, hour: 17
+        )))
+        let task = VTask(
+            id: 1,
+            title: "Deadline",
+            done: false,
+            endDate: end,
+            priority: 0,
+            projectId: 1
+        )
+
+        XCTAssertTrue(task.occurs(on: end, calendar: calendar))
+        let previousDay = try XCTUnwrap(calendar.date(byAdding: .day, value: -1, to: end))
+        XCTAssertFalse(task.occurs(on: previousDay, calendar: calendar))
+    }
+
+    func testTaskWithOnlyDueDateOccursOnDueDay() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Zurich"))
+        let due = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 11, day: 3, hour: 14
+        )))
+        let task = VTask(
+            id: 1,
+            title: "Submit",
+            done: false,
+            dueDate: due,
+            priority: 0,
+            projectId: 1
+        )
+
+        XCTAssertTrue(task.occurs(on: due, calendar: calendar))
+    }
+
+    func testDueDateAddsAnOccurrenceOutsideTheTaskRange() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Zurich"))
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 24, hour: 9
+        )))
+        let end = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 26, hour: 17
+        )))
+        let due = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 30, hour: 12
+        )))
+        let between = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 28, hour: 12
+        )))
+        let task = VTask(
+            id: 15,
+            title: "Range plus due",
+            done: false,
+            dueDate: due,
+            startDate: start,
+            endDate: end,
+            priority: 0,
+            projectId: 1
+        )
+
+        XCTAssertTrue(task.occurs(on: start, calendar: calendar))
+        XCTAssertTrue(task.occurs(on: due, calendar: calendar))
+        XCTAssertFalse(task.occurs(on: between, calendar: calendar))
+    }
+
+    func testOccurrenceDaysExpandsRangePlusDueDateWithinWindow() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Zurich"))
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 24, hour: 9
+        )))
+        let end = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 26, hour: 17
+        )))
+        let due = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 30, hour: 12
+        )))
+        let task = VTask(
+            id: 17,
+            title: "Range plus due",
+            done: false,
+            dueDate: due,
+            startDate: start,
+            endDate: end,
+            priority: 0,
+            projectId: 1
+        )
+        let monthStart = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 1)))
+        let monthEnd = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 11, day: 1)))
+
+        let days = task.occurrenceDays(from: monthStart, before: monthEnd, calendar: calendar)
+
+        XCTAssertEqual(
+            days.map { calendar.component(.day, from: $0) },
+            [24, 25, 26, 30]
+        )
+        XCTAssertTrue(days.allSatisfy { calendar.startOfDay(for: $0) == $0 })
+
+        // A window that starts mid-range only reports the days inside it.
+        let lateWindowStart = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 26)))
+        let clamped = task.occurrenceDays(from: lateWindowStart, before: monthEnd, calendar: calendar)
+        XCTAssertEqual(clamped.map { calendar.component(.day, from: $0) }, [26, 30])
+    }
+
+    func testTaskWithReversedRangeStillOccursBetweenBoundaries() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Zurich"))
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 11, day: 5, hour: 9
+        )))
+        let end = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 11, day: 3, hour: 17
+        )))
+        let middle = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 11, day: 4, hour: 12
+        )))
+        let task = VTask(
+            id: 1,
+            title: "Imported invalid range",
+            done: false,
+            startDate: start,
+            endDate: end,
+            priority: 0,
+            projectId: 1
+        )
+
+        XCTAssertTrue(task.occurs(on: middle, calendar: calendar))
+    }
+
+    func testTaskScheduleValidationRejectsEndBeforeStart() {
+        let start = Date(timeIntervalSince1970: 200)
+        let end = Date(timeIntervalSince1970: 100)
+
+        XCTAssertFalse(TaskScheduleEditor.isValid(startDate: start, endDate: end))
+        XCTAssertTrue(TaskScheduleEditor.isValid(startDate: start, endDate: nil))
+        XCTAssertTrue(TaskScheduleEditor.isValid(startDate: nil, endDate: end))
+        XCTAssertTrue(TaskScheduleEditor.isValid(startDate: start, endDate: start))
+    }
+
+    func testRepeatModeUsesFixedIntervalWhenEditorChangesInterval() {
+        let task = VTask(
+            id: 16,
+            title: "Calendar monthly",
+            done: false,
+            priority: 0,
+            projectId: 1,
+            repeatAfter: 2_592_000,
+            repeatMode: 1
+        )
+
+        XCTAssertEqual(task.repeatModeForEditedRepeatAfter(2_592_000), 1)
+        XCTAssertEqual(task.repeatModeForEditedRepeatAfter(604_800), 0)
+    }
+
     // MARK: - VTask isRepeating
 
     func testIsRepeatingTrue() {
@@ -186,7 +425,7 @@ final class TaskServiceTests: XCTestCase {
 
     // MARK: - VTask isOverdue end-of-day grace
 
-    func testDateOnlyTaskDueTodayIsNotOverdue() throws {
+    func testDateOnlyTaskDueTodayIsNotOverdue() {
         let calendar = Calendar.current
         let midnightToday = calendar.startOfDay(for: Date())
         let task = VTask(id: 1, title: "All-day today", done: false, dueDate: midnightToday, priority: 0, projectId: 1)
@@ -205,7 +444,11 @@ final class TaskServiceTests: XCTestCase {
         let calendar = Calendar.current
         let pastNoon = try XCTUnwrap(calendar.date(bySettingHour: 12, minute: 30, second: 0, of: Date()))
         // If the test happens to run before 12:30 local time, push to yesterday so the task is definitively overdue.
-        let dueDate = pastNoon < Date() ? pastNoon : try XCTUnwrap(calendar.date(byAdding: .day, value: -1, to: pastNoon))
+        let dueDate = pastNoon < Date() ? pastNoon : try XCTUnwrap(calendar.date(
+            byAdding: .day,
+            value: -1,
+            to: pastNoon
+        ))
         let task = VTask(id: 1, title: "Timed", done: false, dueDate: dueDate, priority: 0, projectId: 1)
         XCTAssertTrue(task.hasSpecificTime)
         XCTAssertTrue(task.isOverdue)
@@ -351,11 +594,25 @@ final class TaskServiceTests: XCTestCase {
         XCTAssertEqual(task.title, "Updated Task")
     }
 
-    func testToggleDoneFlipsState() async throws {
+    func testToggleRequestCarriesScheduleFields() async throws {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let originalTask = VTask(id: 7, title: "Toggle Me", done: false, priority: 1, projectId: 1)
+        let due = Date(timeIntervalSince1970: 1_800_000_000)
+        let start = Date(timeIntervalSince1970: 1_799_900_000)
+        let end = Date(timeIntervalSince1970: 1_800_100_000)
+        let originalTask = VTask(
+            id: 7,
+            title: "Toggle Me",
+            done: false,
+            dueDate: due,
+            startDate: start,
+            endDate: end,
+            priority: 1,
+            projectId: 1,
+            repeatAfter: 86400,
+            repeatMode: 1
+        )
 
         let responseJSON = """
         {"id": 7, "title": "Toggle Me", "done": true, "priority": 1, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-20T10:00:00Z"}
@@ -366,21 +623,27 @@ final class TaskServiceTests: XCTestCase {
             XCTAssertEqual(request.httpMethod, "POST")
 
             // Verify the body contains done: true (toggled from false)
-            if let bodyData = request.httpBody,
-               let bodyJSON = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
-            {
-                XCTAssertEqual(bodyJSON["done"] as? Bool, true)
+            guard let bodyJSON = request.decodedJSONBody else {
+                XCTFail("Expected a JSON request body")
+                return (MockURLProtocol.makeResponse(statusCode: 500, url: request.url), Data())
             }
+            XCTAssertEqual(bodyJSON["done"] as? Bool, true)
+            XCTAssertNotNil(bodyJSON["due_date"])
+            XCTAssertNotNil(bodyJSON["start_date"])
+            XCTAssertNotNil(bodyJSON["end_date"])
+            XCTAssertEqual(bodyJSON["repeat_after"] as? Int, 86400)
+            XCTAssertEqual(bodyJSON["repeat_mode"] as? Int, 1)
 
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             return (response, responseJSON)
         }
 
-        let toggled = try await service.toggleDone(task: originalTask)
+        let request = TaskUpdateRequest(done: !originalTask.done).preservingSchedule(from: originalTask)
+        let toggled = try await service.updateTask(id: originalTask.id, request: request)
         XCTAssertTrue(toggled.done)
     }
 
-    func testToggleDoneFlipsFromDoneToUndone() async throws {
+    func testToggleRequestFlipsFromDoneToUndone() async throws {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
@@ -391,17 +654,18 @@ final class TaskServiceTests: XCTestCase {
         """.data(using: .utf8)!
 
         MockURLProtocol.requestHandler = { request in
-            if let bodyData = request.httpBody,
-               let bodyJSON = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
-            {
-                XCTAssertEqual(bodyJSON["done"] as? Bool, false)
+            guard let bodyJSON = request.decodedJSONBody else {
+                XCTFail("Expected a JSON request body")
+                return (MockURLProtocol.makeResponse(statusCode: 500, url: request.url), Data())
             }
+            XCTAssertEqual(bodyJSON["done"] as? Bool, false)
 
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             return (response, responseJSON)
         }
 
-        let toggled = try await service.toggleDone(task: originalTask)
+        let request = TaskUpdateRequest(done: !originalTask.done).preservingSchedule(from: originalTask)
+        let toggled = try await service.updateTask(id: originalTask.id, request: request)
         XCTAssertFalse(toggled.done)
     }
 
@@ -517,5 +781,60 @@ final class TaskServiceTests: XCTestCase {
 
         // When clearDueDate is true, due_date should be encoded as distantPast
         XCTAssertNotNil(json?["due_date"])
+    }
+
+    func testTaskUpdateRequestEncodesStartAndEndDates() throws {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let end = Date(timeIntervalSince1970: 1_800_003_600)
+        let request = TaskUpdateRequest(startDate: start, endDate: end)
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(request)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+
+        XCTAssertNotNil(json?["start_date"])
+        XCTAssertNotNil(json?["end_date"])
+    }
+
+    func testTaskUpdateRequestClearsStartAndEndDatesWithVikunjaZeroDate() throws {
+        let request = TaskUpdateRequest(clearStartDate: true, clearEndDate: true)
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(request)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+
+        XCTAssertEqual(json?["start_date"] as? String, "0001-01-01T00:00:00Z")
+        XCTAssertEqual(json?["end_date"] as? String, "0001-01-01T00:00:00Z")
+    }
+
+    func testTaskUpdateRequestPreservesExistingSchedule() {
+        let due = Date(timeIntervalSince1970: 1_800_000_000)
+        let start = Date(timeIntervalSince1970: 1_799_900_000)
+        let end = Date(timeIntervalSince1970: 1_800_100_000)
+        let reminder = TaskReminder(reminder: due, relativePeriod: nil, relativeTo: nil)
+        let task = VTask(
+            id: 1,
+            title: "Scheduled",
+            done: false,
+            dueDate: due,
+            startDate: start,
+            endDate: end,
+            priority: 0,
+            projectId: 1,
+            repeatAfter: 86400,
+            repeatMode: 1,
+            reminders: [reminder]
+        )
+
+        let request = TaskUpdateRequest(done: true).preservingSchedule(from: task)
+
+        XCTAssertEqual(request.dueDate, due)
+        XCTAssertEqual(request.startDate, start)
+        XCTAssertEqual(request.endDate, end)
+        XCTAssertEqual(request.repeatAfter, 86400)
+        XCTAssertEqual(request.repeatMode, 1)
+        XCTAssertEqual(request.reminders, [reminder])
     }
 }
