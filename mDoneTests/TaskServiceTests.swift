@@ -532,6 +532,45 @@ final class TaskServiceTests: XCTestCase {
         XCTAssertTrue(tasks[1].done)
     }
 
+    /// The view response drives the ordering of a project's list, so stopping
+    /// at page 1 left everything past the 50th task with no known position
+    /// (issue #141). Unlike the kanban view, this endpoint reports its task
+    /// pages honestly, so following the header is enough here.
+    func testFetchProjectTasksFollowsPaginationAcrossPages() async throws {
+        let (service, client) = makeTestService()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+
+        func page(ids: ClosedRange<Int>) -> Data {
+            let objects = ids.map { id in
+                """
+                {"id": \(id), "title": "Task \(id)", "done": false, "priority": 0, "project_id": 7, \
+                "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"}
+                """
+            }
+            return "[\(objects.joined(separator: ","))]".data(using: .utf8)!
+        }
+        let page1 = page(ids: 1 ... 50)
+        let page2 = page(ids: 51 ... 60)
+
+        MockURLProtocol.requestHandler = { request in
+            let items = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems
+            let pageNumber = Int(items?.first(where: { $0.name == "page" })?.value ?? "1") ?? 1
+            let response = MockURLProtocol.makeResponse(
+                statusCode: 200,
+                url: request.url,
+                headers: ["x-pagination-total-pages": "2"]
+            )
+            return (response, pageNumber == 1 ? page1 : page2)
+        }
+
+        let tasks = try await service.fetchProjectTasks(projectId: 7, viewId: 3)
+
+        XCTAssertEqual(MockURLProtocol.capturedRequests.count, 2)
+        XCTAssertEqual(tasks.count, 60)
+        XCTAssertEqual(tasks.last?.id, 60, "view order must survive to the last page")
+        XCTAssertEqual(MockURLProtocol.capturedRequests.first?.url?.path, "/api/v1/projects/7/views/3/tasks")
+    }
+
     func testFetchTaskReturnsTask() async throws {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")

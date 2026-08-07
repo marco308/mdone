@@ -17,8 +17,18 @@ actor TaskService {
         try await apiClient.fetch(Endpoint.task(id: id))
     }
 
-    func fetchProjectTasks(projectId: Int64, viewId: Int64, page: Int = 1) async throws -> [VTask] {
-        try await apiClient.fetch(Endpoint.projectTasks(projectId: projectId, viewId: viewId, page: page))
+    /// Fetches a project view's tasks in their stored view order, following
+    /// pagination to the last page.
+    ///
+    /// The order matters more than the tasks here: `AppState` keeps the global
+    /// task list as its source of truth and uses this response only to order a
+    /// project's list. Reading one page left everything past the 50th task out
+    /// of the order map, so those tasks fell to the bottom of the list in
+    /// arbitrary order (issue #141).
+    func fetchProjectTasks(projectId: Int64, viewId: Int64, perPage: Int = 100) async throws -> [VTask] {
+        try await apiClient.fetchAllPages({ page, pp in
+            Endpoint.projectTasks(projectId: projectId, viewId: viewId, page: page, perPage: pp)
+        }, perPage: perPage)
     }
 
     func createTask(projectId: Int64, request: TaskCreateRequest) async throws -> VTask {

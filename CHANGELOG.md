@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Kanban columns now show every card. A column holding more than 50 tasks stopped at 50, with nothing on the board to say the rest existed. Project lists are ordered correctly all the way down too: tasks past the 50th used to collect at the bottom instead of sitting in their proper place (#141).
 - All of your projects and labels now load, not just the first 50. The app only ever asked the server for one page, so anyone with more than 50 projects lost the rest everywhere: sidebar, project pickers, favourites and sync, with no error to explain why. Raising the page size would not have helped, since Vikunja caps it server-side, so the app now walks through every page (#139).
 - The Kanban board now shows your tasks again. Columns loaded but sat empty on current Vikunja servers (v0.24 and later, including 2.x) because the app still read tasks from an endpoint that stopped including them; the board now loads columns and cards the way modern Vikunja expects (#130).
 
