@@ -828,6 +828,7 @@ Use `order_by` parameter: `asc` (default) or `desc`. Can specify multiple: `sort
 
 - `per_page` is clamped server-side to `maxitemsperpage` (50 by default), so asking for a bigger page does not avoid paging. Always loop until `page >= x-pagination-total-pages`.
 - `GET /projects` appends the caller's **pseudo-projects** (negative ids, e.g. `-2` "My Open Tasks") to *every* page, and they are excluded from `x-pagination-result-count`. Page 1 returned 51 objects with a result count of 50. Anything that concatenates pages must de-duplicate by `id` or it gets one copy of each pseudo-project per page. `GET /labels` does not do this.
+- On a **kanban** view, `GET /projects/:project/views/:view/tasks` paginates the tasks *inside* each bucket: every page repeats all the buckets, each carrying its next slice of tasks. The pagination headers describe the **buckets**, so a 3-bucket board reports `x-pagination-result-count: 3` and `x-pagination-total-pages: 1` even when a bucket has further pages of tasks. Following the header therefore caps each column at `per_page` cards. Page on each bucket's own `count` field instead, and stop when a page returns no tasks. The **list** view of the same endpoint paginates tasks normally and reports honest headers.
 
 ---
 

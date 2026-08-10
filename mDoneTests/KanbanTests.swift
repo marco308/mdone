@@ -146,6 +146,158 @@ final class KanbanTests: XCTestCase {
         XCTAssertEqual(buckets[1].tasks?.first?.bucketId, 2)
     }
 
+    // MARK: - fetchBuckets Task Pagination (issue #141)
+
+    private struct BucketSpec {
+        let id: Int
+        let title: String
+        let count: Int?
+        let taskIds: [Int]
+    }
+
+    /// A kanban view-tasks response. `tasks` is omitted for empty buckets and
+    /// `count` can be left out, matching what the server actually sends.
+    private static func bucketsJSON(_ specs: [BucketSpec]) throws -> Data {
+        let objects: [[String: Any]] = specs.map { spec in
+            var bucket: [String: Any] = [
+                "id": spec.id,
+                "title": spec.title,
+                "project_view_id": 3,
+                "limit": 0,
+                "position": Double(spec.id),
+            ]
+            if let count = spec.count {
+                bucket["count"] = count
+            }
+            if !spec.taskIds.isEmpty {
+                bucket["tasks"] = spec.taskIds.map { id in
+                    [
+                        "id": id, "title": "Task \(id)", "done": false,
+                        "priority": 0, "project_id": 7, "bucket_id": spec.id,
+                    ] as [String: Any]
+                }
+            }
+            return bucket
+        }
+        return try JSONSerialization.data(withJSONObject: objects)
+    }
+
+    private static func pageParam(of request: URLRequest) -> Int {
+        guard let url = request.url,
+              let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
+              let raw = items.first(where: { $0.name == "page" })?.value,
+              let page = Int(raw)
+        else { return 1 }
+        return page
+    }
+
+    private func makeBucketService() async -> ProjectService {
+        let client = APIClient(session: MockURLProtocol.mockSession())
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+        return ProjectService(apiClient: client)
+    }
+
+    /// The board capped every column at one page of cards. `x-pagination-total-pages`
+    /// cannot drive this loop: it counts buckets, so it says `1` even while a
+    /// bucket still has tasks on later pages. The bucket's own `count` does.
+    func testFetchBucketsPagesUntilEveryBucketReachesItsCount() async throws {
+        let service = await makeBucketService()
+        let page1 = try Self.bucketsJSON([BucketSpec(id: 2, title: "To-Do", count: 60, taskIds: Array(1 ... 50))])
+        let page2 = try Self.bucketsJSON([BucketSpec(id: 2, title: "To-Do", count: 60, taskIds: Array(51 ... 60))])
+
+        MockURLProtocol.requestHandler = { request in
+            // The header lies about task pages, exactly as the server sends it.
+            let response = MockURLProtocol.makeResponse(
+                statusCode: 200,
+                url: request.url,
+                headers: ["x-pagination-total-pages": "1"]
+            )
+            return (response, Self.pageParam(of: request) == 1 ? page1 : page2)
+        }
+
+        let buckets = try await service.fetchBuckets(projectId: 7, viewId: 3)
+
+        XCTAssertEqual(MockURLProtocol.capturedRequests.count, 2)
+        XCTAssertEqual(buckets.count, 1)
+        XCTAssertEqual(buckets.first?.tasks?.count, 60)
+        XCTAssertEqual(buckets.first?.tasks?.last?.id, 60, "later pages must append, not replace")
+    }
+
+    func testFetchBucketsRoutesLaterPagesIntoTheMatchingBucket() async throws {
+        let service = await makeBucketService()
+        let page1 = try Self.bucketsJSON([
+            BucketSpec(id: 2, title: "To-Do", count: 3, taskIds: [1, 2]),
+            BucketSpec(id: 3, title: "Doing", count: 2, taskIds: [10]),
+        ])
+        let page2 = try Self.bucketsJSON([
+            BucketSpec(id: 2, title: "To-Do", count: 3, taskIds: [3]),
+            BucketSpec(id: 3, title: "Doing", count: 2, taskIds: [11]),
+        ])
+
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
+            return (response, Self.pageParam(of: request) == 1 ? page1 : page2)
+        }
+
+        let buckets = try await service.fetchBuckets(projectId: 7, viewId: 3)
+
+        XCTAssertEqual(buckets.first(where: { $0.id == 2 })?.tasks?.map(\.id), [1, 2, 3])
+        XCTAssertEqual(buckets.first(where: { $0.id == 3 })?.tasks?.map(\.id), [10, 11])
+    }
+
+    /// Small boards are the common case, so a complete first page must not
+    /// cost a second request.
+    func testFetchBucketsMakesOneRequestWhenTheFirstPageIsComplete() async throws {
+        let service = await makeBucketService()
+        let page = try Self.bucketsJSON([
+            BucketSpec(id: 2, title: "To-Do", count: 2, taskIds: [1, 2]),
+            BucketSpec(id: 3, title: "Done", count: 0, taskIds: []),
+        ])
+
+        MockURLProtocol.requestHandler = { request in
+            (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), page)
+        }
+
+        let buckets = try await service.fetchBuckets(projectId: 7, viewId: 3)
+
+        XCTAssertEqual(MockURLProtocol.capturedRequests.count, 1)
+        XCTAssertEqual(buckets.count, 2)
+    }
+
+    /// A server that ignores `page` (or reports a `count` it never delivers)
+    /// keeps handing back the same tasks. Give up instead of looping forever.
+    func testFetchBucketsStopsWhenAPageRepeatsTasksItAlreadyHas() async throws {
+        let service = await makeBucketService()
+        let page = try Self.bucketsJSON([BucketSpec(id: 2, title: "To-Do", count: 60, taskIds: Array(1 ... 50))])
+
+        MockURLProtocol.requestHandler = { request in
+            (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), page)
+        }
+
+        let buckets = try await service.fetchBuckets(projectId: 7, viewId: 3)
+
+        XCTAssertEqual(MockURLProtocol.capturedRequests.count, 2, "must give up after a page adds nothing")
+        XCTAssertEqual(buckets.first?.tasks?.count, 50)
+    }
+
+    /// Older servers may omit `count`. Treat that as "might have more", then
+    /// stop on the empty page.
+    func testFetchBucketsWithoutCountStopsAfterAPageWithNoTasks() async throws {
+        let service = await makeBucketService()
+        let page1 = try Self.bucketsJSON([BucketSpec(id: 2, title: "To-Do", count: nil, taskIds: [1, 2])])
+        let page2 = try Self.bucketsJSON([BucketSpec(id: 2, title: "To-Do", count: nil, taskIds: [])])
+
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
+            return (response, Self.pageParam(of: request) == 1 ? page1 : page2)
+        }
+
+        let buckets = try await service.fetchBuckets(projectId: 7, viewId: 3)
+
+        XCTAssertEqual(MockURLProtocol.capturedRequests.count, 2)
+        XCTAssertEqual(buckets.first?.tasks?.count, 2)
+    }
+
     // MARK: - TaskService.moveTaskToBucket
 
     func testMoveTaskToBucketSendsTaskId() async throws {
