@@ -114,15 +114,18 @@ actor SyncService {
         return (try? context.fetchCount(descriptor)) ?? 0
     }
 
-    // MARK: - Cache Sync
+    // MARK: - Cache Writes
 
+    /// Replaces the cached task list with `tasks`: rows that still exist are
+    /// updated in place, new ones inserted, and rows the server no longer
+    /// returns deleted. Takes an already-fetched list rather than fetching its
+    /// own so `AppState.refreshAll()` can persist exactly what it just put on
+    /// screen without a second round trip (issue #144).
     @MainActor
-    func syncTasks() async throws -> [VTask] {
-        let tasks = try await taskService.fetchAllTasks(perPage: 200)
-
+    func cacheTasks(_ tasks: [VTask]) throws {
         let context = modelContainer.mainContext
-        let existingTasks = try context.fetch(FetchDescriptor<CachedTask>())
-        let existingById = Dictionary(uniqueKeysWithValues: existingTasks.map { ($0.id, $0) })
+        let existing = try context.fetch(FetchDescriptor<CachedTask>())
+        let existingById = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
         for task in tasks {
             if let cached = existingById[task.id] {
@@ -133,21 +136,18 @@ actor SyncService {
         }
 
         let fetchedIds = Set(tasks.map(\.id))
-        for existing in existingTasks where !fetchedIds.contains(existing.id) {
-            context.delete(existing)
+        for row in existing where !fetchedIds.contains(row.id) {
+            context.delete(row)
         }
 
         try context.save()
-        return tasks
     }
 
     @MainActor
-    func syncProjects() async throws -> [Project] {
-        let projects = try await projectService.fetchProjects()
-
+    func cacheProjects(_ projects: [Project]) throws {
         let context = modelContainer.mainContext
-        let existingProjects = try context.fetch(FetchDescriptor<CachedProject>())
-        let existingById = Dictionary(uniqueKeysWithValues: existingProjects.map { ($0.id, $0) })
+        let existing = try context.fetch(FetchDescriptor<CachedProject>())
+        let existingById = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
         for project in projects {
             if let cached = existingById[project.id] {
@@ -158,13 +158,64 @@ actor SyncService {
         }
 
         let fetchedIds = Set(projects.map(\.id))
-        for existing in existingProjects where !fetchedIds.contains(existing.id) {
-            context.delete(existing)
+        for row in existing where !fetchedIds.contains(row.id) {
+            context.delete(row)
         }
 
         try context.save()
+    }
+
+    /// `CachedLabel` has no `update(from:)` because labels are small and
+    /// immutable in practice, so the whole set is replaced.
+    @MainActor
+    func cacheLabels(_ labels: [VLabel]) throws {
+        let context = modelContainer.mainContext
+        for row in try context.fetch(FetchDescriptor<CachedLabel>()) {
+            context.delete(row)
+        }
+        for label in labels {
+            context.insert(CachedLabel(from: label))
+        }
+        try context.save()
+    }
+
+    /// Drops every cached record. Called on an explicit logout so one account's
+    /// tasks can't surface under the next.
+    @MainActor
+    func clearCache() {
+        let context = modelContainer.mainContext
+        for row in (try? context.fetch(FetchDescriptor<CachedTask>())) ?? [] {
+            context.delete(row)
+        }
+        for row in (try? context.fetch(FetchDescriptor<CachedProject>())) ?? [] {
+            context.delete(row)
+        }
+        for row in (try? context.fetch(FetchDescriptor<CachedLabel>())) ?? [] {
+            context.delete(row)
+        }
+        for row in (try? context.fetch(FetchDescriptor<PendingOperation>())) ?? [] {
+            context.delete(row)
+        }
+        try? context.save()
+    }
+
+    // MARK: - Cache Sync
+
+    @MainActor
+    func syncTasks() async throws -> [VTask] {
+        let tasks = try await taskService.fetchAllTasks(perPage: 200)
+        try cacheTasks(tasks)
+        return tasks
+    }
+
+    @MainActor
+    func syncProjects() async throws -> [Project] {
+        let projects = try await projectService.fetchProjects()
+        try cacheProjects(projects)
         return projects
     }
+
+    // MARK: - Cache Reads
 
     @MainActor
     func loadCachedTasks() throws -> [VTask] {
@@ -178,6 +229,13 @@ actor SyncService {
         let context = modelContainer.mainContext
         let cached = try context.fetch(FetchDescriptor<CachedProject>())
         return cached.map { $0.toProject() }
+    }
+
+    @MainActor
+    func loadCachedLabels() throws -> [VLabel] {
+        let context = modelContainer.mainContext
+        let cached = try context.fetch(FetchDescriptor<CachedLabel>())
+        return cached.map { $0.toLabel() }
     }
 
     // MARK: - Local Cache Updates

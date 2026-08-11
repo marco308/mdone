@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Offline mode now actually works. Opening the app without a reachable server used to sit on a loading spinner and then show an empty list claiming "All done!", because your tasks were never being saved to the offline cache and the cache was never read back. Your tasks, projects and labels are now saved on every successful sync and appear instantly on launch, before any network call, so the app is usable offline (#144).
+- When the device is offline the app no longer fires requests it can only lose, so there is no wait before your cached tasks appear (#144).
+- A server that cannot be reached now shows "You're offline. Showing your last synced tasks." and a clear "can't reach the server" message, instead of a generic error and a misleading empty list. This covers the case where Wi-Fi is working but your Vikunja is not reachable, for example over a VPN that is down (#144).
+- Requests now time out after 20 seconds instead of 60. On a network that drops packets rather than refusing the connection, the app could sit on a spinner for minutes before giving up (#144).
+
 ## [1.12.0] - 2026-08-10
 
 ### Fixed

@@ -23,6 +23,13 @@ final class NetworkMonitor {
         monitor.start(queue: queue)
     }
 
+    /// Builds a monitor pinned to a fixed state, without starting `NWPathMonitor`.
+    /// Tests need a deterministic offline flag; a started monitor would
+    /// asynchronously overwrite `isConnected` with the host's real path.
+    init(stubbedConnection isConnected: Bool) {
+        self.isConnected = isConnected
+    }
+
     private func getConnectionType(_ path: NWPath) -> ConnectionType {
         if path.usesInterfaceType(.wifi) { return .wifi }
         if path.usesInterfaceType(.cellular) { return .cellular }
