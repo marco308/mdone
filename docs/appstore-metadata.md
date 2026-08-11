@@ -83,6 +83,15 @@ Steps to test:
 
 This is a private test server maintained by the developer for App Store review purposes.
 
+## What's New (v1.12.0)
+
+Task date ranges, plus fixes for busy accounts.
+
+- Give a task an optional start and end date from its detail view. Tasks spanning several days now appear on every included day in the calendar, so multi-day work stays visible.
+- All of your projects and labels now load, not just the first 50. Larger accounts previously lost projects from the sidebar and pickers with no explanation.
+- Kanban columns now show every card, and long project lists keep their order all the way down. Columns with more than 50 tasks previously stopped at 50.
+- Available on both iPhone and Mac.
+
 ## What's New (v1.11.0)
 
 Hide all-day calendar events, plus a Kanban fix.
