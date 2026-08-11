@@ -341,10 +341,30 @@ struct TaskUpdateRequest: Encodable {
         try container.encodeIfPresent(percentDone, forKey: .percentDone)
     }
 
-    /// Carries schedule fields forward for Vikunja task updates, which can
-    /// otherwise clear omitted values on partial mutations such as Done or Progress.
-    func preservingSchedule(from task: VTask) -> TaskUpdateRequest {
+    /// Carries every field this request doesn't set forward from `task`.
+    ///
+    /// Vikunja's `POST /tasks/{id}` is a **full replace**: any field missing
+    /// from the body is reset to its zero value. A partial request such as
+    /// "just mark it done" therefore wipes whatever it doesn't mention.
+    ///
+    /// This used to cover the schedule fields only, so completing, postponing
+    /// or re-progressing a task silently destroyed that task's description,
+    /// priority and progress on the server (issue #147).
+    ///
+    /// `title`, `labels` and `projectId` are deliberately **not** carried: the
+    /// server keeps those when they're omitted, so leaving them out avoids
+    /// overwriting a change made elsewhere with our local snapshot.
+    func preservingExistingValues(from task: VTask) -> TaskUpdateRequest {
         var request = self
+        if request.description == nil {
+            request.description = task.description
+        }
+        if request.priority == nil {
+            request.priority = task.priority
+        }
+        if request.percentDone == nil {
+            request.percentDone = task.percentDone
+        }
         if request.dueDate == nil, request.clearDueDate != true {
             request.dueDate = task.effectiveDueDate
         }

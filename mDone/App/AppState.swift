@@ -777,7 +777,7 @@ final class AppState {
         // One request drives both the network call and the response merge, so
         // the merge can never disagree with what was actually sent.
         let current = taskSnapshot(id: task.id) ?? task
-        let request = TaskUpdateRequest(done: !current.done).preservingSchedule(from: current)
+        let request = TaskUpdateRequest(done: !current.done).preservingExistingValues(from: current)
         do {
             let response = try await taskService.updateTask(id: task.id, request: request)
             let existing = taskSnapshot(id: response.id) ?? current
@@ -825,7 +825,7 @@ final class AppState {
         defer { releaseTaskUpdateSlot(id: target.id) }
         let current = taskSnapshot(id: target.id) ?? target
         do {
-            let request = TaskUpdateRequest(done: false).preservingSchedule(from: current)
+            let request = TaskUpdateRequest(done: false).preservingExistingValues(from: current)
             _ = try await taskService.updateTask(id: target.id, request: request)
             // Restore from the freshest local snapshot rather than the update
             // response because Vikunja can omit fields such as the due date.
@@ -901,7 +901,7 @@ final class AppState {
         let current = taskSnapshot(id: task.id) ?? task
         let baseDate = current.effectiveDueDate ?? Date()
         let newDate = Calendar.current.date(byAdding: .hour, value: hours, to: baseDate) ?? baseDate
-        let request = TaskUpdateRequest(dueDate: newDate).preservingSchedule(from: current)
+        let request = TaskUpdateRequest(dueDate: newDate).preservingExistingValues(from: current)
 
         let originalDueDate: Date?
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
@@ -940,7 +940,7 @@ final class AppState {
         defer { releaseTaskUpdateSlot(id: task.id) }
 
         let current = taskSnapshot(id: task.id) ?? task
-        let request = TaskUpdateRequest(dueDate: newDate).preservingSchedule(from: current)
+        let request = TaskUpdateRequest(dueDate: newDate).preservingExistingValues(from: current)
         let originalDueDate: Date?
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
             originalDueDate = tasks[index].dueDate
@@ -976,7 +976,7 @@ final class AppState {
         defer { releaseTaskUpdateSlot(id: id) }
 
         let existing = taskSnapshot(id: id)
-        let safeRequest = existing.map { request.preservingSchedule(from: $0) } ?? request
+        let safeRequest = existing.map { request.preservingExistingValues(from: $0) } ?? request
         do {
             let response = try await taskService.updateTask(id: id, request: safeRequest)
             // Preserve relations from the latest local snapshot when Vikunja
@@ -1187,7 +1187,7 @@ final class AppState {
 
         let current = taskSnapshot(id: task.id) ?? task
         let clamped = min(max(percent, 0), 1)
-        let request = TaskUpdateRequest(percentDone: clamped).preservingSchedule(from: current)
+        let request = TaskUpdateRequest(percentDone: clamped).preservingExistingValues(from: current)
         let original = current.percentDone
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
             tasks[index].percentDone = clamped
