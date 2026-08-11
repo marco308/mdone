@@ -299,6 +299,12 @@ struct TaskUpdateRequest: Encodable {
     var reminders: [TaskReminder]?
     /// Completion progress, 0...1. Drives the Current section's progress bar.
     var percentDone: Double?
+    /// The app never sets a color itself; this exists so partial updates can
+    /// carry a color assigned in another client through Vikunja's full replace.
+    var hexColor: String?
+    /// Same as `hexColor`: carried so completing a task in mDone doesn't drop
+    /// it from favorites lists in other clients.
+    var isFavorite: Bool?
     var clearDueDate: Bool?
     var clearStartDate: Bool?
     var clearEndDate: Bool?
@@ -309,7 +315,7 @@ struct TaskUpdateRequest: Encodable {
 
     private enum CodingKeys: String, CodingKey {
         case title, description, done, dueDate, startDate, endDate, priority, projectId, labels
-        case repeatAfter, repeatMode, reminders, percentDone
+        case repeatAfter, repeatMode, reminders, percentDone, hexColor, isFavorite
     }
 
     func encode(to encoder: Encoder) throws {
@@ -339,6 +345,8 @@ struct TaskUpdateRequest: Encodable {
         try container.encodeIfPresent(repeatMode, forKey: .repeatMode)
         try container.encodeIfPresent(reminders, forKey: .reminders)
         try container.encodeIfPresent(percentDone, forKey: .percentDone)
+        try container.encodeIfPresent(hexColor, forKey: .hexColor)
+        try container.encodeIfPresent(isFavorite, forKey: .isFavorite)
     }
 
     /// Carries every field this request doesn't set forward from `task`.
@@ -349,11 +357,14 @@ struct TaskUpdateRequest: Encodable {
     ///
     /// This used to cover the schedule fields only, so completing, postponing
     /// or re-progressing a task silently destroyed that task's description,
-    /// priority and progress on the server (issue #147).
+    /// priority, progress, color and favorite flag on the server (issue #147).
     ///
     /// `title`, `labels` and `projectId` are deliberately **not** carried: the
     /// server keeps those when they're omitted, so leaving them out avoids
     /// overwriting a change made elsewhere with our local snapshot.
+    ///
+    /// Callers that mean "clear the description" must send an explicit empty
+    /// string; a nil description here means "keep what the task has".
     func preservingExistingValues(from task: VTask) -> TaskUpdateRequest {
         var request = self
         if request.description == nil {
@@ -364,6 +375,12 @@ struct TaskUpdateRequest: Encodable {
         }
         if request.percentDone == nil {
             request.percentDone = task.percentDone
+        }
+        if request.hexColor == nil {
+            request.hexColor = task.hexColor
+        }
+        if request.isFavorite == nil {
+            request.isFavorite = task.isFavorite
         }
         if request.dueDate == nil, request.clearDueDate != true {
             request.dueDate = task.effectiveDueDate

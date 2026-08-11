@@ -23,7 +23,9 @@ final class TaskUpdateRequestMergeTests: XCTestCase {
             dueDate: Date(timeIntervalSince1970: 1_800_000_000),
             priority: 5,
             projectId: 3,
-            percentDone: 0.75
+            hexColor: "e8283c",
+            percentDone: 0.75,
+            isFavorite: true
         )
     }
 
@@ -67,6 +69,18 @@ final class TaskUpdateRequestMergeTests: XCTestCase {
         XCTAssertEqual(body["priority"] as? Int, 5)
     }
 
+    /// The color and favorite flag are set from other Vikunja clients, but the
+    /// server wipes them on partial updates just like the fields above, so every
+    /// update must carry them too (verified against Vikunja v2.4.0: a bare
+    /// `{done: true}` resets `hex_color` to "" and `is_favorite` to false).
+    func testCompletingATaskCarriesColorAndFavorite() throws {
+        let task = richTask()
+        let body = try encodedBody(TaskUpdateRequest(done: true).preservingExistingValues(from: task))
+
+        XCTAssertEqual(body["hex_color"] as? String, "e8283c")
+        XCTAssertEqual(body["is_favorite"] as? Bool, true)
+    }
+
     // MARK: - The caller's own values still win
 
     func testExplicitValuesAreNotOverwrittenByTheSnapshot() throws {
@@ -80,6 +94,17 @@ final class TaskUpdateRequestMergeTests: XCTestCase {
         XCTAssertEqual(body["description"] as? String, "Rewritten")
         XCTAssertEqual(body["priority"] as? Int, 1)
         XCTAssertEqual(body["percent_done"] as? Double, 0.1)
+    }
+
+    func testExplicitColorAndFavoriteAreNotOverwrittenByTheSnapshot() throws {
+        let task = richTask()
+        var request = TaskUpdateRequest(done: true)
+        request.hexColor = "00ff00"
+        request.isFavorite = false
+        let body = try encodedBody(request.preservingExistingValues(from: task))
+
+        XCTAssertEqual(body["hex_color"] as? String, "00ff00")
+        XCTAssertEqual(body["is_favorite"] as? Bool, false)
     }
 
     /// Clearing a description to empty is a real edit, not "unset", so it must
@@ -159,5 +184,35 @@ final class TaskUpdateRequestMergeTests: XCTestCase {
         XCTAssertEqual(body["priority"] as? Int, 0)
         XCTAssertNil(body["description"])
         XCTAssertNil(body["percent_done"])
+        XCTAssertNil(body["hex_color"])
+        XCTAssertNil(body["is_favorite"])
+    }
+
+    // MARK: - What the task editors send
+
+    /// The edit sheets compose their description through `EstimateMarker.apply`
+    /// and must fall back to "" (an explicit clear), never nil: under
+    /// `preservingExistingValues` a nil description means "keep the old text",
+    /// which would silently undo the user deleting a description.
+    func testEditorStyleClearedDescriptionReachesTheWire() throws {
+        let task = richTask()
+        var request = TaskUpdateRequest(done: false)
+        // What TaskDetailSheet/MacTaskDetailView build for an emptied editor
+        // with no estimate set.
+        request.description = EstimateMarker.apply(nil, to: nil) ?? ""
+        let body = try encodedBody(request.preservingExistingValues(from: task))
+
+        XCTAssertEqual(body["description"] as? String, "")
+    }
+
+    /// The converse pin: removing the body but keeping an estimate must still
+    /// send the marker-only description, not resurrect the old body.
+    func testEditorStyleMarkerOnlyDescriptionReachesTheWire() throws {
+        let task = richTask()
+        var request = TaskUpdateRequest(done: false)
+        request.description = EstimateMarker.apply(1500, to: nil) ?? ""
+        let body = try encodedBody(request.preservingExistingValues(from: task))
+
+        XCTAssertEqual(body["description"] as? String, "<!-- mdone:estimate=1500 -->")
     }
 }

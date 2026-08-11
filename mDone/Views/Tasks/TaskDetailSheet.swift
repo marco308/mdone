@@ -245,7 +245,9 @@ struct TaskDetailSheet: View {
         // round-trips through Vikunja and is visible to any agent that reads
         // the task via the API. `apply` strips any prior marker first.
         let body = description.isEmpty ? nil : description
-        let composedDescription = EstimateMarker.apply(estimateSeconds, to: body)
+        // Empty string, not nil: preservingExistingValues treats nil as "keep
+        // the old text", so a cleared description must be sent explicitly.
+        let composedDescription = EstimateMarker.apply(estimateSeconds, to: body) ?? ""
         let request = TaskUpdateRequest(
             title: title,
             description: composedDescription,
