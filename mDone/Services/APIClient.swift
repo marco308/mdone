@@ -17,6 +17,13 @@ actor APIClient {
     private let baseRetryDelay: UInt64 = 1_000_000_000 // 1 second in nanoseconds
     private static let refreshCookieName = "vikunja_refresh_token"
 
+    /// Per-request timeout, in seconds. URLSession's 60s default is far too
+    /// long here: a network that drops packets rather than refusing the
+    /// connection (VPN down, server off the LAN) burned 60s on every one of the
+    /// four attempts, leaving the UI on a loading spinner for minutes (issue
+    /// #144). 20s is still generous for a self-hosted Vikunja on a slow link.
+    static let requestTimeout: TimeInterval = 20
+
     /// Fired when the access token (and optionally its refresh cookie) change
     /// because of a `/login` response or a refresh-on-401. Callers should
     /// persist both to the keychain so the new credentials survive relaunch.
@@ -107,6 +114,7 @@ actor APIClient {
 
         var request = URLRequest(url: url)
         request.httpMethod = endpoint.method.rawValue
+        request.timeoutInterval = APIClient.requestTimeout
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         if let apiToken {
@@ -210,9 +218,14 @@ actor APIClient {
 
                 isRetrying = false
 
-                // Map URLError to NetworkError for non-retryable or exhausted network errors
-                if let urlError = error as? URLError, urlError.code == .notConnectedToInternet {
-                    throw NetworkError.networkUnavailable
+                // Map URLError to NetworkError for non-retryable or exhausted
+                // network errors. This has to cover every connectivity code, not
+                // just `.notConnectedToInternet`: an unreachable server used to
+                // surface as `.unknown`, which hid it from callers checking for
+                // connectivity failures and gave the user a generic banner
+                // instead of "can't reach the server" (issue #144).
+                if let urlError = error as? URLError {
+                    throw NetworkError.from(urlError)
                 }
                 throw NetworkError.unknown(error)
             }
@@ -222,8 +235,8 @@ actor APIClient {
 
         // All retries exhausted — surface the appropriate error
         if let lastError {
-            if let urlError = lastError as? URLError, urlError.code == .notConnectedToInternet {
-                throw NetworkError.networkUnavailable
+            if let urlError = lastError as? URLError {
+                throw NetworkError.from(urlError)
             }
             throw NetworkError.unknown(lastError)
         }

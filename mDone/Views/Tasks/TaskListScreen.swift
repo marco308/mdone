@@ -99,7 +99,7 @@ struct TaskListScreen: View {
                     }
                     #endif
 
-                    if !networkMonitor.isConnected {
+                    if isOffline {
                         offlineBanner
                     }
 
@@ -354,11 +354,22 @@ struct TaskListScreen: View {
 
         if appState.activeTasks.isEmpty, !appState.isLoading {
             Section {
-                EmptyStateView(
-                    icon: "checkmark.circle",
-                    title: "All done!",
-                    subtitle: "No pending tasks"
-                )
+                // An empty list while offline usually means "nothing cached
+                // yet", not "nothing to do". Claiming "All done!" there is
+                // actively misleading (issue #144).
+                if isOffline {
+                    EmptyStateView(
+                        icon: "wifi.slash",
+                        title: "No cached tasks",
+                        subtitle: "Connect to your server to load your tasks"
+                    )
+                } else {
+                    EmptyStateView(
+                        icon: "checkmark.circle",
+                        title: "All done!",
+                        subtitle: "No pending tasks"
+                    )
+                }
             }
         }
     }
@@ -413,11 +424,19 @@ struct TaskListScreen: View {
         }
     }
 
+    /// True when the device has no link, or when the last refresh couldn't
+    /// reach the server on an otherwise-working connection (a self-hosted
+    /// Vikunja behind a VPN that's down, say). The second case looks identical
+    /// to the user, so it gets the same banner.
+    private var isOffline: Bool {
+        !networkMonitor.isConnected || appState.isShowingCachedData
+    }
+
     private var offlineBanner: some View {
         HStack {
             Image(systemName: "wifi.slash")
                 .accessibilityHidden(true)
-            Text("You're offline. Changes will sync when connected.")
+            Text("You're offline. Showing your last synced tasks.")
                 .font(.caption)
         }
         .foregroundStyle(.orange)

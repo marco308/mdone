@@ -134,6 +134,18 @@ final class AppState {
         !(networkMonitor?.isConnected ?? true)
     }
 
+    /// True while the visible lists come from the on-device cache because the
+    /// last refresh couldn't reach the server (device offline, or the server
+    /// unreachable on an otherwise-working connection). Drives the offline
+    /// banner and the "no cached data" empty state.
+    private(set) var isShowingCachedData: Bool = false
+
+    /// Cache hydration runs once per session, on the first refresh. Later
+    /// refreshes have either replaced the lists from the network or kept the
+    /// hydrated ones, so re-reading SwiftData would only cost a main-thread
+    /// fetch.
+    private var hasHydratedFromCache = false
+
     /// Polls the APIClient's retry state and updates the published `isRetrying` property.
     @MainActor
     func updateRetryState() async {
@@ -411,7 +423,7 @@ final class AppState {
         print("[mDone] logout() called")
         #endif
         authService.clearAll()
-        await tearDownSession()
+        await tearDownSession(clearingCache: true)
     }
 
     /// Called when the server stops accepting our credentials (refresh failed,
@@ -425,21 +437,72 @@ final class AppState {
         print("[mDone] expireSession() called")
         #endif
         authService.clearSession()
-        await tearDownSession()
+        // Keep the cache: it's the same account, and the user only has to
+        // re-enter their password. Their tasks stay readable in the meantime.
+        await tearDownSession(clearingCache: false)
     }
 
     @MainActor
-    private func tearDownSession() async {
+    private func tearDownSession(clearingCache: Bool) async {
         await APIClient.shared.clearCredentials()
         tasks = []
         projects = []
         labels = []
         notifications = []
         isAuthenticated = false
+        isShowingCachedData = false
+
+        if clearingCache {
+            syncService?.clearCache()
+            pendingOperationsCount = 0
+        }
+        // Let the next session hydrate from whatever cache survives.
+        hasHydratedFromCache = false
 
         // Clear cached widget data and refresh widgets
         SharedKeys.sharedDefaults.removeObject(forKey: SharedKeys.widgetDataKey)
         WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    /// Fills the in-memory lists from the on-device cache so the app has
+    /// content before (and without) a network round trip. Only fills lists that
+    /// are still empty, so it can never clobber fresher data from the server.
+    ///
+    /// Issue #144: nothing ever read the cache, so launching offline sat on a
+    /// blocking spinner for the whole retry backoff and then showed an empty
+    /// list, even though the user had synced moments earlier.
+    @MainActor
+    func hydrateFromCache() {
+        guard let syncService else { return }
+        hasHydratedFromCache = true
+
+        if tasks.isEmpty, let cached = try? syncService.loadCachedTasks(), !cached.isEmpty {
+            tasks = cached
+        }
+        if projects.isEmpty, let cached = try? syncService.loadCachedProjects(), !cached.isEmpty {
+            projects = cached
+        }
+        if labels.isEmpty, let cached = try? syncService.loadCachedLabels(), !cached.isEmpty {
+            labels = cached
+        }
+        updatePendingCount()
+    }
+
+    /// Persists the freshly-fetched lists so the next launch has something to
+    /// show while offline. Cache writes are best-effort: a SwiftData failure
+    /// must not turn a successful refresh into a visible error.
+    @MainActor
+    private func persistToCache() {
+        guard let syncService else { return }
+        do {
+            try syncService.cacheTasks(tasks)
+            try syncService.cacheProjects(projects)
+            try syncService.cacheLabels(labels)
+        } catch {
+            #if DEBUG
+            print("[mDone] persistToCache failed: \(error)")
+            #endif
+        }
     }
 
     @MainActor
@@ -447,6 +510,22 @@ final class AppState {
         #if DEBUG
         print("[mDone] refreshAll() called")
         #endif
+
+        if !hasHydratedFromCache {
+            hydrateFromCache()
+        }
+
+        // Offline: serve the cache instead of firing requests that can only
+        // fail. Skipping the network here is what keeps the loading overlay
+        // from sitting over an empty screen for the whole retry backoff.
+        if isOffline {
+            isShowingCachedData = true
+            #if DEBUG
+            print("[mDone] refreshAll: offline, serving \(tasks.count) cached tasks")
+            #endif
+            return
+        }
+
         isLoading = true
 
         #if os(iOS)
@@ -495,10 +574,12 @@ final class AppState {
 
             errorMessage = nil
             activeError = nil
+            isShowingCachedData = false
             #if DEBUG
             print("[mDone] refreshAll: SUCCESS")
             #endif
 
+            persistToCache()
             pushWidgetData()
             WidgetCenter.shared.reloadAllTimelines()
 
@@ -513,12 +594,29 @@ final class AppState {
                 #endif
                 await expireSession()
             }
+            markCachedIfUnreachable(error)
             handleError(error)
         } catch {
             #if DEBUG
             print("[mDone] refreshAll: other error: \(error)")
             #endif
+            markCachedIfUnreachable(error)
             handleError(error)
+        }
+    }
+
+    /// Flags the UI as showing cached data when a refresh failed for
+    /// connectivity reasons. `NetworkMonitor` only reports the device's own
+    /// link, so a reachable Wi-Fi with an unreachable Vikunja (VPN down, server
+    /// off the LAN) leaves `isOffline` false; without this the user would get a
+    /// stale list with no indication it wasn't refreshed.
+    @MainActor
+    private func markCachedIfUnreachable(_ error: Error) {
+        switch NetworkError.friendly(from: error) {
+        case .networkUnavailable, .timeout, .serverUnreachable:
+            isShowingCachedData = true
+        default:
+            break
         }
     }
 
@@ -750,9 +848,7 @@ final class AppState {
             // Only restore the old target if no newer completion was recorded
             // while this request was in flight — otherwise we'd clobber the more
             // recent undo target and break "undo the most recent completion".
-            if undoableCompletion == nil {
-                undoableCompletion = target
-            }
+            if undoableCompletion == nil { undoableCompletion = target }
             handleError(error)
         }
     }

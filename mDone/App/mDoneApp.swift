@@ -4,7 +4,7 @@ import SwiftUI
 @main
 struct mDoneApp: App {
     private let dependencies: AppDependencies
-    @State private var appState = AppState()
+    @State private var appState: AppState
     @Environment(\.scenePhase) private var scenePhase
     #if os(iOS)
     @State private var focusManager: FocusManager
@@ -14,6 +14,22 @@ struct mDoneApp: App {
     init() {
         let deps = AppDependencies()
         dependencies = deps
+
+        // Wire the sync service before the first view appears. It used to be
+        // done in `.onAppear`, which races the child views' `.task` blocks:
+        // whichever refresh ran first would find no sync service and so no
+        // cache to hydrate from (issue #144).
+        let state = AppState()
+        state.configureSyncService(
+            SyncService(
+                taskService: TaskService(),
+                projectService: ProjectService(),
+                modelContainer: deps.modelContainer
+            ),
+            networkMonitor: deps.networkMonitor
+        )
+        _appState = State(initialValue: state)
+
         #if os(iOS)
         let outbox = FocusOutboxService(modelContainer: deps.modelContainer)
         focusOutbox = outbox
@@ -42,13 +58,6 @@ struct mDoneApp: App {
             #endif
                 .modelContainer(dependencies.modelContainer)
                 .onAppear {
-                    let syncService = SyncService(
-                        taskService: TaskService(),
-                        projectService: ProjectService(),
-                        modelContainer: dependencies.modelContainer
-                    )
-                    appState.configureSyncService(syncService, networkMonitor: dependencies.networkMonitor)
-
                     #if os(iOS)
                     appState.onTaskCompleted = { taskId in
                         focusManager.handleTaskCompleted(taskId: taskId)
