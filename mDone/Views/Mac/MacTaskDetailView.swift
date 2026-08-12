@@ -247,7 +247,9 @@ struct MacTaskDetailView: View {
 
     private func saveTask() {
         let body = descriptionText.isEmpty ? nil : descriptionText
-        let composedDescription = EstimateMarker.apply(estimateSeconds, to: body)
+        // Empty string, not nil: preservingExistingValues treats nil as "keep
+        // the old text", so a cleared description must be sent explicitly.
+        let composedDescription = EstimateMarker.apply(estimateSeconds, to: body) ?? ""
         let request = TaskUpdateRequest(
             title: title,
             description: composedDescription,

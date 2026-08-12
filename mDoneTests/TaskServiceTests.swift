@@ -677,7 +677,7 @@ final class TaskServiceTests: XCTestCase {
             return (response, responseJSON)
         }
 
-        let request = TaskUpdateRequest(done: !originalTask.done).preservingSchedule(from: originalTask)
+        let request = TaskUpdateRequest(done: !originalTask.done).preservingExistingValues(from: originalTask)
         let toggled = try await service.updateTask(id: originalTask.id, request: request)
         XCTAssertTrue(toggled.done)
     }
@@ -703,7 +703,7 @@ final class TaskServiceTests: XCTestCase {
             return (response, responseJSON)
         }
 
-        let request = TaskUpdateRequest(done: !originalTask.done).preservingSchedule(from: originalTask)
+        let request = TaskUpdateRequest(done: !originalTask.done).preservingExistingValues(from: originalTask)
         let toggled = try await service.updateTask(id: originalTask.id, request: request)
         XCTAssertFalse(toggled.done)
     }
@@ -867,7 +867,7 @@ final class TaskServiceTests: XCTestCase {
             reminders: [reminder]
         )
 
-        let request = TaskUpdateRequest(done: true).preservingSchedule(from: task)
+        let request = TaskUpdateRequest(done: true).preservingExistingValues(from: task)
 
         XCTAssertEqual(request.dueDate, due)
         XCTAssertEqual(request.startDate, start)
