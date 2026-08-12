@@ -24,6 +24,12 @@ struct QueuedTaskEdit: Codable, Equatable {
     var repeatAfter: Int64?
     var repeatMode: Int64?
     var reminders: [TaskReminder]?
+    /// Captured for completeness: the app doesn't set these itself today, so an
+    /// offline edit leaves them nil and the replay merge fills them from the
+    /// fresh server copy. Recorded anyway so a future editor of colour or
+    /// favourite status doesn't silently lose it offline.
+    var hexColor: String?
+    var isFavorite: Bool?
     var clearDueDate: Bool?
     var clearStartDate: Bool?
     var clearEndDate: Bool?
@@ -43,6 +49,8 @@ struct QueuedTaskEdit: Codable, Equatable {
         repeatAfter = request.repeatAfter
         repeatMode = request.repeatMode
         reminders = request.reminders
+        hexColor = request.hexColor
+        isFavorite = request.isFavorite
         clearDueDate = request.clearDueDate
         clearStartDate = request.clearStartDate
         clearEndDate = request.clearEndDate
@@ -64,6 +72,8 @@ struct QueuedTaskEdit: Codable, Equatable {
         result.repeatAfter = repeatAfter
         result.repeatMode = repeatMode
         result.reminders = reminders
+        result.hexColor = hexColor
+        result.isFavorite = isFavorite
         result.clearDueDate = clearDueDate
         result.clearStartDate = clearStartDate
         result.clearEndDate = clearEndDate
@@ -104,6 +114,12 @@ struct QueuedTaskEdit: Codable, Equatable {
         }
         if let value = newer.reminders {
             result.reminders = value
+        }
+        if let value = newer.hexColor {
+            result.hexColor = value
+        }
+        if let value = newer.isFavorite {
+            result.isFavorite = value
         }
 
         if newer.clearDueDate == true {
@@ -163,6 +179,12 @@ struct QueuedTaskEdit: Codable, Equatable {
         }
         if let reminders {
             result.reminders = reminders
+        }
+        if let hexColor {
+            result.hexColor = hexColor
+        }
+        if let isFavorite {
+            result.isFavorite = isFavorite
         }
         if clearDueDate == true {
             result.dueDate = nil
