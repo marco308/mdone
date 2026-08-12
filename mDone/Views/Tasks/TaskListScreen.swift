@@ -436,11 +436,23 @@ struct TaskListScreen: View {
         HStack {
             Image(systemName: "wifi.slash")
                 .accessibilityHidden(true)
-            Text("You're offline. Showing your last synced tasks.")
+            Text(offlineBannerText)
                 .font(.caption)
         }
         .foregroundStyle(.orange)
         .listRowBackground(Color.orange.opacity(0.1))
         .accessibilityElement(children: .combine)
+    }
+
+    /// Says what's actually happening: whether the user is just reading cached
+    /// data, or has edits sitting in the queue waiting to go out.
+    private var offlineBannerText: String {
+        let pending = appState.pendingOperationsCount
+        guard pending > 0 else {
+            return "You're offline. Showing your last synced tasks."
+        }
+        return pending == 1
+            ? "You're offline. 1 change will sync when you reconnect."
+            : "You're offline. \(pending) changes will sync when you reconnect."
     }
 }

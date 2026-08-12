@@ -229,11 +229,43 @@ final class PendingOperation {
     var retryCount: Int
     var failed: Bool
 
-    init(endpointPath: String, method: String, bodyData: Data? = nil) {
+    /// How `SyncService` should replay this operation. Optional so the store
+    /// migrates without a custom plan; a nil kind means the pre-#146 behaviour
+    /// of sending `bodyData` verbatim.
+    var kind: String?
+
+    /// The task a `.taskEdit` / `.taskDelete` operation targets. Lets the queue
+    /// coalesce repeat edits of one task and drop edits superseded by a delete.
+    var taskId: Int64?
+
+    /// Why the operation was abandoned after exhausting its retries, kept so the
+    /// UI can tell the user which change didn't make it and why.
+    var failureReason: String?
+
+    enum Kind: String {
+        /// `bodyData` holds a `QueuedTaskEdit`: re-read the task, merge, then send.
+        case taskEdit
+        /// No body; delete `taskId`.
+        case taskDelete
+    }
+
+    var operationKind: Kind? {
+        kind.flatMap(Kind.init(rawValue:))
+    }
+
+    init(
+        endpointPath: String,
+        method: String,
+        bodyData: Data? = nil,
+        kind: Kind? = nil,
+        taskId: Int64? = nil
+    ) {
         id = UUID()
         self.endpointPath = endpointPath
         self.method = method
         self.bodyData = bodyData
+        self.kind = kind?.rawValue
+        self.taskId = taskId
         timestamp = Date()
         retryCount = 0
         failed = false

@@ -66,6 +66,23 @@ struct MainTabView: View {
         .errorBanner(Bindable(appState).activeError) {
             Task { await appState.refreshAll() }
         }
+        // Changes the sync queue gave up on must not disappear quietly: the
+        // user thinks they made that edit (issue #146).
+        .alert(
+            "Some changes could not be synced",
+            isPresented: Binding(
+                get: { !appState.failedSyncMessages.isEmpty },
+                set: {
+                    if !$0 {
+                        appState.failedSyncMessages = []
+                    }
+                }
+            )
+        ) {
+            Button("OK", role: .cancel) { appState.failedSyncMessages = [] }
+        } message: {
+            Text(appState.failedSyncMessages.joined(separator: "\n\n"))
+        }
         .onShake {
             if appState.canUndoLastCompletion {
                 showUndoCompletionPrompt = true

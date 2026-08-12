@@ -6,7 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- You can now edit tasks while offline. Completing a task, rescheduling it, changing its progress, editing its details or deleting it all take effect straight away and sync when you reconnect. Rows with changes still waiting show a "Not synced" marker, and the offline banner tells you how many are queued. Previously these actions did nothing for several seconds, then failed with an error that faded away (#146).
+- Queued changes are merged rather than replayed blindly. When your change reaches the server, only the fields you actually edited are applied, so an edit made offline no longer overwrites something you or someone else changed elsewhere in the meantime (#146).
+- If a queued change can never be delivered, for example because the task was deleted elsewhere, the app now tells you which change it was and why, instead of dropping it silently (#146).
+
 ### Fixed
+- Actions that genuinely need a connection, such as creating a task or a project, now say so immediately instead of spending several seconds retrying first (#146).
 - Completing a task no longer wipes its description, priority, progress, color or favorite status. Vikunja replaces a task wholesale on every update, so ticking a task off, postponing it, rescheduling it or dragging its progress bar silently cleared the fields the app did not resend. Those fields are now carried through on every task update (#147).
 - Offline mode now actually works. Opening the app without a reachable server used to sit on a loading spinner and then show an empty list claiming "All done!", because your tasks were never being saved to the offline cache and the cache was never read back. Your tasks, projects and labels are now saved on every successful sync and appear instantly on launch, before any network call, so the app is usable offline (#144).
 - When the device is offline the app no longer fires requests it can only lose, so there is no wait before your cached tasks appear (#144).
