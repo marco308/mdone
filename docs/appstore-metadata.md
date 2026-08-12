@@ -83,6 +83,15 @@ Steps to test:
 
 This is a private test server maintained by the developer for App Store review purposes.
 
+## What's New (v1.12.2)
+
+Offline mode that actually works, plus an important data-loss fix.
+
+- Your tasks, projects and labels are saved as you sync and appear the moment you open the app, even with no connection. mDone previously showed a loading spinner and then an empty list.
+- When your server cannot be reached, mDone now says so clearly and shows your last synced tasks, instead of a generic error and a misleading empty list.
+- Fixed a bug where completing, postponing or rescheduling a task, or changing its progress, could clear that task's description, priority and progress on your server.
+- Available on both iPhone and Mac.
+
 ## What's New (v1.12.0)
 
 Task date ranges, plus fixes for busy accounts.

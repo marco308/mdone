@@ -13,7 +13,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - Actions that genuinely need a connection, such as creating a task or a project, now say so immediately instead of spending several seconds retrying first (#146).
-- Completing a task no longer wipes its description, priority, progress, color or favorite status. Vikunja replaces a task wholesale on every update, so ticking a task off, postponing it, rescheduling it or dragging its progress bar silently cleared the fields the app did not resend. Those fields are now carried through on every task update (#147).
+- Completing a task now preserves its colour and favourite status too. 1.12.2 stopped the description, priority and progress being cleared; Vikunja resets these two the same way, so every task update now carries them as well (#147).
+
+## [1.12.2] - 2026-08-12
+
+### Fixed
+- Completing a task no longer wipes its description, priority and progress. Vikunja replaces a task wholesale on every update, so ticking a task off, postponing it, rescheduling it or dragging its progress bar silently cleared the fields the app did not resend. Those fields are now carried through on every task update (#147).
 - Offline mode now actually works. Opening the app without a reachable server used to sit on a loading spinner and then show an empty list claiming "All done!", because your tasks were never being saved to the offline cache and the cache was never read back. Your tasks, projects and labels are now saved on every successful sync and appear instantly on launch, before any network call, so the app is usable offline (#144).
 - When the device is offline the app no longer fires requests it can only lose, so there is no wait before your cached tasks appear (#144).
 - A server that cannot be reached now shows "You're offline. Showing your last synced tasks." and a clear "can't reach the server" message, instead of a generic error and a misleading empty list. This covers the case where Wi-Fi is working but your Vikunja is not reachable, for example over a VPN that is down (#144).
