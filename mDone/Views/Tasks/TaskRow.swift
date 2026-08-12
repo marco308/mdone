@@ -201,6 +201,19 @@ struct TaskRow: View {
                 }
 
                 HStack(spacing: 8) {
+                    // Changes made offline live only on this device until they
+                    // replay, so say which rows are in that state rather than
+                    // letting the user assume everything reached the server.
+                    if appState.hasPendingChanges(task.id) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                            Text("Not synced")
+                        }
+                        .font(density.metadataFont)
+                        .foregroundStyle(.orange)
+                        .accessibilityLabel("Change not yet synced")
+                    }
+
                     if let dueDate = task.effectiveDueDate {
                         HStack(spacing: 4) {
                             Image(systemName: "calendar")

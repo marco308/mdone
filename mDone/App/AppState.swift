@@ -203,13 +203,11 @@ final class AppState {
     @MainActor
     func onNetworkRestored() async {
         await syncService?.processPendingOperations()
-        updatePendingCount()
+        // Read the queue's leftovers before refreshing: a refresh overwrites the
+        // local tasks, and the failure messages name tasks by title.
+        collectFailedOperations()
+        refreshPendingState()
         await refreshAll()
-    }
-
-    @MainActor
-    private func updatePendingCount() {
-        pendingOperationsCount = (try? syncService?.pendingOperationCount()) ?? 0
     }
 
     var overdueTasks: [VTask] {
@@ -485,7 +483,7 @@ final class AppState {
         if labels.isEmpty, let cached = try? syncService.loadCachedLabels(), !cached.isEmpty {
             labels = cached
         }
-        updatePendingCount()
+        refreshPendingState()
     }
 
     /// Persists the freshly-fetched lists so the next launch has something to
@@ -524,6 +522,16 @@ final class AppState {
             print("[mDone] refreshAll: offline, serving \(tasks.count) cached tasks")
             #endif
             return
+        }
+
+        // Anything queued offline goes out before we read, so the state we
+        // fetch already includes it. This is also what drains the queue when the
+        // server simply became reachable again without the device's own link
+        // ever dropping, which `onNetworkRestored` would never see.
+        if pendingOperationsCount > 0, let syncService {
+            await syncService.processPendingOperations()
+            collectFailedOperations()
+            refreshPendingState()
         }
 
         isLoading = true
@@ -769,6 +777,88 @@ final class AppState {
         return result
     }
 
+    // MARK: - Offline edits (issue #146)
+
+    /// Ids of tasks with an edit still waiting to reach the server.
+    private(set) var pendingTaskIds: Set<Int64> = []
+
+    /// Changes abandoned after repeated failures, surfaced once and then cleared.
+    var failedSyncMessages: [String] = []
+
+    func hasPendingChanges(_ taskId: Int64) -> Bool {
+        pendingTaskIds.contains(taskId)
+    }
+
+    /// Applies an edit locally and queues it for replay when the device is
+    /// offline, returning the updated task. Returns nil when online, so callers
+    /// fall through to their normal network path.
+    ///
+    /// `request` must be the raw intent, i.e. only the fields the user actually
+    /// changed. The queue deliberately stores it un-expanded so replay can merge
+    /// it onto a freshly-read task instead of overwriting everything with values
+    /// that were current when the device went offline (issue #146).
+    @MainActor
+    private func queueOfflineEdit(_ request: TaskUpdateRequest, for current: VTask) -> VTask? {
+        // `isShowingCachedData` covers the other way to be offline: the link is
+        // up but the server isn't reachable (VPN down, server off the LAN). The
+        // last refresh already proved that, so queue rather than spend the retry
+        // budget rediscovering it.
+        guard isOffline || isShowingCachedData, let syncService else { return nil }
+
+        let edit = QueuedTaskEdit(from: request)
+        let updated = edit.applied(to: current)
+        if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
+            tasks[index] = updated
+        } else {
+            tasks.append(updated)
+        }
+        syncEmbeddedRelations(with: updated)
+        syncService.updateCachedTask(updated)
+        syncService.queueTaskEdit(taskId: updated.id, edit: edit)
+        refreshPendingState()
+        WidgetCenter.shared.reloadAllTimelines()
+        return updated
+    }
+
+    /// Reports an action that genuinely can't be done offline, without the
+    /// pointless 7 seconds of connection retries it used to take to find out.
+    @MainActor
+    private var isEffectivelyOffline: Bool {
+        isOffline || isShowingCachedData
+    }
+
+    @MainActor
+    private func rejectOffline(_ action: String) {
+        errorMessage = "\(action) needs a connection."
+        activeError = .networkUnavailable
+    }
+
+    @MainActor
+    func refreshPendingState() {
+        pendingTaskIds = syncService?.pendingTaskIds() ?? []
+        pendingOperationsCount = pendingTaskIds.count
+    }
+
+    /// Collects changes the queue gave up on so the user finds out rather than
+    /// assuming an edit synced.
+    @MainActor
+    private func collectFailedOperations() {
+        guard let syncService else { return }
+        let failed = syncService.failedOperations()
+        guard !failed.isEmpty else { return }
+
+        failedSyncMessages = failed.map { operation in
+            let title = operation.taskId.flatMap { id in
+                tasks.first(where: { $0.id == id })?.title
+            }
+            let reason = operation.failureReason ?? "the server rejected it"
+            return title.map { "\"\($0)\" could not be synced: \(reason)" }
+                ?? "A queued change could not be synced: \(reason)"
+        }
+        syncService.discardFailedOperations()
+        refreshPendingState()
+    }
+
     @MainActor
     func toggleTaskDone(_ task: VTask) async {
         guard await acquireTaskUpdateSlot(id: task.id) else { return }
@@ -777,7 +867,22 @@ final class AppState {
         // One request drives both the network call and the response merge, so
         // the merge can never disagree with what was actually sent.
         let current = taskSnapshot(id: task.id) ?? task
-        let request = TaskUpdateRequest(done: !current.done).preservingExistingValues(from: current)
+        let intent = TaskUpdateRequest(done: !current.done)
+
+        if let updated = queueOfflineEdit(intent, for: current) {
+            if updated.done {
+                recordCompletionForUndo(current)
+                onTaskCompleted?(updated.id)
+            } else {
+                clearUndoIfMatches(id: updated.id)
+            }
+            #if os(iOS)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
+            return
+        }
+
+        let request = intent.preservingExistingValues(from: current)
         do {
             let response = try await taskService.updateTask(id: task.id, request: request)
             let existing = taskSnapshot(id: response.id) ?? current
@@ -824,8 +929,17 @@ final class AppState {
         }
         defer { releaseTaskUpdateSlot(id: target.id) }
         let current = taskSnapshot(id: target.id) ?? target
+        let intent = TaskUpdateRequest(done: false)
+
+        if queueOfflineEdit(intent, for: current) != nil {
+            #if os(iOS)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            #endif
+            return
+        }
+
         do {
-            let request = TaskUpdateRequest(done: false).preservingExistingValues(from: current)
+            let request = intent.preservingExistingValues(from: current)
             _ = try await taskService.updateTask(id: target.id, request: request)
             // Restore from the freshest local snapshot rather than the update
             // response because Vikunja can omit fields such as the due date.
@@ -877,6 +991,15 @@ final class AppState {
         dueDate: Date? = nil,
         priority: Int64 = 0
     ) async -> VTask? {
+        // Creating offline isn't queueable yet: a queued create has no server id,
+        // so any later edit or completion of that task would have nothing to
+        // address. Say so immediately rather than spending the retry budget
+        // discovering it (issue #146).
+        if isEffectivelyOffline {
+            rejectOffline("Creating a task")
+            return nil
+        }
+
         let request = TaskCreateRequest(title: title, description: description, dueDate: dueDate, priority: priority)
         do {
             let newTask = try await taskService.createTask(projectId: projectId, request: request)
@@ -901,7 +1024,13 @@ final class AppState {
         let current = taskSnapshot(id: task.id) ?? task
         let baseDate = current.effectiveDueDate ?? Date()
         let newDate = Calendar.current.date(byAdding: .hour, value: hours, to: baseDate) ?? baseDate
-        let request = TaskUpdateRequest(dueDate: newDate).preservingExistingValues(from: current)
+        let intent = TaskUpdateRequest(dueDate: newDate)
+
+        if queueOfflineEdit(intent, for: current) != nil {
+            return
+        }
+
+        let request = intent.preservingExistingValues(from: current)
 
         let originalDueDate: Date?
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
@@ -940,7 +1069,13 @@ final class AppState {
         defer { releaseTaskUpdateSlot(id: task.id) }
 
         let current = taskSnapshot(id: task.id) ?? task
-        let request = TaskUpdateRequest(dueDate: newDate).preservingExistingValues(from: current)
+        let intent = TaskUpdateRequest(dueDate: newDate)
+
+        if queueOfflineEdit(intent, for: current) != nil {
+            return
+        }
+
+        let request = intent.preservingExistingValues(from: current)
         let originalDueDate: Date?
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
             originalDueDate = tasks[index].dueDate
@@ -976,6 +1111,11 @@ final class AppState {
         defer { releaseTaskUpdateSlot(id: id) }
 
         let existing = taskSnapshot(id: id)
+
+        if let existing, queueOfflineEdit(request, for: existing) != nil {
+            return
+        }
+
         let safeRequest = existing.map { request.preservingExistingValues(from: $0) } ?? request
         do {
             let response = try await taskService.updateTask(id: id, request: safeRequest)
@@ -1005,6 +1145,10 @@ final class AppState {
     @MainActor
     @discardableResult
     func addSubtaskRelation(parentId: Int64, childId: Int64) async -> Bool {
+        if isEffectivelyOffline {
+            rejectOffline("Linking subtasks")
+            return false
+        }
         do {
             try await taskService.createRelation(taskId: parentId, otherTaskId: childId, kind: .subtask)
             await refreshTasksAfterRelationChange(ids: [parentId, childId])
@@ -1034,6 +1178,10 @@ final class AppState {
     /// `subtask` relation only unlinks the tasks; neither is deleted.
     @MainActor
     func removeRelation(taskId: Int64, otherTaskId: Int64, kind: RelationKind) async {
+        if isEffectivelyOffline {
+            rejectOffline("Changing task relations")
+            return
+        }
         do {
             try await taskService.deleteRelation(taskId: taskId, otherTaskId: otherTaskId, kind: kind)
             await refreshTasksAfterRelationChange(ids: [taskId, otherTaskId])
@@ -1187,7 +1335,13 @@ final class AppState {
 
         let current = taskSnapshot(id: task.id) ?? task
         let clamped = min(max(percent, 0), 1)
-        let request = TaskUpdateRequest(percentDone: clamped).preservingExistingValues(from: current)
+        let intent = TaskUpdateRequest(percentDone: clamped)
+
+        if queueOfflineEdit(intent, for: current) != nil {
+            return
+        }
+
+        let request = intent.preservingExistingValues(from: current)
         let original = current.percentDone
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
             tasks[index].percentDone = clamped
@@ -1207,8 +1361,25 @@ final class AppState {
 
     @MainActor
     func deleteTask(_ task: VTask) async {
+        let taskId = task.id
+
+        // Deleting offline is safe to queue: the id is stable, and a queued
+        // delete supersedes any edits of the same task still waiting.
+        if isEffectivelyOffline, let syncService {
+            tasks.removeAll { $0.id == taskId }
+            removeEmbeddedRelations(taskId: taskId)
+            syncService.deleteCachedTask(id: taskId)
+            syncService.queueTaskDelete(taskId: taskId)
+            refreshPendingState()
+            onTaskDeleted?(taskId)
+            #if os(iOS)
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            #endif
+            WidgetCenter.shared.reloadAllTimelines()
+            return
+        }
+
         do {
-            let taskId = task.id
             try await taskService.deleteTask(id: taskId)
             tasks.removeAll { $0.id == taskId }
             removeEmbeddedRelations(taskId: taskId)
@@ -1345,6 +1516,12 @@ final class AppState {
     ) async -> Project? {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
+        // Project mutations aren't queued yet (issue #146 covers task edits only),
+        // so fail fast instead of retrying a connection that isn't there.
+        if isEffectivelyOffline {
+            rejectOffline("Creating a project")
+            return nil
+        }
         let request = ProjectCreateRequest(
             title: trimmed,
             description: description.flatMap { $0.isEmpty ? nil : $0 },
