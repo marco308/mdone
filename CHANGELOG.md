@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Assign, remove, search, and create Vikunja labels directly from task detail on iPhone and Mac (#4).
 - You can now edit tasks while offline. Completing a task, rescheduling it, changing its progress, editing its details or deleting it all take effect straight away and sync when you reconnect. Rows with changes still waiting show a "Not synced" marker, and the offline banner tells you how many are queued. Previously these actions did nothing for several seconds, then failed with an error that faded away (#146).
 - Queued changes are merged rather than replayed blindly. When your change reaches the server, only the fields you actually edited are applied, so an edit made offline no longer overwrites something you or someone else changed elsewhere in the meantime (#146).
 - If a queued change can never be delivered, for example because the task was deleted elsewhere, the app now tells you which change it was and why, instead of dropping it silently (#146).

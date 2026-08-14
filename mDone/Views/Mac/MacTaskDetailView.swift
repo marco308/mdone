@@ -168,15 +168,7 @@ struct MacTaskDetailView: View {
                 }
             }
 
-            if let labels = task.labels, !labels.isEmpty {
-                Section("Labels") {
-                    FlowLayout(spacing: 8) {
-                        ForEach(labels) { label in
-                            LabelChip(label: label)
-                        }
-                    }
-                }
-            }
+            TaskLabelsSection(task: task)
 
             FocusHistoryGate(taskId: task.id) {
                 Section("Focus") {

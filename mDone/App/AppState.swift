@@ -1254,7 +1254,25 @@ final class AppState {
         }
     }
 
-    // MARK: - Current task mutations
+    // MARK: - Label mutations
+
+    private static let newLabelColors = [
+        "e74c3c",
+        "e67e22",
+        "f1c40f",
+        "2ecc71",
+        "1abc9c",
+        "3498db",
+        "9b59b6",
+        "e84393",
+    ]
+
+    @MainActor
+    private func cacheLabelIfNeeded(_ label: VLabel) {
+        guard !labels.contains(where: { $0.id == label.id }) else { return }
+        labels.append(label)
+        try? syncService?.cacheLabels(labels)
+    }
 
     /// Resolves the "Current" label, creating it on the server if it doesn't
     /// exist yet. Persists the id so it survives a later rename.
@@ -1266,11 +1284,107 @@ final class AppState {
         let created = try await labelService.createLabel(
             LabelCreateRequest(title: Self.currentLabelTitle, hexColor: "1a8cff")
         )
-        if !labels.contains(where: { $0.id == created.id }) {
-            labels.append(created)
-        }
+        cacheLabelIfNeeded(created)
         storedCurrentLabelId = created.id
         return created
+    }
+
+    /// Creates a label and immediately assigns it to `task`. An existing label
+    /// with the same title is reused so a case difference does not create an
+    /// obvious duplicate.
+    @MainActor
+    func createAndAssignLabel(title: String, to task: VTask) async -> VLabel? {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else { return nil }
+        guard !isEffectivelyOffline else {
+            rejectOffline("Creating a label")
+            return nil
+        }
+
+        if let existing = labels.first(where: {
+            $0.title.caseInsensitiveCompare(trimmedTitle) == .orderedSame
+        }) {
+            return await setLabel(existing, on: task, present: true) ? existing : nil
+        }
+
+        do {
+            let color = Self.newLabelColors.randomElement() ?? "3498db"
+            let created = try await labelService.createLabel(
+                LabelCreateRequest(title: trimmedTitle, hexColor: color)
+            )
+            cacheLabelIfNeeded(created)
+            return await setLabel(created, on: task, present: true) ? created : nil
+        } catch {
+            handleError(error)
+            return nil
+        }
+    }
+
+    /// Assigns or removes one label through Vikunja's individual label-task
+    /// endpoint. The local task changes immediately and rolls back if the
+    /// request fails.
+    @MainActor
+    @discardableResult
+    func setLabel(_ label: VLabel, on task: VTask, present: Bool) async -> Bool {
+        guard !isEffectivelyOffline else {
+            rejectOffline(present ? "Adding a label" : "Removing a label")
+            return false
+        }
+
+        let liveTask = taskSnapshot(id: task.id) ?? task
+        let previousLabels = liveTask.labels
+        let previousUpdated = liveTask.updated
+        let matchingLabelCount = previousLabels?.filter { $0.id == label.id }.count ?? 0
+        let wasPresent = matchingLabelCount > 0
+
+        guard wasPresent != present else {
+            if present, matchingLabelCount > 1 {
+                setLabelLocally(taskId: task.id, label: label, present: true, fallback: task)
+            }
+            return true
+        }
+
+        let optimisticTask = setLabelLocally(
+            taskId: task.id,
+            label: label,
+            present: present,
+            fallback: task
+        )
+
+        do {
+            if present {
+                try await labelService.addLabel(taskId: task.id, labelId: label.id)
+            } else {
+                try await labelService.removeLabel(taskId: task.id, labelId: label.id)
+            }
+            #if os(iOS)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
+            WidgetCenter.shared.reloadAllTimelines()
+            return true
+        } catch {
+            let currentTask = taskSnapshot(id: task.id)
+            let stillAtOptimisticState = currentTask?.labels?.map(\.id) == optimisticTask?.labels?.map(\.id)
+                && currentTask?.updated == optimisticTask?.updated
+            if stillAtOptimisticState {
+                replaceLabelsLocally(
+                    taskId: task.id,
+                    labels: previousLabels,
+                    updated: previousUpdated,
+                    fallback: task
+                )
+            } else {
+                setLabelLocally(
+                    taskId: task.id,
+                    label: label,
+                    present: wasPresent,
+                    fallback: task,
+                    bumpUpdated: false
+                )
+            }
+            handleError(error)
+            return false
+        }
     }
 
     /// Toggles the "Current" label on `task`, surfacing it in (or removing it
@@ -1278,6 +1392,11 @@ final class AppState {
     /// local copy updates immediately and reverts if the network call fails.
     @MainActor
     func toggleCurrent(_ task: VTask) async {
+        guard !isEffectivelyOffline else {
+            rejectOffline("Changing Current")
+            return
+        }
+
         let label: VLabel
         do {
             label = try await ensureCurrentLabel()
@@ -1286,42 +1405,53 @@ final class AppState {
             return
         }
 
-        let wasCurrent = isCurrent(task)
-        setCurrentLabelLocally(taskId: task.id, label: label, present: !wasCurrent)
-
-        do {
-            if wasCurrent {
-                try await labelService.removeLabel(taskId: task.id, labelId: label.id)
-            } else {
-                try await labelService.addLabel(taskId: task.id, labelId: label.id)
-            }
-            #if os(iOS)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            #endif
-            WidgetCenter.shared.reloadAllTimelines()
-        } catch {
-            setCurrentLabelLocally(taskId: task.id, label: label, present: wasCurrent)
-            handleError(error)
-        }
+        let liveTask = taskSnapshot(id: task.id) ?? task
+        await setLabel(label, on: liveTask, present: !isCurrent(liveTask))
     }
 
-    /// Adds or removes `label` from the locally cached copy of a task, and
-    /// bumps its `updated` timestamp so the stall indicator resets. The
-    /// `tasks` array is the source of truth.
+    /// Adds or removes `label` from the local task and mirrors that change into
+    /// embedded relation snapshots and the on-device cache.
     @MainActor
-    private func setCurrentLabelLocally(taskId: Int64, label: VLabel, present: Bool) {
-        guard let index = tasks.firstIndex(where: { $0.id == taskId }) else { return }
-        var labelList = tasks[index].labels ?? []
+    @discardableResult
+    private func setLabelLocally(
+        taskId: Int64,
+        label: VLabel,
+        present: Bool,
+        fallback: VTask? = nil,
+        bumpUpdated: Bool = true
+    ) -> VTask? {
+        guard let current = taskSnapshot(id: taskId) ?? fallback else { return nil }
+        var labelList = (current.labels ?? []).filter { $0.id != label.id }
         if present {
-            if !labelList.contains(where: { $0.id == label.id }) {
-                labelList.append(label)
-            }
-        } else {
-            labelList.removeAll { $0.id == label.id }
+            labelList.append(label)
         }
-        tasks[index].labels = labelList
-        tasks[index].updated = Date()
-        syncService?.updateCachedTask(tasks[index])
+        return replaceLabelsLocally(
+            taskId: taskId,
+            labels: labelList,
+            updated: bumpUpdated ? Date() : current.updated,
+            fallback: current
+        )
+    }
+
+    @MainActor
+    @discardableResult
+    private func replaceLabelsLocally(
+        taskId: Int64,
+        labels: [VLabel]?,
+        updated: Date?,
+        fallback: VTask? = nil
+    ) -> VTask? {
+        guard var updatedTask = taskSnapshot(id: taskId) ?? fallback else { return nil }
+        updatedTask.labels = labels
+        updatedTask.updated = updated
+        if let index = tasks.firstIndex(where: { $0.id == taskId }) {
+            tasks[index] = updatedTask
+        } else {
+            tasks.append(updatedTask)
+        }
+        syncEmbeddedRelations(with: updatedTask)
+        syncService?.updateCachedTask(updatedTask)
+        return updatedTask
     }
 
     /// Sets a task's completion progress (clamped to 0...1) and persists it.

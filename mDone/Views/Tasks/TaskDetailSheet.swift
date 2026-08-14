@@ -188,15 +188,7 @@ struct TaskDetailSheet: View {
                     }
                 }
 
-                if let labels = task.labels, !labels.isEmpty {
-                    Section("Labels") {
-                        FlowLayout(spacing: 8) {
-                            ForEach(labels) { label in
-                                LabelChip(label: label)
-                            }
-                        }
-                    }
-                }
+                TaskLabelsSection(task: task)
 
                 Section {
                     Button("Delete Task", role: .destructive) {
@@ -268,48 +260,5 @@ struct TaskDetailSheet: View {
             await appState.updateTask(id: task.id, request: request)
             dismiss()
         }
-    }
-}
-
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
-        return layout(sizes: sizes, containerWidth: proposal.width ?? .infinity).size
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
-        let positions = layout(sizes: sizes, containerWidth: bounds.width).positions
-
-        for (index, subview) in subviews.enumerated() {
-            subview.place(
-                at: CGPoint(x: bounds.minX + positions[index].x, y: bounds.minY + positions[index].y),
-                proposal: .unspecified
-            )
-        }
-    }
-
-    private func layout(sizes: [CGSize], containerWidth: CGFloat) -> (positions: [CGPoint], size: CGSize) {
-        var positions: [CGPoint] = []
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var maxHeight: CGFloat = 0
-        var maxWidth: CGFloat = 0
-
-        for size in sizes {
-            if x + size.width > containerWidth, x > 0 {
-                x = 0
-                y += maxHeight + spacing
-                maxHeight = 0
-            }
-            positions.append(CGPoint(x: x, y: y))
-            maxHeight = max(maxHeight, size.height)
-            x += size.width + spacing
-            maxWidth = max(maxWidth, x)
-        }
-
-        return (positions, CGSize(width: maxWidth, height: y + maxHeight))
     }
 }
