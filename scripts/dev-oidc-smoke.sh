@@ -23,18 +23,43 @@ CURL=(curl -sS --cacert "${CAROOT}/rootCA.pem")
 JAR="$(mktemp)"
 trap 'rm -f "$JAR"' EXIT
 
-AUTH_HOST="https://auth.${DEV_BASE}:8443"
 VIK_HOST="https://vikunja.${DEV_BASE}:8443"
-REDIRECT="${VIK_HOST}/auth/openid/authelia"
-STATE="state-$$-$(od -An -N6 -tx1 /dev/urandom | tr -d ' \n')"
-NONCE="nonce-$$-$(od -An -N6 -tx1 /dev/urandom | tr -d ' \n')"
+
+# The app's own callback URI. See docs/oidc-callback-decision.md.
+REDIRECT="mdone://oidc-callback"
+
+# state and nonce are independent values, and providers enforce a floor on
+# nonce entropy: a short one is rejected with `insufficient_entropy` at the
+# token exchange, long after the user has finished logging in.
+STATE=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
+NONCE=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 ok()   { echo "  ok: $*"; }
 
+echo "==> 0. discover the provider from /api/v1/info"
+# Read the provider exactly as the app does, rather than hardcoding it, so this
+# exercises the same data path: info -> provider -> authorization URL.
+eval "$("${CURL[@]}" "${VIK_HOST}/api/v1/info" | python3 -c '
+import json, sys
+auth = json.load(sys.stdin)["auth"]["openid_connect"]
+providers = auth.get("providers") or []
+if not auth.get("enabled") or not providers:
+    print("PROVIDER_KEY=")
+    sys.exit(0)
+p = providers[0]
+print("PROVIDER_KEY=%s" % p["key"])
+print("AUTH_URL=%s" % p["auth_url"])
+print("CLIENT_ID=%s" % (p.get("client_id") or ""))
+print("SCOPE=%s" % ((p.get("scope") or "openid profile email").replace(" ", "+")))
+')"
+[ -n "${PROVIDER_KEY:-}" ] || fail "no OIDC provider advertised by ${VIK_HOST}"
+AUTH_HOST="https://auth.${DEV_BASE}:8443"
+ok "provider '${PROVIDER_KEY}', client '${CLIENT_ID}', scope '${SCOPE//+/ }'"
+
 echo "==> 1. authorization request"
 LOC=$("${CURL[@]}" -c "$JAR" -D- -o /dev/null \
-    "${AUTH_HOST}/api/oidc/authorization?client_id=vikunja&response_type=code&scope=openid+profile+email&redirect_uri=${REDIRECT}&state=${STATE}&nonce=${NONCE}" \
+    "${AUTH_URL}?client_id=${CLIENT_ID}&response_type=code&redirect_uri=${REDIRECT}&scope=${SCOPE}&state=${STATE}&nonce=${NONCE}" \
     | grep -i '^location:' | tr -d '\r' | cut -d' ' -f2-)
 FLOW_ID=$(printf '%s' "$LOC" | sed -n 's/.*flow_id=\([0-9a-f-]*\).*/\1/p')
 [ -n "$FLOW_ID" ] || fail "no flow_id in redirect: $LOC"
@@ -66,7 +91,7 @@ echo "==> 4. state validation"
 ok "state round-tripped unchanged"
 
 echo "==> 5. code exchange at Vikunja"
-TOKEN=$("${CURL[@]}" -X POST "${VIK_HOST}/api/v1/auth/openid/authelia/callback" \
+TOKEN=$("${CURL[@]}" -X POST "${VIK_HOST}/api/v1/auth/openid/${PROVIDER_KEY}/callback" \
     -H 'Content-Type: application/json' \
     -d "{\"code\":\"${CODE}\",\"redirect_url\":\"${REDIRECT}\"}" \
     | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("token",""))')
@@ -80,7 +105,7 @@ COUNT=$("${CURL[@]}" -H "Authorization: Bearer ${TOKEN}" "${VIK_HOST}/api/v1/pro
 ok "GET /api/v1/projects returned ${COUNT} projects"
 
 echo "==> 7. the code is single use"
-REPLAY=$("${CURL[@]}" -o /dev/null -w '%{http_code}' -X POST "${VIK_HOST}/api/v1/auth/openid/authelia/callback" \
+REPLAY=$("${CURL[@]}" -o /dev/null -w '%{http_code}' -X POST "${VIK_HOST}/api/v1/auth/openid/${PROVIDER_KEY}/callback" \
     -H 'Content-Type: application/json' \
     -d "{\"code\":\"${CODE}\",\"redirect_url\":\"${REDIRECT}\"}")
 [ "$REPLAY" != "200" ] || fail "replaying the code succeeded, it should not"
