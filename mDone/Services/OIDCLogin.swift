@@ -44,6 +44,27 @@ extension OIDCCallbackResult: CustomDebugStringConvertible {
     }
 }
 
+/// Reasons the app cannot start an OIDC login with a given provider.
+///
+/// These are all "this server is configured in a way we cannot use", not
+/// transient failures, so they are worth distinguishing from `NetworkError`.
+enum OIDCLoginError: LocalizedError, Equatable {
+    case invalidAuthorizationEndpoint
+    case insecureAuthorizationEndpoint
+    case missingClientID
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidAuthorizationEndpoint:
+            "This server's single sign-on address doesn't look right. Check the provider setup on your server."
+        case .insecureAuthorizationEndpoint:
+            "Single sign-on needs an https address. Your server is offering an insecure one, which iOS will not open."
+        case .missingClientID:
+            "This server's single sign-on provider is missing a client ID. Check the provider setup on your server."
+        }
+    }
+}
+
 enum OIDCLogin {
     /// Generates a CSRF token for the `state` parameter.
     ///
@@ -83,6 +104,65 @@ enum OIDCLogin {
         }
         return Data(bytes).base64URLEncodedString()
     }
+
+    /// Builds the authorization URL to hand to `ASWebAuthenticationSession`.
+    ///
+    /// Vikunja supplies only the resolved authorization endpoint in
+    /// `provider.authUrl`, taken from the provider's discovery document, so the
+    /// app supplies everything else.
+    ///
+    /// - Parameters:
+    ///   - provider: as advertised by `GET /api/v1/info`.
+    ///   - redirectURI: must match the value later sent to Vikunja's callback
+    ///     byte for byte, or the token exchange fails with `invalid_grant`.
+    ///   - state: from `generateState()`, compared on the way back.
+    ///   - nonce: from `generateNonce()`, and a different value from `state`.
+    static func authorizationURL(
+        for provider: OIDCProvider,
+        redirectURI: String,
+        state: String,
+        nonce: String
+    ) throws -> URL {
+        // `host` is non-nil but empty for input like "https://", so checking
+        // for nil alone would let a hostless URL through.
+        guard var components = URLComponents(string: provider.authUrl),
+              let host = components.host, !host.isEmpty
+        else {
+            throw OIDCLoginError.invalidAuthorizationEndpoint
+        }
+
+        // Sending an authorization request in clear text would expose the code
+        // in transit. iOS App Transport Security would refuse to load it anyway,
+        // so failing here gives a better message than a generic network error.
+        guard components.scheme?.lowercased() == "https" else {
+            throw OIDCLoginError.insecureAuthorizationEndpoint
+        }
+
+        guard let clientID = provider.clientId, !clientID.isEmpty else {
+            throw OIDCLoginError.missingClientID
+        }
+
+        // Some providers publish an authorization endpoint that already carries
+        // query parameters. Append rather than replace, so they survive.
+        var items = components.queryItems ?? []
+        items.append(contentsOf: [
+            URLQueryItem(name: "client_id", value: clientID),
+            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "redirect_uri", value: redirectURI),
+            URLQueryItem(name: "scope", value: provider.scope ?? defaultScope),
+            URLQueryItem(name: "state", value: state),
+            URLQueryItem(name: "nonce", value: nonce),
+        ])
+        components.queryItems = items
+
+        guard let url = components.url else {
+            throw OIDCLoginError.invalidAuthorizationEndpoint
+        }
+        return url
+    }
+
+    /// Used when the server does not advertise a scope. Vikunja normally does.
+    static let defaultScope = "openid profile email"
 
     /// Parses the redirect the provider sends back to the app.
     ///
