@@ -52,3 +52,9 @@ vikunja-dev-data/
 
 # Claude Code
 .claude/
+
+# Dev OIDC stack (docker-compose.oidc.yml)
+dev/vikunja/config.yml
+.env.oidc
+dev/certs/
+dev/authelia/oidc.key

@@ -1,0 +1,12 @@
+# Dev-only user database for the throwaway Authelia in docker-compose.dev.yml.
+# Password is "devpassword" (argon2id hash below).
+# Never reuse these anywhere that matters.
+users:
+  devuser:
+    disabled: false
+    displayname: 'Dev User'
+    # devpassword
+    password: '$argon2id$v=19$m=65536,t=3,p=4$gMo5BYE1lJbT+5605phJXg$cE5TbOoBq5MWrSS9qBUWWZmeSZt1nyyQ3C4QmadvGmg'
+    email: 'devuser@example.com'
+    groups:
+      - 'admins'

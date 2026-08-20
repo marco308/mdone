@@ -1,0 +1,82 @@
+###############################################################################
+# Dev-only Authelia, acting as an OIDC provider for the throwaway Vikunja in
+# docker-compose.dev.yml. See docs/dev-setup.md.
+#
+# Every secret in here is a literal, committed, dev-only string. Nothing in
+# this file is safe to reuse anywhere real.
+#
+# DEV_BASE is injected by scripts/dev-oidc-up.sh as <lan-ip>.nip.io, so the
+# same hostname resolves from the Mac, the iOS Simulator and from inside the
+# other containers. See the note in docker-compose.dev.yml for why.
+###############################################################################
+
+theme: 'light'
+
+log:
+  level: 'info'
+
+server:
+  address: 'tcp://0.0.0.0:9091'
+
+identity_validation:
+  reset_password:
+    jwt_secret: 'dev-only-authelia-reset-jwt-secret-not-real'
+
+authentication_backend:
+  password_reset:
+    disable: true
+  file:
+    path: '/config/users_database.yml'
+
+access_control:
+  default_policy: 'one_factor'
+
+session:
+  secret: 'dev-only-authelia-session-secret-not-real'
+  cookies:
+    - name: 'authelia_session'
+      # Parent of both vikunja.* and auth.*, so the session cookie covers both.
+      domain: '{{ env "DEV_BASE" }}'
+      authelia_url: 'https://auth.{{ env "DEV_BASE" }}:8443'
+      default_redirection_url: 'https://vikunja.{{ env "DEV_BASE" }}:8443'
+
+storage:
+  encryption_key: 'dev-only-authelia-storage-encryption-key-not-real'
+  local:
+    path: '/config/db.sqlite3'
+
+notifier:
+  # Writes "emails" to a file instead of sending them.
+  filesystem:
+    filename: '/config/notification.txt'
+
+identity_providers:
+  oidc:
+    hmac_secret: 'dev-only-authelia-oidc-hmac-secret-not-real'
+    jwks:
+      - key_id: 'dev'
+        algorithm: 'RS256'
+        use: 'sig'
+        key: {{ secret "/config/oidc.key" | mindent 10 "|" | msquote }}
+    clients:
+      - client_id: 'vikunja'
+        client_name: 'Vikunja (dev)'
+        # $plaintext$ prefix keeps the dev secret readable. Real deployments
+        # store a PBKDF2 hash here instead.
+        client_secret: '$plaintext$vikunja-dev-client-secret'
+        public: false
+        authorization_policy: 'one_factor'
+        require_pkce: false
+        consent_mode: 'implicit'
+        redirect_uris:
+          # The web frontend's URI, and the custom scheme a native app would
+          # use. Registering both is what a self-hoster running web + app would
+          # have to do. See the callback-shape investigation for issue #153.
+          - 'https://vikunja.{{ env "DEV_BASE" }}:8443/auth/openid/authelia'
+          - 'mdone://oidc-callback'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'email'
+        userinfo_signed_response_alg: 'none'
+        token_endpoint_auth_method: 'client_secret_post'

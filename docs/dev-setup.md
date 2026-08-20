@@ -98,6 +98,122 @@ After `docker compose up -d` and the seed script, run the app and exercise the p
 - **Offline / sync** — Simulator → Settings → Developer → Network Link Conditioner → 100% Loss; make changes; restore network; verify the pending operations in [mDone/Services/SyncService.swift](../mDone/Services/SyncService.swift) flush.
 - **Edge dates** — the seed includes overdue and zero-date cases ([APIClient.swift](../mDone/Services/APIClient.swift) handles Vikunja's `0001-01-01T00:00:00Z` → `Date.distantPast`).
 
+## OIDC / SSO dev stack (issue #153)
+
+The plain dev server has no identity provider. For OIDC work there is a second
+stack that puts **Authelia** in front of the same Vikunja, chosen because it is
+what the maintainer's homelab runs, so dev and production behave the same.
+
+```bash
+./scripts/dev-oidc-up.sh                  # local auth on  + OIDC
+./scripts/dev-oidc-up.sh --no-local-auth  # local auth off + OIDC
+```
+
+The second form is the one that exercises "hide the username and password
+fields when the server has local auth disabled". Log in as `devuser` /
+`devpassword`, same as the plain stack.
+
+Tear down with the command the script prints when it finishes.
+
+### Why it looks more complicated than the plain stack
+
+Three constraints shape it, and all three are easy to rediscover the hard way.
+
+**One hostname, three vantage points.** The same host has to resolve
+identically from the Mac, from the iOS Simulator, and from inside the Vikunja
+container doing the server-side token exchange. `localhost` cannot do that,
+because inside a container it means that container. The script uses
+`<lan-ip>.nip.io`, public wildcard DNS that maps the embedded IP straight back,
+so all three agree without touching `/etc/hosts`. It does need working public
+DNS, and a few resolvers block nip.io as DNS rebinding.
+
+**Everything is HTTPS.** Authelia refuses a plaintext `authelia_url`, and iOS
+App Transport Security would block a cleartext identity provider, so an HTTP
+stack would need an ATS exception we do not want to ship. Caddy terminates TLS
+for both hosts with one mkcert wildcard certificate. Vikunja trusts that CA via
+`SSL_CERT_FILE`; the Simulator gets it from `simctl keychain add-root-cert`,
+which the script runs for you if a Simulator is booted. Nothing needs
+`mkcert -install`, so nothing needs your password.
+
+**Vikunja wants a map of providers, not a list.** This one costs an hour if you
+follow the older docs:
+
+```yaml
+# WRONG on v2.4.0, and fails almost silently
+providers:
+  - name: Authelia
+    authurl: ...
+
+# RIGHT
+providers:
+  authelia:
+    name: Authelia
+    authurl: ...
+```
+
+The list form logs only `It looks like your openid configuration is in the
+wrong format` and leaves `"providers": null` in `/api/v1/info`, with
+`"enabled": true` right next to it, so it looks like a discovery or networking
+problem rather than a parse error. The map key becomes the provider `key` in
+that payload and the last path segment of both the redirect URI and the
+callback endpoint.
+
+### Proving the flow works
+
+```bash
+./scripts/dev-oidc-smoke.sh
+```
+
+Walks the whole leg the app has to perform, against the running dev stack:
+authorization request, Authelia login, authorization code, Vikunja callback,
+JWT, then a real API call with that JWT. It asserts the two security
+properties #153 calls out, that `state` round-trips unchanged and that an
+authorization code cannot be replayed, and it verifies TLS against the mkcert
+root rather than skipping verification, so a broken certificate chain fails the
+run instead of hiding.
+
+Run it after any change to the stack, and against your own server before
+trusting a build there. It does not exercise `ASWebAuthenticationSession`,
+which is system UI and still has to be checked by hand.
+
+One behaviour worth knowing, because it decides how wrong the UI can afford to
+be: with local auth disabled, `POST /api/v1/login` returns **404**, not 401 or
+403. The endpoint is gone rather than refusing. So a build that shows the
+username and password fields on an SSO-only server does not produce a helpful
+"local login is disabled" message, it produces "Not Found".
+
+### What /api/v1/info actually returns
+
+With a provider configured, the block the app decodes looks like this. Note
+that `auth_url` is the fully resolved authorization endpoint, which Vikunja
+gets from the provider's discovery document, so the app never builds it:
+
+```json
+"auth": {
+  "local":          { "enabled": true, "registration_enabled": true },
+  "ldap":           { "enabled": false },
+  "openid_connect": {
+    "enabled": true,
+    "providers": [
+      {
+        "name": "Authelia",
+        "key": "authelia",
+        "auth_url": "https://auth.<host>:8443/api/oidc/authorization",
+        "logout_url": "",
+        "client_id": "vikunja",
+        "scope": "openid profile email",
+        "email_fallback": false,
+        "username_fallback": false,
+        "force_user_info": false
+      }
+    ]
+  }
+}
+```
+
+With no provider configured, `providers` is `null` rather than `[]`, so decode
+it as an optional array.
+
 ## Vikunja version pinning
 
 `docker-compose.dev.yml` currently uses `vikunja/vikunja:latest`. When you start noticing odd behaviour after a `docker compose pull`, check the [Vikunja release notes](https://kolaente.dev/vikunja/vikunja/-/releases) and pin to a known-good tag.
