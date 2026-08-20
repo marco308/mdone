@@ -24,6 +24,17 @@ struct Endpoint {
     /// Set-Cookie that invalidates the previous refresh token.
     static let refreshToken = Endpoint(path: "/api/v1/user/token/refresh", method: .POST)
 
+    /// Instance metadata, including which auth methods the server offers.
+    /// Unauthenticated: this is what the login screen reads before it knows
+    /// anything about the server.
+    static let info = Endpoint(path: "/api/v1/info")
+
+    /// Exchanges an OIDC authorization code for a Vikunja JWT. `provider` is
+    /// the provider `key` from `/api/v1/info`, not its display name.
+    static func openIDCallback(provider: String) -> Endpoint {
+        Endpoint(path: "/api/v1/auth/openid/\(provider)/callback", method: .POST)
+    }
+
     // MARK: - User
 
     static let currentUser = Endpoint(path: "/api/v1/user")
