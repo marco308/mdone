@@ -93,10 +93,14 @@ actor APIClient {
     }
 
     /// Test/inspection hook for the currently stored refresh token.
-    func currentRefreshToken() -> String? { refreshToken }
+    func currentRefreshToken() -> String? {
+        refreshToken
+    }
 
     /// Test/inspection hook for the currently stored access token.
-    func currentToken() -> String? { apiToken }
+    func currentToken() -> String? {
+        apiToken
+    }
 
     private func buildRequest(for endpoint: Endpoint) throws -> URLRequest {
         guard let serverURL else { throw NetworkError.invalidURL }
@@ -117,7 +121,14 @@ actor APIClient {
         request.timeoutInterval = APIClient.requestTimeout
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        if let apiToken {
+        // Pre-login requests configure the client with an empty token so a base
+        // URL exists. Without the isEmpty guard that sends a literal
+        // "Authorization: Bearer " with nothing after it. Vikunja ignores it,
+        // because /info, /login and the OIDC callback sit outside its JWT
+        // middleware, but a forward-auth proxy in front of it (Authelia,
+        // Cloudflare Access, nginx auth_request) can reject the malformed
+        // header, which would look like the server being unreachable.
+        if let apiToken, !apiToken.isEmpty {
             request.setValue("Bearer \(apiToken)", forHTTPHeaderField: "Authorization")
         }
 
@@ -338,7 +349,7 @@ actor APIClient {
         // which would have masked a real bug.
         let task = Task<Void, Error> { [self] in
             defer { self.inFlightRefresh = nil }
-            try await self.performRefresh()
+            try await performRefresh()
         }
         inFlightRefresh = task
         try await task.value

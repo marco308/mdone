@@ -102,7 +102,7 @@ final class AppState {
     /// The live instance backing the UI, set on init. App Intents run in the
     /// app process without access to the SwiftUI environment, so this is their
     /// only route to app state. Touch it from the main actor only.
-    static weak var shared: AppState?
+    weak static var shared: AppState?
 
     /// `taskService` is injectable so tests can drive the network paths
     /// (e.g. `undoLastCompletion`) through a mocked `APIClient`.
@@ -342,77 +342,115 @@ final class AppState {
         )
     }
 
+    /// How a session's access token is obtained. The rest of logging in is
+    /// identical whichever of these is used, which is what `completeLogin`
+    /// exists to stop us copying three times (noted in the PR #103 review).
+    private enum LoginMethod {
+        case apiToken(String)
+        case credentials(username: String, password: String)
+        /// `redirectURI` must be byte-identical to the one sent on the
+        /// authorization request, or Vikunja's exchange fails with
+        /// `invalid_grant`. Thread the same constant through, never rebuild it.
+        case oidc(provider: String, code: String, redirectURI: String)
+    }
+
     @MainActor
     func login(serverURL: String, token: String) async throws {
-        #if DEBUG
-        print("[mDone] login() called with serverURL: \(serverURL)")
-        #endif
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
-
-        await registerAPIClientHandlers()
-        await APIClient.shared.configure(serverURL: serverURL, token: token)
-
-        // Validate by fetching projects: works with both JWT and API tokens.
-        // One page is enough to prove the credentials are good; the full
-        // paginated list is loaded by refreshAll().
-        #if DEBUG
-        print("[mDone] Fetching projects to validate...")
-        #endif
-        let projects: [Project] = try await APIClient.shared.fetch(Endpoint.projects())
-        #if DEBUG
-        print("[mDone] Validation OK - got \(projects.count) projects")
-        #endif
-
-        authService.saveServerURL(serverURL)
-        authService.saveToken(token)
-        #if DEBUG
-        print("[mDone] Credentials saved, setting isAuthenticated = true")
-        #endif
-        isAuthenticated = true
+        try await completeLogin(serverURL: serverURL, using: .apiToken(token))
     }
 
     @MainActor
     func loginWithCredentials(serverURL: String, username: String, password: String) async throws {
-        #if DEBUG
-        print("[mDone] loginWithCredentials() called")
-        #endif
+        try await completeLogin(serverURL: serverURL, using: .credentials(username: username, password: password))
+    }
+
+    /// Finishes an OIDC login with the code the auth session brought back.
+    ///
+    /// The `state` check has already happened in `OIDCLogin.parseCallback`; by
+    /// the time a code reaches here it belongs to a session this app started.
+    @MainActor
+    func loginWithOIDC(serverURL: String, provider: String, code: String, redirectURI: String) async throws {
+        try await completeLogin(
+            serverURL: serverURL,
+            using: .oidc(provider: provider, code: code, redirectURI: redirectURI)
+        )
+    }
+
+    /// The shared spine of every login: obtain a token, prove it works, persist
+    /// it, flip the flag.
+    ///
+    /// `isLoading` is set and cleared here rather than in the callers, so a
+    /// throw from any of them still clears the spinner.
+    @MainActor
+    private func completeLogin(serverURL: String, using method: LoginMethod) async throws {
         isLoading = true
+        // A reset, not a message. The setup screen shows its own error from the
+        // thrown value; assigning here too would show the user the same thing
+        // twice on two different surfaces.
         errorMessage = nil
         defer { isLoading = false }
 
+        // Must happen before any traffic. If a login request 401s with no
+        // handlers installed, notifySessionExpired() fires into a nil handler
+        // and the failure is swallowed. See registerAPIClientHandlers().
         await registerAPIClientHandlers()
+
         let url = serverURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        await APIClient.shared.configure(serverURL: url, token: "")
+        let (token, refreshToken) = try await obtainToken(serverURL: url, using: method)
 
-        // Get JWT token via login endpoint. The Vikunja 2.0+ `Set-Cookie:
-        // vikunja_refresh_token=…` header is captured inside APIClient as part
-        // of the response — we read it back after this call to persist it.
-        let loginRequest = LoginRequest(username: username, password: password)
-        let loginResponse: LoginResponse = try await APIClient.shared.send(Endpoint.login, body: loginRequest)
-        let capturedRefreshToken = await APIClient.shared.currentRefreshToken()
+        // Configure with the token plus any refresh cookie, so ordinary
+        // requests and the 401 retry path both have what they need.
+        await APIClient.shared.configure(serverURL: url, token: token, refreshToken: refreshToken)
 
-        // Configure with the JWT token + refresh cookie so subsequent requests
-        // (and the 401 retry path) have everything they need.
-        await APIClient.shared.configure(
-            serverURL: url,
-            token: loginResponse.token,
-            refreshToken: capturedRefreshToken
-        )
-
-        // Validate. One page is enough here too, see login().
+        // Validate by fetching projects: works with both JWT and API tokens.
+        // One page is enough to prove the credentials are good; the full
+        // paginated list is loaded by refreshAll().
         let projects: [Project] = try await APIClient.shared.fetch(Endpoint.projects())
         #if DEBUG
         print("[mDone] Validation OK - got \(projects.count) projects")
         #endif
 
+        // Goes through AuthService, never the keychain directly: saveToken also
+        // mirrors into SharedTokenStore and saveServerURL into the app group,
+        // which is how the widgets stay signed in.
         authService.saveServerURL(url)
-        authService.saveToken(loginResponse.token)
-        if let capturedRefreshToken {
-            authService.saveRefreshToken(capturedRefreshToken)
+        authService.saveToken(token)
+        if let refreshToken {
+            authService.saveRefreshToken(refreshToken)
         }
         isAuthenticated = true
+    }
+
+    /// The only part that differs per login method.
+    @MainActor
+    private func obtainToken(
+        serverURL: String,
+        using method: LoginMethod
+    ) async throws -> (token: String, refreshToken: String?) {
+        switch method {
+        case let .apiToken(token):
+            // Personal API tokens have no refresh cookie. Returning nil keeps
+            // this path identical to before: persisting a stray refresh token
+            // would flip the 401 branch from "expire the session" to "try to
+            // refresh it", which cannot work for an API token.
+            return (token, nil)
+
+        case let .credentials(username, password):
+            await APIClient.shared.configure(serverURL: serverURL, token: "")
+            let response: LoginResponse = try await APIClient.shared.send(
+                Endpoint.login,
+                body: LoginRequest(username: username, password: password)
+            )
+            return await (response.token, APIClient.shared.currentRefreshToken())
+
+        case let .oidc(provider, code, redirectURI):
+            await APIClient.shared.configure(serverURL: serverURL, token: "")
+            let response: LoginResponse = try await APIClient.shared.send(
+                Endpoint.openIDCallback(provider: provider),
+                body: OIDCCallbackRequest(code: code, redirectUrl: redirectURI)
+            )
+            return await (response.token, APIClient.shared.currentRefreshToken())
+        }
     }
 
     @MainActor
@@ -685,8 +723,12 @@ final class AppState {
     /// response drive them.
     static func preservingRelations(existing: VTask, response: VTask) -> VTask {
         var result = response
-        if result.labels == nil { result.labels = existing.labels }
-        if result.relatedTasks == nil { result.relatedTasks = existing.relatedTasks }
+        if result.labels == nil {
+            result.labels = existing.labels
+        }
+        if result.relatedTasks == nil {
+            result.relatedTasks = existing.relatedTasks
+        }
         return result
     }
 
@@ -712,7 +754,9 @@ final class AppState {
     @MainActor
     private func acquireTaskUpdateSlot(id: Int64) async -> Bool {
         guard !Task.isCancelled else { return false }
-        if activeTaskUpdates.insert(id).inserted { return true }
+        if activeTaskUpdates.insert(id).inserted {
+            return true
+        }
         await withCheckedContinuation { continuation in
             taskUpdateWaiters[id, default: []].append(continuation)
         }
@@ -924,7 +968,9 @@ final class AppState {
         guard let target = undoableCompletion else { return }
         undoableCompletion = nil
         guard await acquireTaskUpdateSlot(id: target.id) else {
-            if undoableCompletion == nil { undoableCompletion = target }
+            if undoableCompletion == nil {
+                undoableCompletion = target
+            }
             return
         }
         defer { releaseTaskUpdateSlot(id: target.id) }
@@ -962,7 +1008,9 @@ final class AppState {
             // Only restore the old target if no newer completion was recorded
             // while this request was in flight — otherwise we'd clobber the more
             // recent undo target and break "undo the most recent completion".
-            if undoableCompletion == nil { undoableCompletion = target }
+            if undoableCompletion == nil {
+                undoableCompletion = target
+            }
             handleError(error)
         }
     }
