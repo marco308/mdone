@@ -161,6 +161,20 @@ enum OIDCLogin {
         return url
     }
 
+    /// The URL scheme the app claims, already registered in `mDone/Info.plist`
+    /// for the widget deep links `mdone://focus` and `mdone://create`.
+    static let callbackScheme = "mdone"
+
+    /// The one callback URI, threaded through the authorization request, the
+    /// callback check and Vikunja's token exchange. All three have to agree
+    /// byte for byte or the exchange fails with `invalid_grant`, so this is a
+    /// constant rather than something rebuilt at each call site.
+    ///
+    /// A single fixed URI rather than one per provider keeps the instruction to
+    /// self-hosters the same however many providers they run: add
+    /// `mdone://oidc-callback` to the Vikunja client at your identity provider.
+    static let redirectURI = "mdone://oidc-callback"
+
     /// Used when the server does not advertise a scope. Vikunja normally does.
     static let defaultScope = "openid profile email"
 
