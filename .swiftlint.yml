@@ -6,6 +6,14 @@ excluded:
   - mDone/Resources
 
 disabled_rules:
+  # SwiftFormat owns formatting. `--commas always` in .swiftformat adds the trailing
+  # commas this rule flags, so leaving it enabled makes the two tools undo each other.
+  # Do not re-enable without switching .swiftformat to `--commas inline` first.
+  #
+  # `modifier_order` is left out of opt_in_rules below for the same reason:
+  # SwiftFormat's modifierOrder rule rewrites `nonisolated private` to
+  # `private nonisolated`, which is the order this rule rejects.
+  - trailing_comma
   - trailing_whitespace
   - line_length
   - type_body_length
@@ -20,7 +28,6 @@ opt_in_rules:
   - closure_spacing
   - contains_over_filter_count
   - empty_string
-  - modifier_order
   - overridden_super_call
   - redundant_nil_coalescing
   - toggle_bool
