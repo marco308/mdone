@@ -99,22 +99,52 @@ identity provider's page. Two further reasons found while investigating:
 
 ## Consequences for the implementation
 
-1. **Register the scheme.** `mdone` goes in `CFBundleURLTypes` via `project.yml`.
-   The `.xcodeproj` is generated, so confirm it survives `xcodegen generate`.
-2. **The app builds the authorization URL.** Vikunja supplies only the resolved
+1. **The scheme is already registered, and must stay in the plist.** `mdone` is
+   in `CFBundleURLTypes` in `mDone/Info.plist`, which both app targets share via
+   `INFOPLIST_FILE` (`project.yml:45` and `project.yml:81`). It has been there
+   since the widget deep links `mdone://focus` and `mdone://create` were added,
+   so `mdone://oidc-callback` is a third host on an existing scheme and needs no
+   new registration.
+
+   **Do not move it into `project.yml`.** An earlier draft of this document said
+   to, which was wrong. XcodeGen's `info:` block *generates* a plist rather than
+   merging into one, so adding it for these targets would rewrite
+   `mDone/Info.plist` from scratch and silently drop the hand-written keys,
+   including `NSSupportsLiveActivities`, `NSCalendarsFullAccessUsageDescription`
+   and `NSLocalNetworkUsageDescription`, and would replace the
+   `$(MARKETING_VERSION)` and `$(CURRENT_PROJECT_VERSION)` wiring with literal
+   `1.0` / `1`. That last one ships every build as version 1.0 and gets rejected
+   at upload.
+
+   This is a different case from the `PRODUCT_NAME`, `ENABLE_TESTABILITY` and
+   `SDKROOT` pins that `project.yml` already carries. Those add back settings
+   XcodeGen stopped emitting. An `info:` block instead takes ownership of a
+   git-tracked file that is currently hand-maintained.
+
+   Guard: `xcodegen generate` must leave `mDone/Info.plist` byte-identical, and
+   `plutil -p mDone/Info.plist | grep -c '^  "'` must still report 22 keys.
+
+2. **Leave `mdone://oidc-callback` unhandled in `onOpenURL`.**
+   `mDoneApp.swift:120` switches on `url.host` with `default: break`, so a
+   callback arriving through the system URL dispatcher is already ignored. That
+   is the behaviour we want and it should be made explicit with a comment rather
+   than left incidental: `ASWebAuthenticationSession` delivers the callback to
+   its own completion handler, and a code arriving by any other route did not
+   come from a session this app started.
+3. **The app builds the authorization URL.** Vikunja supplies only the resolved
    `auth_url`; the app appends `client_id`, `redirect_uri`, `response_type`,
    `scope`, `state` and `nonce`.
-3. **`nonce` needs real entropy**, per the evidence table. Done:
+4. **`nonce` needs real entropy**, per the evidence table. Done:
    `OIDCLogin.generateNonce()` sits alongside `generateState()`, both drawing 32
    bytes from the same CSPRNG helper but as independent values. Reusing the
    generator is fine; reusing the same *value* for both is not, and there is a
    test asserting they differ.
-4. **Send `redirect_url` on the callback**, matching the authorize request byte
+5. **Send `redirect_url` on the callback**, matching the authorize request byte
    for byte, or the exchange fails with `invalid_grant`.
-5. **Document the IdP step for self-hosters:** add `mdone://oidc-callback` to the
+6. **Document the IdP step for self-hosters:** add `mdone://oidc-callback` to the
    Vikunja client's redirect URIs. Without it the provider refuses the request,
    correctly and unhelpfully.
-6. **Known limitation to carry forward from the #103 review:** Vikunja derives
+7. **Known limitation to carry forward from the #103 review:** Vikunja derives
    its own default redirect URL from the API server URL, which assumes the API
    and the frontend share an origin. That assumption is now only load-bearing for
    the web frontend, not for us.
