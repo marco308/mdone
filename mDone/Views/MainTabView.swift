@@ -47,6 +47,10 @@ struct MainTabView: View {
                 }
             }
         }
+        // On iPad this turns the tab bar into a proper sidebar (the user can
+        // collapse it back to a tab bar); on iPhone it stays a plain tab bar.
+        .tabViewStyle(.sidebarAdaptable)
+        .background { keyboardShortcuts }
         .tint(Color.accentColor)
         .task {
             await appState.refreshAll()
@@ -104,6 +108,37 @@ struct MainTabView: View {
     }
 
     #if os(iOS)
+    /// Hardware-keyboard shortcuts (iPad with a keyboard, mainly). The buttons
+    /// are invisible: they exist only to carry the key equivalents, and their
+    /// titles are what the hold-Command discoverability overlay displays.
+    private var keyboardShortcuts: some View {
+        Group {
+            Button("New Task") {
+                // Same pipeline as the widget and the Shortcuts action: the
+                // onChange above switches to Inbox, QuickAddBar grabs focus.
+                appState.quickAddTrigger = UUID()
+            }
+            .keyboardShortcut("n", modifiers: .command)
+
+            Button("Refresh") {
+                Task { await appState.refreshAll() }
+            }
+            .keyboardShortcut("r", modifiers: .command)
+
+            Button("Inbox") { selectedTab = .inbox }
+                .keyboardShortcut("1", modifiers: .command)
+            Button("Projects") { selectedTab = .projects }
+                .keyboardShortcut("2", modifiers: .command)
+            Button("Calendar") { selectedTab = .calendar }
+                .keyboardShortcut("3", modifiers: .command)
+            Button("Settings") { selectedTab = .settings }
+                .keyboardShortcut("4", modifiers: .command)
+        }
+        .opacity(0)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
     private var undoPromptTitle: String {
         if let title = appState.undoableCompletionTitle {
             return "Undo completing \u{201C}\(title)\u{201D}?"
