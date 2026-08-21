@@ -66,6 +66,43 @@ The residual risk is therefore real but narrow, and it is bounded by codes being
 single use and short lived, which the smoke test asserts. It is worth revisiting
 if Vikunja ever exposes a public-client OIDC flow with PKCE.
 
+## macOS behaves differently, and it weakens two claims above
+
+Tested on macOS 15 with a sandboxed build against the dev stack. What works:
+the setup screen renders, the `/api/v1/info` probe succeeds (confirmed in the
+server log as `user_agent="mDone-macOS/..."`), the SSO button appears, and
+`ASWebAuthenticationSession` starts without a presentation-anchor error and
+sends a correct authorization request that reaches the provider.
+
+What is different: **macOS hands the session to the default browser when that
+browser is not Safari.** On a machine defaulting to Brave, the authorization
+request opened in Brave, not in an in-app Safari sheet. Two consequences.
+
+**`prefersEphemeralWebBrowserSession` is a Safari guarantee, and probably does
+nothing here.** Cookie isolation is provided by Safari's ephemeral mode. Handed
+to a third-party browser, the flow almost certainly runs in the user's ordinary
+profile, with whatever identity-provider session they already have. So the
+claim that this matches the isolation PR #103 wanted from
+`WKWebsiteDataStore.nonPersistent()` holds on iOS but should not be relied on
+for macOS.
+
+**The "callback never touches the system URL dispatcher" claim is unverified on
+macOS.** With an external browser the redirect leaves that browser and is
+brokered by `AuthenticationServicesAgent`. That is very likely still a direct
+hand-off to the waiting session, but it was not possible to prove here, so it
+should not be stated as fact. Treat the scheme-squatting mitigation as verified
+on iOS and unproven on macOS.
+
+One thing that did check out: `mDoneApp`'s `onOpenURL` is `#if os(iOS)`, so a
+`mdone://` URL arriving on macOS through LaunchServices is inert. A callback
+that escapes the session cannot be consumed by accident.
+
+### Still to verify on macOS
+
+Completing a sign-in in an external default browser and confirming the code
+reaches the app. Everything up to the provider's login page is confirmed; the
+return leg is not.
+
 ## Option B: https callback via Associated Domains (not viable)
 
 `ASWebAuthenticationSession.Callback.https(host:path:)` exists on our deployment
