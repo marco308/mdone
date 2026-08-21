@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - Actions that genuinely need a connection, such as creating a task or a project, now say so immediately instead of spending several seconds retrying first (#146).
 - Completing a task now preserves its colour and favourite status too. 1.12.2 stopped the description, priority and progress being cleared; Vikunja resets these two the same way, so every task update now carries them as well (#147).
+- A damaged local database no longer crashes the app on every launch. mDone used to stop dead if its offline database could not be opened, for instance after a failed upgrade, and the only fix was deleting and reinstalling the app, which threw away any edits you had made offline. It now rescues your unsynced changes and focus history, rebuilds the cached copy of your tasks from the server, and tells you it has done so (#155).
 
 ## [1.12.2] - 2026-08-12
 
