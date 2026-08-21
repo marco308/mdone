@@ -15,7 +15,8 @@ services:
     volumes:
       - ./vikunja-dev-data/files:/app/vikunja/files
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3456/api/v1/info"]
+      # The image has no shell, wget or curl, so probe with the binary itself.
+      test: ["CMD", "/app/vikunja/vikunja", "healthcheck"]
       interval: 5s
       timeout: 3s
       retries: 10

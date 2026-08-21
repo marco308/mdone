@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - On iPad the tab bar can now expand into a sidebar, making better use of the larger screen (#34).
 - Hardware keyboard shortcuts on iPhone and iPad: Cmd-N new task, Cmd-R refresh, and Cmd-1 to Cmd-4 to switch sections. Hold Cmd to see them listed (#34).
+- You can now sign in with single sign-on. If your Vikunja is set up with an OIDC provider such as Authelia, Keycloak or Authentik, the login screen offers a "Continue with ..." button for it. Sign-in happens in the system browser, so you can see the real address of the page you are typing your password into, and the app never sees it (#153).
+- The login screen now adapts to your server. If your server has username and password login turned off, those fields are hidden rather than shown and then failing with "Not Found" (#153).
 - You can now edit tasks while offline. Completing a task, rescheduling it, changing its progress, editing its details or deleting it all take effect straight away and sync when you reconnect. Rows with changes still waiting show a "Not synced" marker, and the offline banner tells you how many are queued. Previously these actions did nothing for several seconds, then failed with an error that faded away (#146).
 - Queued changes are merged rather than replayed blindly. When your change reaches the server, only the fields you actually edited are applied, so an edit made offline no longer overwrites something you or someone else changed elsewhere in the meantime (#146).
 - If a queued change can never be delivered, for example because the task was deleted elsewhere, the app now tells you which change it was and why, instead of dropping it silently (#146).

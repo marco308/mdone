@@ -24,6 +24,31 @@ struct Endpoint {
     /// Set-Cookie that invalidates the previous refresh token.
     static let refreshToken = Endpoint(path: "/api/v1/user/token/refresh", method: .POST)
 
+    /// Instance metadata, including which auth methods the server offers.
+    /// Unauthenticated: this is what the login screen reads before it knows
+    /// anything about the server.
+    static let info = Endpoint(path: "/api/v1/info")
+
+    /// Exchanges an OIDC authorization code for a Vikunja JWT. `provider` is
+    /// the provider `key` from `/api/v1/info`, not its display name.
+    ///
+    /// The key is percent-encoded because it comes from the server rather than
+    /// from us, and `APIClient.buildRequest` concatenates paths and calls
+    /// `URL(string:)` without escaping. An unescaped key containing `/` or `..`
+    /// would move this POST to a different path, and this is the request that
+    /// carries the authorization code.
+    static func openIDCallback(provider: String) -> Endpoint {
+        Endpoint(path: "/api/v1/auth/openid/\(pathSegment(provider))/callback", method: .POST)
+    }
+
+    /// Percent-encodes a single path segment. Deliberately narrower than
+    /// `.urlPathAllowed`, which permits `/`, and narrower than RFC 3986's
+    /// unreserved set, which permits `.` and would leave `..` intact.
+    static func pathSegment(_ raw: String) -> String {
+        let safe = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_~"))
+        return raw.addingPercentEncoding(withAllowedCharacters: safe) ?? ""
+    }
+
     // MARK: - User
 
     static let currentUser = Endpoint(path: "/api/v1/user")

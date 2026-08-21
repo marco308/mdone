@@ -9,6 +9,18 @@ struct LoginResponse: Codable {
     var token: String
 }
 
+/// Body of `POST /api/v1/auth/openid/{key}/callback`.
+///
+/// `redirectUrl` becomes `redirect_url` through the client's
+/// `convertToSnakeCase` strategy, so do not add `CodingKeys` here without
+/// matching it. Vikunja forwards the value as the `redirect_uri` of the token
+/// exchange, so it must equal the one used on the authorization request or the
+/// provider rejects the grant.
+struct OIDCCallbackRequest: Encodable {
+    var code: String
+    var redirectUrl: String
+}
+
 struct APIError: Codable {
     var code: Int?
     var message: String?

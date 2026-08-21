@@ -1,0 +1,30 @@
+# Generated into dev/vikunja/config.yml by scripts/dev-oidc-up.sh.
+# Do not edit the generated file, edit this template.
+#
+# Only the OIDC bits live here. Everything else stays in the environment block
+# of docker-compose.dev.yml, and environment wins over this file in Vikunja.
+auth:
+  local:
+    enabled: ${VIKUNJA_LOCAL_AUTH}
+  openid:
+    enabled: true
+    # Vikunja appends the provider key to this, giving
+    # .../auth/openid/authelia, which is what dev/authelia/configuration.yml
+    # registers as the client's only redirect URI.
+    #
+    # Known limitation carried over from the #103 review: this assumes the API
+    # and the Vikunja frontend share an origin.
+    redirecturl: https://vikunja.${DEV_BASE}:8443/auth/openid/
+    #
+    # `providers` is a MAP keyed by provider key, not a list. Vikunja v2.4.0
+    # rejects the list form that most guides and older docs show, with only
+    # "It looks like your openid configuration is in the wrong format" in the
+    # log and `"providers": null` in /api/v1/info. The key here ("authelia")
+    # becomes the `key` field in that payload and the last path segment of
+    # both the redirect URI and the callback endpoint.
+    providers:
+      authelia:
+        name: Authelia
+        authurl: https://auth.${DEV_BASE}:8443
+        clientid: vikunja
+        clientsecret: vikunja-dev-client-secret

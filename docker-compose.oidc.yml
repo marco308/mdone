@@ -1,0 +1,64 @@
+###############################################################################
+# Overlay that puts an Authelia OIDC provider and a TLS terminator in front of
+# the dev Vikunja, for work on issue #153. Never used on its own, always via:
+#
+#   ./scripts/dev-oidc-up.sh
+#
+# Two things drive the shape of this file.
+#
+# 1. One hostname has to resolve to the same place from three vantage points:
+#    the Mac, the iOS Simulator, and the Vikunja container doing the
+#    server-side token exchange. "localhost" cannot, because inside a container
+#    it means that container. DEV_BASE is <lan-ip>.nip.io, public wildcard DNS
+#    that maps the embedded IP straight back, so all three agree. Needs DNS.
+#
+# 2. Everything is https. Authelia rejects a plaintext authelia_url, and iOS
+#    App Transport Security would block a cleartext identity provider, so an
+#    http stack would need an ATS exception we do not want to ship. Caddy
+#    terminates TLS with a mkcert-issued wildcard for *.DEV_BASE.
+###############################################################################
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: mdone-caddy-dev
+    restart: unless-stopped
+    ports:
+      - "8443:8443"
+    environment:
+      DEV_BASE: "${DEV_BASE:?run scripts/dev-oidc-up.sh, do not invoke compose directly}"
+    volumes:
+      - ./dev/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./dev/certs:/certs:ro
+    depends_on:
+      - vikunja
+      - authelia
+
+  authelia:
+    image: authelia/authelia:4.39
+    container_name: mdone-authelia-dev
+    restart: unless-stopped
+    expose:
+      - "9091"
+    environment:
+      DEV_BASE: "${DEV_BASE}"
+      # Enables Go templating in configuration.yml, which is how DEV_BASE and
+      # the JWKS private key get injected.
+      X_AUTHELIA_CONFIG_FILTERS: "template"
+    volumes:
+      - ./dev/authelia/configuration.yml:/config/configuration.yml:ro
+      - ./dev/authelia/users_database.yml:/config/users_database.yml:ro
+      - ./dev/authelia/oidc.key:/config/oidc.key:ro
+      - ./vikunja-dev-data/authelia:/config/data
+
+  vikunja:
+    environment:
+      VIKUNJA_SERVICE_PUBLICURL: "https://vikunja.${DEV_BASE}:8443"
+      # Vikunja's server-side discovery and token exchange call Authelia over
+      # TLS, so its Go HTTP client has to trust the mkcert CA. Go reads this
+      # env var; the bundle is system roots plus that CA.
+      SSL_CERT_FILE: "/certs/ca-bundle.crt"
+    volumes:
+      - ./vikunja-dev-data/files:/app/vikunja/files
+      - ./dev/vikunja/config.yml:/etc/vikunja/config.yml:ro
+      - ./dev/certs:/certs:ro

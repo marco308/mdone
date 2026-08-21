@@ -1,0 +1,21 @@
+# Dev-only TLS terminator for the OIDC stack. Gives Vikunja and Authelia two
+# real hostnames on one mkcert-issued wildcard certificate, which is what lets
+# the whole flow run over https.
+#
+# https is not optional here: Authelia refuses a plaintext `authelia_url`, and
+# iOS App Transport Security would block a cleartext identity provider, so
+# testing over http would need an ATS exception we do not want to ship.
+{
+	auto_https off
+	admin off
+}
+
+https://vikunja.{$DEV_BASE}:8443 {
+	tls /certs/cert.pem /certs/key.pem
+	reverse_proxy vikunja:3456
+}
+
+https://auth.{$DEV_BASE}:8443 {
+	tls /certs/cert.pem /certs/key.pem
+	reverse_proxy authelia:9091
+}
