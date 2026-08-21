@@ -158,6 +158,32 @@ problem rather than a parse error. The map key becomes the provider `key` in
 that payload and the last path segment of both the redirect URI and the
 callback endpoint.
 
+### Testing SSO on macOS
+
+```bash
+./scripts/dev-macos-oidc.sh            # build and launch
+./scripts/dev-macos-oidc.sh --cleanup  # quit it, remove every trace
+```
+
+**Do not just build and run `mDone-macOS` for this.** It shares the bundle
+identifier `com.mdone.app` with the copy in `/Applications`, so it reads the
+same keychain and the same sandbox container. It will sign you straight into
+whatever server your real app uses and never show the setup screen, and signing
+in to a test server from it overwrites the credentials your real app depends on.
+
+The script overrides `PRODUCT_BUNDLE_IDENTIFIER`, which gives the build its own
+keychain access group and container, so nothing it does can reach the real app.
+
+Two macOS behaviours to expect, neither of which happens on iOS:
+
+- **The sign-in opens in your default browser**, not an in-app Safari sheet,
+  unless Safari *is* your default. `prefersEphemeralWebBrowserSession` is a
+  Safari feature, so in a third-party browser the flow probably uses your normal
+  profile and whatever provider session it already holds.
+- **If it hangs on the spinner** after you sign in, the callback is not getting
+  back to the app. The first thing to check is whether `mdone://oidc-callback`
+  is registered as a redirect URI on that server's identity provider.
+
 ### Proving the flow works
 
 ```bash

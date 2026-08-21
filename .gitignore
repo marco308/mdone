@@ -58,3 +58,6 @@ dev/vikunja/config.yml
 .env.oidc
 dev/certs/
 dev/authelia/oidc.key
+
+# Isolated macOS OIDC test build (scripts/dev-macos-oidc.sh)
+.build/
