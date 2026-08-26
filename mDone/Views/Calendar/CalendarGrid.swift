@@ -66,8 +66,12 @@ struct CalendarGrid: View {
 
             // Day cells
             LazyVGrid(columns: columns, spacing: 8) {
-                ForEach(daysInMonth(), id: \.self) { date in
-                    if let date {
+                // Indexed rather than `id: \.self`: the leading padding cells
+                // are all `nil`, so identifying by value gives every one of
+                // them the same id, which is undefined behaviour in a ForEach.
+                let days = daysInMonth()
+                ForEach(days.indices, id: \.self) { index in
+                    if let date = days[index] {
                         let dayKey = calendar.startOfDay(for: date)
                         DayCell(
                             date: date,
