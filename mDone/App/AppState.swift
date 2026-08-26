@@ -1800,9 +1800,58 @@ final class AppState {
         return calendarEvents.filter { $0.startDate >= todayStart && $0.startDate < todayEnd }
     }
 
-    func tasksForDate(_ date: Date) -> [VTask] {
+    /// Every appearance of a task on `date`: the tasks whose own dates put them
+    /// there, followed by repeating tasks projected to come back that day.
+    func occurrences(on date: Date) -> [TaskOccurrence] {
         let calendar = Calendar.current
-        return tasks.filter { $0.occurs(on: date, calendar: calendar) }
+        let day = calendar.startOfDay(for: date)
+        guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else { return [] }
+
+        var real: [TaskOccurrence] = []
+        var projected: [TaskOccurrence] = []
+
+        for task in tasks {
+            if task.occurs(on: date, calendar: calendar) {
+                real.append(TaskOccurrence(task: task, day: day, projectedDueDate: nil))
+                continue
+            }
+            if let projection = Self.projectedOccurrences(
+                for: task,
+                from: day,
+                before: nextDay,
+                calendar: calendar
+            ).first {
+                projected.append(
+                    TaskOccurrence(task: task, day: day, projectedDueDate: projection.date)
+                )
+            }
+        }
+
+        // Real work first: the day list is a list of things to do, and a
+        // projection is only a note that the task will be back.
+        return real + projected
+    }
+
+    /// The days inside `[rangeStart, rangeEnd)` on which `task` is projected to
+    /// come back, each paired with the projected due date to display.
+    ///
+    /// Empty for a task that is done, has no due date, does not repeat, or
+    /// repeats from its completion time, whose next date cannot be known until
+    /// the user actually completes it.
+    private static func projectedOccurrences(
+        for task: VTask,
+        from rangeStart: Date,
+        before rangeEnd: Date,
+        calendar: Calendar
+    ) -> [(day: Date, date: Date)] {
+        guard !task.done,
+              let recurrence = task.recurrence,
+              let dueDate = task.effectiveDueDate
+        else { return [] }
+
+        return recurrence
+            .occurrences(dueDate: dueDate, in: rangeStart ..< rangeEnd, calendar: calendar)
+            .map { (day: calendar.startOfDay(for: $0), date: $0) }
     }
 
     // MARK: - Notifications
@@ -1883,7 +1932,8 @@ final class AppState {
         }
     }
 
-    func datesWithTasks(in month: Date) -> [Date: [VTask]] {
+    /// Every appearance of a task across `month`, keyed by start of day.
+    func occurrencesByDay(in month: Date) -> [Date: [TaskOccurrence]] {
         let calendar = Calendar.current
         guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: month)),
               let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart)
@@ -1892,11 +1942,37 @@ final class AppState {
         // Expand each task's own occurrence days rather than testing every
         // task against every day of the month; ranges rarely span many days,
         // so this stays close to one pass over the task list.
-        var result: [Date: [VTask]] = [:]
+        var result: [Date: [TaskOccurrence]] = [:]
+        var projections: [Date: [TaskOccurrence]] = [:]
+
         for task in tasks {
+            var realDays: Set<Date> = []
             for day in task.occurrenceDays(from: monthStart, before: monthEnd, calendar: calendar) {
-                result[day, default: []].append(task)
+                realDays.insert(day)
+                result[day, default: []].append(
+                    TaskOccurrence(task: task, day: day, projectedDueDate: nil)
+                )
             }
+
+            // A projection never displaces the task's real placement: a
+            // repeating task due on the 5th of a month it also spans as a range
+            // keeps the real row it already has on that day.
+            for projection in Self.projectedOccurrences(
+                for: task,
+                from: monthStart,
+                before: monthEnd,
+                calendar: calendar
+            ) where !realDays.contains(projection.day) {
+                projections[projection.day, default: []].append(
+                    TaskOccurrence(task: task, day: projection.day, projectedDueDate: projection.date)
+                )
+            }
+        }
+
+        // Real placements first within each day, so the day cell's three-dot
+        // limit spends its dots on real work before projections.
+        for (day, occurrences) in projections {
+            result[day, default: []].append(contentsOf: occurrences)
         }
         return result
     }

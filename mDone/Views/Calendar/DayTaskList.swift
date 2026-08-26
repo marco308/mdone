@@ -2,11 +2,13 @@ import SwiftUI
 
 struct DayTaskList: View {
     let date: Date
-    let tasks: [VTask]
+    /// Real placements for the day, followed by projected future occurrences
+    /// of repeating tasks.
+    let occurrences: [TaskOccurrence]
     var calendarEvents: [CalendarEvent] = []
 
     private var isEmpty: Bool {
-        tasks.isEmpty && calendarEvents.isEmpty
+        occurrences.isEmpty && calendarEvents.isEmpty
     }
 
     @ScaledMetric(relativeTo: .title) private var emptyIconSize: CGFloat = 36
@@ -28,10 +30,13 @@ struct DayTaskList: View {
                 .frame(maxWidth: .infinity)
             } else {
                 List {
-                    if !tasks.isEmpty {
+                    if !occurrences.isEmpty {
                         Section {
-                            ForEach(tasks) { task in
-                                TaskRow(task: task)
+                            ForEach(occurrences) { occurrence in
+                                TaskRow(
+                                    task: occurrence.task,
+                                    projectedDueDate: occurrence.projectedDueDate
+                                )
                             }
                         } header: {
                             Text(date, format: .dateTime.weekday(.wide).month(.wide).day())

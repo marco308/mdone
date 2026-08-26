@@ -9,6 +9,14 @@ struct TaskRow: View {
     /// When true, the row is display-only: no completion toggle, swipe actions,
     /// context menu, or tap-to-edit. Used for archived (read-only) projects.
     var readOnly: Bool = false
+    /// Set when this row is a projected future occurrence of a repeating task.
+    /// The row shows this date in place of the task's stored due date, and is
+    /// always display-only: Vikunja holds one instance of a repeating task, so
+    /// there is nothing on that future day to complete, edit or delete, and
+    /// acting on the row would silently rewrite the real task instead.
+    /// Setting it implies `readOnly` through `isDisplayOnly`, so the two
+    /// cannot disagree (issue #35).
+    var projectedDueDate: Date?
     /// When true, the row shows a progress bar and (when stalled) an idle badge.
     /// Used by the "Current" section.
     var showsProgress: Bool = false
@@ -26,6 +34,15 @@ struct TaskRow: View {
         TaskListDensity(rawValue: densityRaw) ?? .standard
     }
 
+    /// The single gate every interactive affordance checks. Archived projects
+    /// set `readOnly`; projected occurrences set `projectedDueDate`. Both mean
+    /// the same thing to the row, and routing them through one property is what
+    /// stops a future affordance from being added with only one of the two
+    /// guards on it.
+    private var isDisplayOnly: Bool {
+        readOnly || projectedDueDate != nil
+    }
+
     /// Quick-set progress percentages offered in the context menu.
     private static let progressSteps = [0, 25, 50, 75, 100]
 
@@ -40,14 +57,14 @@ struct TaskRow: View {
         #if os(iOS)
         .contentShape(Rectangle())
         .onTapGesture {
-            if !readOnly {
+            if !isDisplayOnly {
                 showDetail = true
             }
         }
         .listRowBackground(isFocused ? Color.orange.opacity(0.08) : nil)
         #endif
         .swipeActions(edge: .leading) {
-            if !readOnly {
+            if !isDisplayOnly {
                 #if os(iOS)
                 if !task.done {
                     Button {
@@ -80,7 +97,7 @@ struct TaskRow: View {
             }
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            if !readOnly {
+            if !isDisplayOnly {
                 Button(role: .destructive) {
                     Task { await appState.deleteTask(task) }
                 } label: {
@@ -89,7 +106,7 @@ struct TaskRow: View {
             }
         }
         .contextMenu {
-            if !readOnly {
+            if !isDisplayOnly {
                 if !task.done {
                     Menu {
                         ForEach(QuickSchedule.options()) { option in
@@ -165,20 +182,32 @@ struct TaskRow: View {
                 .frame(width: 4, height: density.accentBarHeight)
                 .accessibilityHidden(true)
 
-            Button {
-                Task {
-                    await appState.toggleTaskDone(task)
+            if projectedDueDate == nil {
+                Button {
+                    Task {
+                        await appState.toggleTaskDone(task)
+                    }
+                } label: {
+                    Image(systemName: task.done ? "checkmark.circle.fill" : "circle")
+                        .font(density.checkboxFont)
+                        .foregroundStyle(task.done ? .green : checkboxColor)
+                        .contentTransition(.symbolEffect(.replace))
                 }
-            } label: {
-                Image(systemName: task.done ? "checkmark.circle.fill" : "circle")
+                .buttonStyle(.plain)
+                .disabled(isDisplayOnly)
+                .accessibilityLabel(
+                    task.done ? "Mark \(task.title) as incomplete" : "Mark \(task.title) as complete"
+                )
+                .accessibilityAddTraits(.isToggle)
+            } else {
+                // Not a disabled checkbox: a control that looks tappable and
+                // then does nothing explains nothing. A dashed circle reads as
+                // "this one has not come round yet".
+                Image(systemName: "circle.dashed")
                     .font(density.checkboxFont)
-                    .foregroundStyle(task.done ? .green : checkboxColor)
-                    .contentTransition(.symbolEffect(.replace))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
-            .buttonStyle(.plain)
-            .disabled(readOnly)
-            .accessibilityLabel(task.done ? "Mark \(task.title) as incomplete" : "Mark \(task.title) as complete")
-            .accessibilityAddTraits(.isToggle)
 
             VStack(alignment: .leading, spacing: density.contentSpacing) {
                 Text(task.title)
@@ -214,9 +243,9 @@ struct TaskRow: View {
                         .accessibilityLabel("Change not yet synced")
                     }
 
-                    if let dueDate = task.effectiveDueDate {
+                    if let dueDate = projectedDueDate ?? task.effectiveDueDate {
                         HStack(spacing: 4) {
-                            Image(systemName: "calendar")
+                            Image(systemName: projectedDueDate == nil ? "calendar" : "repeat")
                             if task.hasSpecificTime {
                                 Text(dueDate, format: .dateTime.month().day().year().hour().minute())
                             } else {
@@ -224,10 +253,16 @@ struct TaskRow: View {
                             }
                         }
                         .font(density.metadataFont)
-                        .foregroundStyle(task.isOverdue && !calmMode ? .red : .secondary)
+                        // A projection is always in the future, so it is never
+                        // overdue however late the real task is running.
+                        .foregroundStyle(
+                            projectedDueDate == nil && task.isOverdue && !calmMode ? .red : .secondary
+                        )
                     }
 
-                    if task.isRepeating {
+                    // On a projection the date chip already carries the repeat
+                    // glyph, so the badge would say it twice.
+                    if task.isRepeating, projectedDueDate == nil {
                         HStack(spacing: 4) {
                             Image(systemName: "repeat")
                             if let desc = task.repeatDescription {
@@ -280,7 +315,9 @@ struct TaskRow: View {
         }
         .padding(.leading, CGFloat(min(indentLevel, 4)) * 16)
         .padding(.vertical, density.rowVerticalPadding)
-        .opacity(task.done ? 0.6 : 1)
+        // A projection reads at the same weight as a completed task: present,
+        // and not something to act on now.
+        .opacity(task.done || projectedDueDate != nil ? 0.6 : 1)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(taskAccessibilityLabel)
     }
@@ -303,7 +340,7 @@ struct TaskRow: View {
         if let dateRangeMetadata {
             parts.append(dateRangeMetadata.accessibilityText)
         }
-        if let dueDate = task.effectiveDueDate {
+        if projectedDueDate == nil, let dueDate = task.effectiveDueDate {
             if task.isOverdue {
                 parts.append("overdue")
             }
@@ -311,6 +348,11 @@ struct TaskRow: View {
         }
         if task.isRepeating, let desc = task.repeatDescription {
             parts.append("repeats \(desc)")
+        }
+        if let projectedDueDate {
+            parts.append(
+                "upcoming occurrence on \(projectedDueDate.formatted(date: .abbreviated, time: .omitted))"
+            )
         }
         if let labels = task.labels, !labels.isEmpty {
             let labelNames = labels.prefix(3).map(\.title).joined(separator: ", ")
