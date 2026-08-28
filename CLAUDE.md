@@ -34,16 +34,16 @@ The project uses **XcodeGen** to generate the Xcode project from `project.yml`. 
 xcodegen generate
 
 # Build iOS app
-xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' build
+xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build
 
 # Build macOS app
 xcodebuild -project mDone.xcodeproj -scheme mDone-macOS build
 
 # Run unit tests only (what CI runs)
-xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:mDoneTests test
+xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:mDoneTests test
 
 # Run a single test class
-xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:mDoneTests/TaskServiceTests test
+xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:mDoneTests/TaskServiceTests test
 
 # Lint
 swiftlint lint --quiet
@@ -51,6 +51,8 @@ swiftlint lint --quiet
 # Format
 swiftformat .
 ```
+
+**Simulator destinations:** build-only invocations use `generic/platform=iOS Simulator`, which needs no simulator by that name to exist. Test runs have to name a concrete device, so they use the same one CI pins in `.github/workflows/ios-tests.yml` (`iPhone 17`). If you change one, change the other, and check `xcrun simctl list devices available` when a destination stops resolving after an Xcode update.
 
 **Deployment targets:** iOS 18.0+, macOS 15.0+. Swift 5.9. Version and build number live in `project.yml` (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION`), not in an Info.plist.
 
@@ -76,8 +78,8 @@ Log in with `devuser` / `devpassword`. `./scripts/reset-dev-vikunja.sh` nukes an
 
 ### CI
 
-- `.github/workflows/ios-tests.yml` runs `mDoneTests` on the iOS Simulator for every PR to `main`. UI and snapshot targets are excluded: they need a booted app and are flaky on CI.
-- `.github/workflows/codeql.yml` runs CodeQL; `.github/workflows/deploy-pages.yml` publishes `website/`.
+- `.github/workflows/ios-tests.yml` runs `mDoneTests` on the iOS Simulator for every PR to `main`, pinned to `-destination 'platform=iOS Simulator,name=iPhone 17'`. UI and snapshot targets are excluded: they need a booted app and are flaky on CI.
+- `.github/workflows/codeql.yml` runs CodeQL (build-only, so it uses `generic/platform=iOS Simulator`); `.github/workflows/deploy-pages.yml` publishes `website/`.
 
 ## Architecture
 
