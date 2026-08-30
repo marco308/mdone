@@ -79,7 +79,7 @@ Already comprehensive. Mocked via `MockURLProtocol` ([mDoneTests/Helpers/MockURL
 ```bash
 xcodebuild -project mDone.xcodeproj -scheme mDone \
   -sdk iphonesimulator \
-  -destination 'platform=iOS Simulator,name=iPhone 16' test
+  -destination 'platform=iOS Simulator,name=iPhone 17' test
 
 # Single test target
 xcodebuild ... -only-testing:mDoneTests/TaskServiceTests test

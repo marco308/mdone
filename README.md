@@ -54,14 +54,14 @@ xcodegen generate
 
 # Build for iOS Simulator
 xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator \
-  -destination 'platform=iOS Simulator,name=iPhone 16' build
+  -destination 'generic/platform=iOS Simulator' build
 
 # Build for macOS
 xcodebuild -project mDone.xcodeproj -scheme mDone-macOS build
 
 # Run tests
 xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator \
-  -destination 'platform=iOS Simulator,name=iPhone 16' test
+  -destination 'platform=iOS Simulator,name=iPhone 17' test
 ```
 
 ## Contributing
