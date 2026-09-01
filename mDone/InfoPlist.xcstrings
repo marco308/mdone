@@ -1,0 +1,30 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSCalendarsFullAccessUsageDescription" : {
+      "comment" : "Permission prompt shown before mDone reads the user's calendars.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mDone displays your calendar events alongside your tasks so you can plan your day in one place. For example, your upcoming meetings will appear in the Calendar tab and Today view next to your to-do items."
+          }
+        }
+      }
+    },
+    "NSLocalNetworkUsageDescription" : {
+      "comment" : "Permission prompt shown before mDone reaches a Vikunja server on the local network.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mDone connects to your local Vikunja server to sync tasks and projects."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

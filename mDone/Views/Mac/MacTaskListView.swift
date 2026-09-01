@@ -13,6 +13,14 @@ struct MacTaskListView: View {
         case dueDate = "Due Date"
         case priority = "Priority"
         case title = "Title"
+
+        var label: String {
+            switch self {
+            case .dueDate: String(localized: "Due Date")
+            case .priority: String(localized: "Priority")
+            case .title: String(localized: "Title")
+            }
+        }
     }
 
     var body: some View {
@@ -60,7 +68,7 @@ struct MacTaskListView: View {
                 List(selection: $selectedTask) {
                     if !currentTasks.isEmpty {
                         SmartListSection(
-                            title: "Current",
+                            title: String(localized: "Current"),
                             tasks: currentTasks,
                             accentColor: Color.accentColor,
                             showsProgress: true
@@ -69,33 +77,41 @@ struct MacTaskListView: View {
                     if calmMode {
                         let todayAndOverdue = excludingCurrent(appState.calmModeTodayTasks, currentIds: currentIds)
                         if !todayAndOverdue.isEmpty {
-                            SmartListSection(title: "Today", tasks: todayAndOverdue, accentColor: Color.accentColor)
+                            SmartListSection(
+                                title: String(localized: "Today"),
+                                tasks: todayAndOverdue,
+                                accentColor: Color.accentColor
+                            )
                         }
                     } else {
                         let overdue = excludingCurrent(appState.overdueTasks, currentIds: currentIds)
                         if !overdue.isEmpty {
-                            SmartListSection(title: "Overdue", tasks: overdue, accentColor: .red)
+                            SmartListSection(title: String(localized: "Overdue"), tasks: overdue, accentColor: .red)
                         }
                         let today = excludingCurrent(appState.todayTasks, currentIds: currentIds)
                         if !today.isEmpty {
-                            SmartListSection(title: "Today", tasks: today, accentColor: Color.accentColor)
+                            SmartListSection(
+                                title: String(localized: "Today"),
+                                tasks: today,
+                                accentColor: Color.accentColor
+                            )
                         }
                     }
                     let tomorrow = excludingCurrent(appState.tomorrowTasks, currentIds: currentIds)
                     if !tomorrow.isEmpty {
-                        SmartListSection(title: "Tomorrow", tasks: tomorrow, accentColor: .orange)
+                        SmartListSection(title: String(localized: "Tomorrow"), tasks: tomorrow, accentColor: .orange)
                     }
                     let thisWeek = excludingCurrent(appState.thisWeekTasks, currentIds: currentIds)
                     if !thisWeek.isEmpty {
-                        SmartListSection(title: "This Week", tasks: thisWeek, accentColor: .blue)
+                        SmartListSection(title: String(localized: "This Week"), tasks: thisWeek, accentColor: .blue)
                     }
                     let upcoming = excludingCurrent(appState.upcomingTasks, currentIds: currentIds)
                     if !upcoming.isEmpty {
-                        SmartListSection(title: "Upcoming", tasks: upcoming, accentColor: .purple)
+                        SmartListSection(title: String(localized: "Upcoming"), tasks: upcoming, accentColor: .purple)
                     }
                     let noDate = excludingCurrent(appState.noDateTasks, currentIds: currentIds)
                     if !noDate.isEmpty {
-                        SmartListSection(title: "No Date", tasks: noDate, accentColor: .secondary)
+                        SmartListSection(title: String(localized: "No Date"), tasks: noDate, accentColor: .secondary)
                     }
                 }
                 .listStyle(.inset)
@@ -153,7 +169,7 @@ struct MacTaskListView: View {
                             }
                         } label: {
                             HStack {
-                                Text(order.rawValue)
+                                Text(order.label)
                                 if sortOrder == order {
                                     Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
                                 }
@@ -164,7 +180,9 @@ struct MacTaskListView: View {
                     Image(systemName: "arrow.up.arrow.down")
                 }
                 .help("Sort tasks")
-                .accessibilityLabel("Sort by \(sortOrder.rawValue), \(sortAscending ? "ascending" : "descending")")
+                .accessibilityLabel(sortAscending
+                    ? String(localized: "Sort by \(sortOrder.label), ascending")
+                    : String(localized: "Sort by \(sortOrder.label), descending"))
             }
 
             ToolbarItem(placement: .primaryAction) {
@@ -291,33 +309,33 @@ struct MacTaskListView: View {
     }
 
     private var emptyStateTitle: String {
-        guard let section else { return "No Tasks" }
+        guard let section else { return String(localized: "No Tasks") }
         switch section {
-        case .today: return "All Clear Today"
-        case .tomorrow: return "Nothing Tomorrow"
-        case .thisWeek: return "Nothing This Week"
-        case .upcoming: return "Nothing Upcoming"
-        case .overdue: return "No Overdue Tasks"
-        case .noDate: return "No Undated Tasks"
-        case .inbox: return "No Active Tasks"
-        case .project: return "No Tasks in Project"
-        case .notifications: return "No Notifications"
-        case .archived, .calendar, .settings: return "No Tasks"
+        case .today: return String(localized: "All Clear Today")
+        case .tomorrow: return String(localized: "Nothing Tomorrow")
+        case .thisWeek: return String(localized: "Nothing This Week")
+        case .upcoming: return String(localized: "Nothing Upcoming")
+        case .overdue: return String(localized: "No Overdue Tasks")
+        case .noDate: return String(localized: "No Undated Tasks")
+        case .inbox: return String(localized: "No Active Tasks")
+        case .project: return String(localized: "No Tasks in Project")
+        case .notifications: return String(localized: "No Notifications")
+        case .archived, .calendar, .settings: return String(localized: "No Tasks")
         }
     }
 
     private var emptyStateSubtitle: String {
         guard let section else { return "" }
         switch section {
-        case .today: return "You have no tasks due today."
-        case .tomorrow: return "No tasks due tomorrow."
-        case .thisWeek: return "No tasks due this week."
-        case .upcoming: return "No tasks coming up."
-        case .overdue: return "Great job staying on top of things!"
-        case .noDate: return "All your tasks have due dates."
-        case .inbox: return "Create a task to get started."
-        case .project: return "Add a task to this project."
-        case .notifications: return "You're all caught up!"
+        case .today: return String(localized: "You have no tasks due today.")
+        case .tomorrow: return String(localized: "No tasks due tomorrow.")
+        case .thisWeek: return String(localized: "No tasks due this week.")
+        case .upcoming: return String(localized: "No tasks coming up.")
+        case .overdue: return String(localized: "Great job staying on top of things!")
+        case .noDate: return String(localized: "All your tasks have due dates.")
+        case .inbox: return String(localized: "Create a task to get started.")
+        case .project: return String(localized: "Add a task to this project.")
+        case .notifications: return String(localized: "You're all caught up!")
         case .archived, .calendar, .settings: return ""
         }
     }

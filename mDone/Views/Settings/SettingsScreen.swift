@@ -16,7 +16,7 @@ struct SettingsScreen: View {
     @State private var showAbout = false
 
     private var serverURL: String {
-        AuthService.shared.getServerURL() ?? "Not configured"
+        AuthService.shared.getServerURL() ?? String(localized: "Not configured")
     }
 
     var body: some View {
@@ -77,13 +77,13 @@ struct SettingsScreen: View {
                     }
             } footer: {
                 Text(
-                    "Overdue tasks appear like any other — no red, no separate Overdue list or counts. They still show in your lists and widgets."
+                    "Overdue tasks appear like any other: no red, no separate Overdue list or counts. They still show in your lists and widgets."
                 )
             }
 
             Section {
                 Stepper(
-                    "Idle badge after \(currentStallDays) day\(currentStallDays == 1 ? "" : "s")",
+                    "Idle badge after \(currentStallDays) days",
                     value: $currentStallDays,
                     in: 1 ... 60
                 )
@@ -211,6 +211,6 @@ struct SettingsScreen: View {
         let info = Bundle.main.infoDictionary
         let short = info?["CFBundleShortVersionString"] as? String ?? "—"
         let build = info?["CFBundleVersion"] as? String ?? "—"
-        return "Version \(short) (\(build))"
+        return String(localized: "Version \(short) (\(build))")
     }
 }

@@ -102,8 +102,8 @@ struct NotificationRow: View {
         .padding(.vertical, 4)
         .opacity(notification.isUnread ? 1.0 : 0.7)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "\(notification.isUnread ? "Unread: " : "")\(notification.descriptionText), \(notification.relativeTimeString)"
-        )
+        .accessibilityLabel(notification.isUnread
+            ? String(localized: "Unread: \(notification.descriptionText), \(notification.relativeTimeString)")
+            : String(localized: "\(notification.descriptionText), \(notification.relativeTimeString)"))
     }
 }

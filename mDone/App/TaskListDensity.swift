@@ -18,9 +18,9 @@ enum TaskListDensity: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .compact: "Compact"
-        case .standard: "Standard"
-        case .large: "Large"
+        case .compact: String(localized: "Compact")
+        case .standard: String(localized: "Standard")
+        case .large: String(localized: "Large")
         }
     }
 

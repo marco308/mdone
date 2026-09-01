@@ -56,11 +56,17 @@ enum OIDCLoginError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .invalidAuthorizationEndpoint:
-            "This server's single sign-on address doesn't look right. Check the provider setup on your server."
+            String(
+                localized: "This server's single sign-on address doesn't look right. Check the provider setup on your server."
+            )
         case .insecureAuthorizationEndpoint:
-            "Single sign-on needs an https address. Your server is offering an insecure one, which iOS will not open."
+            String(
+                localized: "Single sign-on needs an https address. Your server is offering an insecure one, which iOS will not open."
+            )
         case .missingClientID:
-            "This server's single sign-on provider is missing a client ID. Check the provider setup on your server."
+            String(
+                localized: "This server's single sign-on provider is missing a client ID. Check the provider setup on your server."
+            )
         }
     }
 }

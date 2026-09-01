@@ -37,6 +37,14 @@ struct TaskListScreen: View {
         case dueDate = "Due Date"
         case priority = "Priority"
         case title = "Title"
+
+        var label: String {
+            switch self {
+            case .dueDate: String(localized: "Due Date")
+            case .priority: String(localized: "Priority")
+            case .title: String(localized: "Title")
+            }
+        }
     }
 
     var body: some View {
@@ -111,8 +119,8 @@ struct TaskListScreen: View {
                             Section {
                                 EmptyStateView(
                                     icon: "checkmark.circle",
-                                    title: "No tasks",
-                                    subtitle: "Add a task to get started"
+                                    title: String(localized: "No tasks"),
+                                    subtitle: String(localized: "Add a task to get started")
                                 )
                             }
                         } else {
@@ -200,7 +208,7 @@ struct TaskListScreen: View {
                             }
                         } label: {
                             HStack {
-                                Text(order.rawValue)
+                                Text(order.label)
                                 if sortOrder == order {
                                     Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
                                 }
@@ -210,7 +218,9 @@ struct TaskListScreen: View {
                 } label: {
                     Image(systemName: "arrow.up.arrow.down")
                 }
-                .accessibilityLabel("Sort by \(sortOrder.rawValue), \(sortAscending ? "ascending" : "descending")")
+                .accessibilityLabel(sortAscending
+                    ? String(localized: "Sort by \(sortOrder.label), ascending")
+                    : String(localized: "Sort by \(sortOrder.label), descending"))
             }
         }
     }
@@ -232,8 +242,8 @@ struct TaskListScreen: View {
             Section {
                 EmptyStateView(
                     icon: "magnifyingglass",
-                    title: "No results",
-                    subtitle: "Try a different search or filter"
+                    title: String(localized: "No results"),
+                    subtitle: String(localized: "Try a different search or filter")
                 )
             }
         } else {
@@ -256,7 +266,7 @@ struct TaskListScreen: View {
 
         if !currentTasks.isEmpty {
             SmartListSection(
-                title: "Current",
+                title: String(localized: "Current"),
                 tasks: currentTasks,
                 accentColor: Color.accentColor,
                 showsProgress: true
@@ -268,7 +278,7 @@ struct TaskListScreen: View {
             let todayAndOverdue = excludingCurrent(appState.calmModeTodayTasks, currentIds: currentIds)
             if !todayAndOverdue.isEmpty {
                 SmartListSection(
-                    title: "Today",
+                    title: String(localized: "Today"),
                     tasks: sorted(todayAndOverdue),
                     accentColor: Color.accentColor
                 )
@@ -277,7 +287,7 @@ struct TaskListScreen: View {
             let overdue = excludingCurrent(appState.overdueTasks, currentIds: currentIds)
             if !overdue.isEmpty {
                 SmartListSection(
-                    title: "Overdue",
+                    title: String(localized: "Overdue"),
                     tasks: sorted(overdue),
                     accentColor: .red
                 )
@@ -286,7 +296,7 @@ struct TaskListScreen: View {
             let today = excludingCurrent(appState.todayTasks, currentIds: currentIds)
             if !today.isEmpty {
                 SmartListSection(
-                    title: "Today",
+                    title: String(localized: "Today"),
                     tasks: sorted(today),
                     accentColor: Color.accentColor
                 )
@@ -319,7 +329,7 @@ struct TaskListScreen: View {
         let tomorrow = excludingCurrent(appState.tomorrowTasks, currentIds: currentIds)
         if !tomorrow.isEmpty {
             SmartListSection(
-                title: "Tomorrow",
+                title: String(localized: "Tomorrow"),
                 tasks: sorted(tomorrow),
                 accentColor: .orange
             )
@@ -328,7 +338,7 @@ struct TaskListScreen: View {
         let thisWeek = excludingCurrent(appState.thisWeekTasks, currentIds: currentIds)
         if !thisWeek.isEmpty {
             SmartListSection(
-                title: "This Week",
+                title: String(localized: "This Week"),
                 tasks: sorted(thisWeek),
                 accentColor: .blue
             )
@@ -337,7 +347,7 @@ struct TaskListScreen: View {
         let upcoming = excludingCurrent(appState.upcomingTasks, currentIds: currentIds)
         if !upcoming.isEmpty {
             SmartListSection(
-                title: "Upcoming",
+                title: String(localized: "Upcoming"),
                 tasks: sorted(upcoming),
                 accentColor: .purple
             )
@@ -346,7 +356,7 @@ struct TaskListScreen: View {
         let noDate = excludingCurrent(appState.noDateTasks, currentIds: currentIds)
         if !noDate.isEmpty {
             SmartListSection(
-                title: "No Date",
+                title: String(localized: "No Date"),
                 tasks: sorted(noDate),
                 accentColor: .secondary
             )
@@ -360,14 +370,14 @@ struct TaskListScreen: View {
                 if isOffline {
                     EmptyStateView(
                         icon: "wifi.slash",
-                        title: "No cached tasks",
-                        subtitle: "Connect to your server to load your tasks"
+                        title: String(localized: "No cached tasks"),
+                        subtitle: String(localized: "Connect to your server to load your tasks")
                     )
                 } else {
                     EmptyStateView(
                         icon: "checkmark.circle",
-                        title: "All done!",
-                        subtitle: "No pending tasks"
+                        title: String(localized: "All done!"),
+                        subtitle: String(localized: "No pending tasks")
                     )
                 }
             }
@@ -449,10 +459,11 @@ struct TaskListScreen: View {
     private var offlineBannerText: String {
         let pending = appState.pendingOperationsCount
         guard pending > 0 else {
-            return "You're offline. Showing your last synced tasks."
+            return String(localized: "You're offline. Showing your last synced tasks.")
         }
-        return pending == 1
-            ? "You're offline. 1 change will sync when you reconnect."
-            : "You're offline. \(pending) changes will sync when you reconnect."
+        // One key with a plural variation in the catalog rather than a
+        // hand-rolled singular/plural ternary: languages vary in how many
+        // plural forms they have, and only the catalog can express that.
+        return String(localized: "You're offline. \(pending) changes will sync when you reconnect.")
     }
 }

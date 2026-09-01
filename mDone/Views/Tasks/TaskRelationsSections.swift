@@ -80,7 +80,9 @@ struct TaskRelationsSections: View {
             }
             .buttonStyle(.borderless)
             .accessibilityLabel(
-                subtask.done ? "Mark \(subtask.title) as incomplete" : "Mark \(subtask.title) as complete"
+                subtask.done
+                    ? String(localized: "Mark \(subtask.title) as incomplete")
+                    : String(localized: "Mark \(subtask.title) as complete")
             )
             .accessibilityAddTraits(.isToggle)
 
@@ -223,10 +225,12 @@ struct LinkSubtaskSheet: View {
                 if candidates.isEmpty {
                     EmptyStateView(
                         icon: "link",
-                        title: searchText.isEmpty ? "No Tasks to Link" : "No Matches",
+                        title: searchText.isEmpty
+                            ? String(localized: "No Tasks to Link")
+                            : String(localized: "No Matches"),
                         subtitle: searchText.isEmpty
-                            ? "Every other open task is already related to this one."
-                            : "No open task titles match your search."
+                            ? String(localized: "Every other open task is already related to this one.")
+                            : String(localized: "No open task titles match your search.")
                     )
                 } else {
                     List {
@@ -282,6 +286,7 @@ struct LinkSubtaskSheet: View {
     }
 
     private func projectName(for task: VTask) -> String {
-        appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Project \(task.projectId)"
+        appState.projects.first(where: { $0.id == task.projectId })?
+            .title ?? String(localized: "Project \(task.projectId)")
     }
 }

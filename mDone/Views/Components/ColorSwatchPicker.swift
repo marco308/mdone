@@ -49,7 +49,7 @@ struct ColorSwatchPicker: View {
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(isNone ? "No color" : "Color \(hex)")
+        .accessibilityLabel(isNone ? String(localized: "No color") : String(localized: "Color \(hex)"))
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 

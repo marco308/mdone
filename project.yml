@@ -6,6 +6,13 @@ options:
     macOS: "15.0"
   xcodeVersion: "26.0"
   generateEmptyDirectories: true
+  # Localization (issue #163). `en` is the source language the string
+  # catalogs are authored in. There is deliberately no `knownRegions` here:
+  # XcodeGen derives regions from localized resources and ignores the key,
+  # and the catalogs are the real source of truth anyway. A language appears
+  # in the built bundle as soon as Localizable.xcstrings has translations for
+  # it. See docs/localization.md.
+  developmentLanguage: en
 
 settings:
   base:
@@ -129,6 +136,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.widgets
         CODE_SIGN_ENTITLEMENTS: mDoneWidgets/mDoneWidgets.entitlements
+        # The extension is its own bundle, so it needs its own copy of the
+        # catalog and its own extraction pass. See docs/localization.md.
+        SWIFT_EMIT_LOC_STRINGS: "YES"
 
   mDoneTests:
     type: bundle.unit-test

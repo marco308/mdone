@@ -186,10 +186,10 @@ struct DayCell: View {
     private var dayCellAccessibilityLabel: String {
         var label = date.formatted(date: .complete, time: .omitted)
         if isToday {
-            label += ", today"
+            label += String(localized: ", today")
         }
         if !tasks.isEmpty {
-            label += ", \(tasks.count) \(tasks.count == 1 ? "task" : "tasks")"
+            label += String(localized: ", \(tasks.count) tasks")
         }
         return label
     }

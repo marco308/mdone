@@ -20,7 +20,7 @@ enum WebAuthenticationError: LocalizedError, Equatable {
         case .cancelled:
             nil
         case .cannotStart:
-            "Couldn't open the sign-in window. Please try again."
+            String(localized: "Couldn't open the sign-in window. Please try again.")
         case let .failed(message):
             message
         }

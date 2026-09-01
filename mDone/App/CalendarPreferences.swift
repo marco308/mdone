@@ -17,10 +17,10 @@ enum WeekStartPreference: Int, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .system: "System"
-        case .sunday: "Sunday"
-        case .monday: "Monday"
-        case .saturday: "Saturday"
+        case .system: String(localized: "System")
+        case .sunday: String(localized: "Sunday")
+        case .monday: String(localized: "Monday")
+        case .saturday: String(localized: "Saturday")
         }
     }
 }

@@ -40,54 +40,54 @@ enum NetworkError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            "The server URL doesn't look right. Please check it in Settings."
+            String(localized: "The server URL doesn't look right. Please check it in Settings.")
         case .unauthorized:
-            "Your session has expired. Please log in again."
+            String(localized: "Your session has expired. Please log in again.")
         case let .serverError(code, _):
             if code >= 500 {
-                "The server is having trouble. Please try again in a moment."
+                String(localized: "The server is having trouble. Please try again in a moment.")
             } else {
-                "Something went wrong with that request. Please try again."
+                String(localized: "Something went wrong with that request. Please try again.")
             }
         case .decodingError:
-            "We received an unexpected response from the server. Please try again."
+            String(localized: "We received an unexpected response from the server. Please try again.")
         case .networkUnavailable:
-            "You're offline. Your changes will sync when you're back online."
+            String(localized: "You're offline. Your changes will sync when you're back online.")
         case .rateLimited:
-            "Server is busy. Please try again later."
+            String(localized: "Server is busy. Please try again later.")
         case .timeout:
-            "The request timed out. Please check your connection and try again."
+            String(localized: "The request timed out. Please check your connection and try again.")
         case .serverUnreachable:
-            "Can't reach the server. Please check your connection and server URL."
+            String(localized: "Can't reach the server. Please check your connection and server URL.")
         case .unknown:
-            "Something went wrong. Please check your connection and try again."
+            String(localized: "Something went wrong. Please check your connection and try again.")
         }
     }
 
     var recoverySuggestion: String? {
         switch self {
         case .invalidURL:
-            "Open Settings and verify your server URL starts with https:// or http://."
+            String(localized: "Open Settings and verify your server URL starts with https:// or http://.")
         case .unauthorized:
-            "Go to Settings and sign in with your credentials or a new API token."
+            String(localized: "Go to Settings and sign in with your credentials or a new API token.")
         case let .serverError(code, _):
             if code >= 500 {
-                "The server may be temporarily unavailable. Wait a moment and try again."
+                String(localized: "The server may be temporarily unavailable. Wait a moment and try again.")
             } else {
-                "If this keeps happening, try logging out and back in."
+                String(localized: "If this keeps happening, try logging out and back in.")
             }
         case .decodingError:
-            "Make sure your server is running a compatible version of Vikunja."
+            String(localized: "Make sure your server is running a compatible version of Vikunja.")
         case .networkUnavailable:
-            "Check that Wi-Fi or cellular data is turned on."
+            String(localized: "Check that Wi-Fi or cellular data is turned on.")
         case .rateLimited:
-            "The server is rate limiting requests. Wait a moment and try again."
+            String(localized: "The server is rate limiting requests. Wait a moment and try again.")
         case .timeout:
-            "Try moving closer to your router or switching to a different network."
+            String(localized: "Try moving closer to your router or switching to a different network.")
         case .serverUnreachable:
-            "Verify the server is running and the URL in Settings is correct."
+            String(localized: "Verify the server is running and the URL in Settings is correct.")
         case .unknown:
-            "Try again. If the problem persists, check your internet connection or restart the app."
+            String(localized: "Try again. If the problem persists, check your internet connection or restart the app.")
         }
     }
 

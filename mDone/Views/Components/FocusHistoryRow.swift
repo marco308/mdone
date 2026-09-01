@@ -23,7 +23,7 @@ struct FocusHistoryRow: View {
                 Text(summary)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                    .accessibilityLabel("Focused \(accessibleDuration), \(records.count) \(records.count == 1 ? "session" : "sessions")")
+                    .accessibilityLabel(String(localized: "Focused \(accessibleDuration), \(records.count) sessions"))
             }
         }
     }
@@ -33,8 +33,7 @@ struct FocusHistoryRow: View {
     }
 
     private var summary: String {
-        let session = records.count == 1 ? "session" : "sessions"
-        return "\(FocusDurationFormatter.string(from: total)) · \(records.count) \(session)"
+        String(localized: "\(FocusDurationFormatter.string(from: total)) · \(records.count) sessions")
     }
 
     private var accessibleDuration: String {
