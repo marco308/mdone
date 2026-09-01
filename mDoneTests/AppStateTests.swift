@@ -970,9 +970,12 @@ final class AppStateTests: XCTestCase {
         )
         appState.tasks = [task]
 
-        XCTAssertEqual(appState.tasksForDate(middle).map(\.id), [90])
+        // Renamed from `tasksForDate` / `datesWithTasks` in #35; the behaviour
+        // asserted here is unchanged, a range still occupies every day it spans.
+        XCTAssertEqual(appState.occurrences(on: middle).map(\.task.id), [90])
+        XCTAssertEqual(appState.occurrences(on: middle).map(\.isProjected), [false])
         let dayKey = Calendar.current.startOfDay(for: middle)
-        XCTAssertEqual(appState.datesWithTasks(in: middle)[dayKey]?.map(\.id), [90])
+        XCTAssertEqual(appState.occurrencesByDay(in: middle)[dayKey]?.map(\.task.id), [90])
     }
 
     // MARK: - Calm Mode (#68)

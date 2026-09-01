@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Actions that genuinely need a connection, such as creating a task or a project, now say so immediately instead of spending several seconds retrying first (#146).
 - Completing a task now preserves its colour and favourite status too. 1.12.2 stopped the description, priority and progress being cleared; Vikunja resets these two the same way, so every task update now carries them as well (#147).
 - A damaged local database no longer crashes the app on every launch. mDone used to stop dead if its offline database could not be opened, for instance after a failed upgrade, and the only fix was deleting and reinstalling the app, which threw away any edits you had made offline. It now rescues your unsynced changes and focus history, rebuilds the cached copy of your tasks from the server, and tells you it has done so (#155).
+- Repeating tasks now show on the calendar on every day they are due, not only on their next one. A daily task appears on each remaining day of the month and a weekly task on each week it falls in, so you can see what is coming. These future occurrences are drawn in a lighter shade with a dashed circle and cannot be ticked off, edited or deleted, because Vikunja keeps a single copy of a repeating task and moves it forward when you complete the real one (#35).
+- Monthly repeating tasks are now recognised as repeating. Vikunja records a monthly repeat without an interval, which the app read as "does not repeat", so those tasks showed no repeat marker anywhere (#35).
 
 ## [1.12.2] - 2026-08-12
 
