@@ -829,6 +829,10 @@ final class AppState {
     /// Changes abandoned after repeated failures, surfaced once and then cleared.
     var failedSyncMessages: [String] = []
 
+    /// Set at launch when the local store had to be rebuilt or fell back to
+    /// memory, so the rebuild is announced rather than silent (issue #155).
+    var storeRecoveryMessage: String?
+
     func hasPendingChanges(_ taskId: Int64) -> Bool {
         pendingTaskIds.contains(taskId)
     }

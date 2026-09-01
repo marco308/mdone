@@ -33,13 +33,13 @@ Full walkthrough — environments, reset/reseed, manual + unit testing, version 
 xcodegen generate
 
 # Build for iOS
-xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' build
+xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build
 
 # Build for macOS
 xcodebuild -project mDone.xcodeproj -scheme mDone-macOS build
 
 # Run tests
-xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' test
+xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' test
 ```
 
 ## Code Style
