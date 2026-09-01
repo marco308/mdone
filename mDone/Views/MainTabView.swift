@@ -87,6 +87,23 @@ struct MainTabView: View {
         } message: {
             Text(appState.failedSyncMessages.joined(separator: "\n\n"))
         }
+        // A rebuilt local store must not be silent: the user's cached tasks
+        // are gone until the next refresh (issue #155).
+        .alert(
+            "Offline database rebuilt",
+            isPresented: Binding(
+                get: { appState.storeRecoveryMessage != nil },
+                set: {
+                    if !$0 {
+                        appState.storeRecoveryMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button("OK", role: .cancel) { appState.storeRecoveryMessage = nil }
+        } message: {
+            Text(appState.storeRecoveryMessage ?? "")
+        }
         .onShake {
             if appState.canUndoLastCompletion {
                 showUndoCompletionPrompt = true
