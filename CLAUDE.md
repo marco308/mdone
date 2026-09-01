@@ -42,6 +42,9 @@ xcodebuild -project mDone.xcodeproj -scheme mDone-macOS build
 # Run unit tests only (what CI runs)
 xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:mDoneTests test
 
+# Run the same unit tests against the macOS app
+xcodebuild -project mDone.xcodeproj -scheme mDone-macOS -destination 'platform=macOS' -only-testing:mDoneMacTests test
+
 # Run a single test class
 xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:mDoneTests/TaskServiceTests test
 
@@ -59,8 +62,10 @@ swiftformat .
 ### Targets and schemes
 
 - `mDone` (iOS app, embeds `mDoneWidgets`); its scheme runs `mDoneTests`, `mDoneUITests`, `mDoneWidgetRenderTests`.
-- `mDone-macOS` (macOS app); its scheme runs `mDoneMacUITests`.
-- `mDoneWidgets` (app extension), `mDoneTests`, `mDoneUITests`, `mDoneMacUITests`, `mDoneWidgetRenderTests`.
+- `mDone-macOS` (macOS app); its scheme runs `mDoneMacTests` and `mDoneMacUITests`.
+- `mDoneWidgets` (app extension), `mDoneTests`, `mDoneUITests`, `mDoneMacTests`, `mDoneMacUITests`, `mDoneWidgetRenderTests`.
+
+`mDoneTests` and `mDoneMacTests` compile the **same** `mDoneTests/` sources against the iOS and macOS app respectively, so a shared service or model is covered on both platforms from one set of files. Cases that only make sense on iOS (Live Activity, focus outbox) guard themselves with `#if os(iOS)`. `mDone-macOS` pins `PRODUCT_MODULE_NAME: mDone` so the shared `@testable import mDone` resolves there too; without it the module would be `mDone_macOS` and every test file would fail to compile.
 
 The iOS and macOS app targets compile the **same** `mDone/` + `mDoneShared/` sources, so anything platform-specific needs `#if os(iOS)` / `#if os(macOS)`.
 
@@ -79,6 +84,7 @@ Log in with `devuser` / `devpassword`. `./scripts/reset-dev-vikunja.sh` nukes an
 ### CI
 
 - `.github/workflows/ios-tests.yml` runs `mDoneTests` on the iOS Simulator for every PR to `main`, pinned to `-destination 'platform=iOS Simulator,name=iPhone 17'`. UI and snapshot targets are excluded: they need a booted app and are flaky on CI.
+- `.github/workflows/macos-tests.yml` runs `mDoneMacTests` on `-destination 'platform=macOS'` for every PR to `main`. It signs ad-hoc (`CODE_SIGN_IDENTITY=-`, `CODE_SIGNING_REQUIRED=NO`, `CODE_SIGN_STYLE=Manual`, empty `DEVELOPMENT_TEAM`) because runners have no Apple Development identity and, unlike the simulator, a real macOS bundle has to be signed to launch. Ad-hoc still applies the sandbox entitlements, so the Keychain-backed tests pass. `mDoneMacUITests` is excluded: it is the App Store screenshot run and needs a live server plus credentials.
 - `.github/workflows/codeql.yml` runs CodeQL (build-only, so it uses `generic/platform=iOS Simulator`); `.github/workflows/deploy-pages.yml` publishes `website/`.
 
 ## Architecture
