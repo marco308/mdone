@@ -80,8 +80,21 @@ Steps to test:
    - Long-press a task (or open it) and choose "Mark as Current" to pin it to the new Current section at the top of the list, then update its progress from the task's detail view.
    - Try the focus timer from a task's detail view.
    - Add a widget from the home screen (long press > Edit Home Screen > tap +).
+   - Say "Hey Siri, add a task in mDone" (the app can be closed). Siri asks for the task, adds it to the first project, and reads back where it went and when it is due. On a Mac, use the Shortcuts app's "Add Task" action for mDone.
 
 This is a private test server maintained by the developer for App Store review purposes.
+
+## What's New (v1.15.0)
+
+Add tasks with Siri, hands-free.
+
+- Say "Add a task in mDone" and Siri asks what the task is, adds it, and reads back where it went and when it is due, without opening the app. It works wherever Siri does, including in the car over CarPlay, on AirPods and on Apple Watch. Say "Add a task to Home in mDone" to choose a project. With no connection the task is kept and sent when you reconnect.
+- Tasks added by voice are due today at your default due time (6:00 PM unless you change it). A new setting switches that to tomorrow or to no due date.
+- On iPad the tab bar can expand into a sidebar, and hardware keyboards get shortcuts: Cmd-N for a new task, Cmd-R to refresh, Cmd-1 to Cmd-4 to switch sections.
+- Notifications you have read now stay read after a restart.
+- A damaged local database no longer stops the app from opening. Your unsynced edits and focus history are rescued and the cached tasks are rebuilt from your server.
+- Groundwork for translations: all of the app's text is ready for its first languages.
+- Available on both iPhone and Mac.
 
 ## What's New (v1.12.2)
 
