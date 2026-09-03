@@ -17,17 +17,17 @@ struct TaskScheduleEditor: View {
     var body: some View {
         Section("Schedule") {
             optionalDateRow(
-                title: "Due Date",
+                title: String(localized: "Due Date"),
                 date: $dueDate,
                 defaultValue: { Date() }
             )
             optionalDateRow(
-                title: "Start Date",
+                title: String(localized: "Start Date"),
                 date: $startDate,
                 defaultValue: { endDate ?? Date() }
             )
             optionalDateRow(
-                title: "End Date",
+                title: String(localized: "End Date"),
                 date: $endDate,
                 defaultValue: { startDate ?? Date() }
             )

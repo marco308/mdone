@@ -39,8 +39,8 @@ struct ProjectListScreen: View {
                     VStack(spacing: 16) {
                         EmptyStateView(
                             icon: "folder",
-                            title: "No projects",
-                            subtitle: "Create your first project to organize your tasks"
+                            title: String(localized: "No projects"),
+                            subtitle: String(localized: "Create your first project to organize your tasks")
                         )
                         Button {
                             showingCreate = true
@@ -94,10 +94,9 @@ struct ProjectListScreen: View {
             Button("Cancel", role: .cancel) {}
         } message: { project in
             let count = appState.tasksForProject(project.id).count
-            Text(
-                "This permanently deletes the project and all \(count) task\(count == 1 ? "" : "s") in it, "
-                    + "including any sub-projects. This can't be undone."
-            )
+            Text(String(
+                localized: "This permanently deletes the project and all \(count) tasks in it, including any sub-projects. This can't be undone."
+            ))
         }
         .refreshable {
             await appState.refreshAll()

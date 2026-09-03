@@ -184,14 +184,15 @@ struct DayCell: View {
     }
 
     private var dayCellAccessibilityLabel: String {
-        var label = date.formatted(date: .complete, time: .omitted)
-        if isToday {
-            label += ", today"
+        // Whole-string variants rather than fragments appended to the date, so
+        // a translator controls the word order and punctuation.
+        let day = date.formatted(date: .complete, time: .omitted)
+        switch (isToday, tasks.isEmpty) {
+        case (false, true): return day
+        case (true, true): return String(localized: "\(day), today")
+        case (false, false): return String(localized: "\(day), \(tasks.count) tasks")
+        case (true, false): return String(localized: "\(day), today, \(tasks.count) tasks")
         }
-        if !tasks.isEmpty {
-            label += ", \(tasks.count) \(tasks.count == 1 ? "task" : "tasks")"
-        }
-        return label
     }
 
     private func dotColor(for task: VTask) -> Color {

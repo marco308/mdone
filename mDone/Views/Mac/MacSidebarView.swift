@@ -217,10 +217,9 @@ struct MacSidebarView: View {
             Button("Cancel", role: .cancel) {}
         } message: { project in
             let count = appState.tasksForProject(project.id).count
-            Text(
-                "This permanently deletes the project and all \(count) task\(count == 1 ? "" : "s") in it, "
-                    + "including any sub-projects. This can't be undone."
-            )
+            Text(String(
+                localized: "This permanently deletes the project and all \(count) tasks in it, including any sub-projects. This can't be undone."
+            ))
         }
     }
 

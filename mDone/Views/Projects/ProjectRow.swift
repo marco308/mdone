@@ -28,7 +28,7 @@ struct ProjectRow: View {
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(project.title), \(taskCount) \(taskCount == 1 ? "task" : "tasks")")
+        .accessibilityLabel(String(localized: "\(project.title), \(taskCount) tasks"))
     }
 
     private var projectColor: Color {

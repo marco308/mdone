@@ -1,0 +1,786 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "\"%@\" could not be synced: %@" : {},
+    "%@ - %@" : {},
+    "%@ column, %@ tasks" : {},
+    "%@ commented on \"%@\"" : {},
+    "%@ updated \"%@\"" : {},
+    "%@ updated project \"%@\"" : {},
+    "%@ · %lld sessions" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%@ · %lld session"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%@ · %lld sessions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%@, %@" : {},
+    "%@, %lld tasks" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%@, %lld task"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%@, %lld tasks"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%@, today" : {},
+    "%@, today, %lld tasks" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%@, today, %lld task"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%@, today, %lld tasks"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld" : {},
+    "%lld days before due" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld day before due"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld days before due"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld focus sessions were recovered." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld focus session was recovered."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld focus sessions were recovered."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld h" : {},
+    "%lld hours before due" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld hour before due"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld hours before due"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld m" : {},
+    "%lld min before due" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld min before due"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld min before due"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld percent" : {},
+    "%lld unsynced changes and %lld focus sessions were recovered." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@changes@ and %#@sessions@ were recovered."
+          },
+          "substitutions" : {
+            "changes" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg unsynced change"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg unsynced changes"
+                    }
+                  }
+                }
+              }
+            },
+            "sessions" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg focus session"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg focus sessions"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld unsynced changes were recovered." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld unsynced change was recovered."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld unsynced changes were recovered."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld%%" : {},
+    "%lld/%lld" : {},
+    "%lld/%lld done" : {},
+    "+24h" : {},
+    "1 day before" : {},
+    "1 hour before" : {},
+    "12:00 PM" : {},
+    "15 minutes before" : {},
+    "30 minutes before" : {},
+    "5 minutes before" : {},
+    "5:00 PM" : {},
+    "6:00 PM" : {},
+    "9:00 AM" : {},
+    "9:00 PM" : {},
+    "A native task manager for Vikunja." : {},
+    "A queued change could not be synced: %@" : {},
+    "API Token" : {},
+    "API tokens have limited permissions. Use Login for full functionality including task reordering." : {},
+    "About" : {},
+    "About mDone" : {},
+    "Add" : {},
+    "Add Reminder" : {},
+    "Add Task" : {},
+    "Add a task to get started" : {},
+    "Add a task to this project." : {},
+    "Add a task..." : {},
+    "Add subtask" : {},
+    "Add task" : {},
+    "Add time estimate" : {},
+    "Add to Favorites" : {},
+    "Advanced Filter" : {},
+    "Advanced filter" : {},
+    "Advanced filter active" : {},
+    "All" : {},
+    "All Clear Today" : {},
+    "All Day" : {},
+    "All done!" : {},
+    "All your tasks have due dates." : {},
+    "Any" : {},
+    "Appearance" : {},
+    "Apply" : {},
+    "Archive" : {},
+    "Archive Instead" : {},
+    "Archived" : {},
+    "At time of due date" : {},
+    "Auth Method" : {},
+    "Bearer token" : {},
+    "Blocked By" : {},
+    "Blocking" : {},
+    "Buy Me a Coffee" : {},
+    "Calendar" : {},
+    "Calendars" : {},
+    "Calendars in mDone" : {},
+    "Calm Mode" : {},
+    "Can't reach the server. Please check your connection and server URL." : {},
+    "Cancel" : {},
+    "Change not yet synced" : {},
+    "Check that Wi-Fi or cellular data is turned on." : {},
+    "Choose a section from the sidebar" : {},
+    "Choose a task to view its details" : {},
+    "Clear estimate" : {},
+    "Close" : {},
+    "Collapse %@" : {},
+    "Color" : {},
+    "Color %@" : {},
+    "Compact" : {},
+    "Completed" : {},
+    "Completion" : {},
+    "Configured" : {},
+    "Connect" : {},
+    "Connect to your Vikunja server" : {},
+    "Connect to your server to load your tasks" : {},
+    "Connected" : {},
+    "Continue with %@" : {},
+    "Copied From" : {},
+    "Copied To" : {},
+    "Couldn't open the sign-in window. Please try again." : {},
+    "Create a task to get started." : {},
+    "Create your first project to organize your tasks" : {},
+    "Critical" : {},
+    "Current" : {},
+    "Current Tasks" : {},
+    "Custom Estimate" : {},
+    "Custom Range" : {},
+    "Custom Reminder" : {},
+    "Custom date..." : {},
+    "Custom…" : {},
+    "Daily" : {},
+    "Data" : {},
+    "Date" : {},
+    "Date Range" : {},
+    "Default due time" : {},
+    "Delete" : {},
+    "Delete %@?" : {},
+    "Delete Project" : {},
+    "Delete Task" : {},
+    "Delete Task?" : {},
+    "Delivered" : {},
+    "Description" : {},
+    "Discarded" : {},
+    "Disconnect" : {},
+    "Disconnect?" : {},
+    "Disconnected" : {},
+    "Dismiss estimate suggestion" : {},
+    "Done" : {},
+    "Due Date" : {},
+    "Due in 7 Days" : {},
+    "Duplicate Of" : {},
+    "Duplicates" : {},
+    "Edit" : {},
+    "Edit Project" : {},
+    "Edit Task" : {},
+    "Edit description" : {},
+    "Edit…" : {},
+    "Elapsed time: %@" : {},
+    "Enable Reminders" : {},
+    "Enable calendar access to see events" : {},
+    "End" : {},
+    "End Date" : {},
+    "End Focus" : {},
+    "End focus session" : {},
+    "End of day" : {},
+    "Ends %@" : {},
+    "Estimated duration" : {},
+    "Every %lld days" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Every %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Every %lld days"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Every %lld hours" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Every %lld hour"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Every %lld hours"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Every 2 Weeks" : {},
+    "Every other open task is already related to this one." : {},
+    "Expand %@" : {},
+    "Favorites" : {},
+    "Feedback" : {},
+    "Filter tasks" : {},
+    "Filter: %@" : {},
+    "Focus" : {},
+    "Focus History Sync" : {},
+    "Focus Mode" : {},
+    "Focus on This Task" : {},
+    "Focus sessions sync automatically when you complete a task. The server uses each session's client_id for idempotent retry, so re-sending the same session never creates duplicates." : {},
+    "Focused" : {},
+    "Focused %@, %lld sessions" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Focused %@, %lld session"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Focused %@, %lld sessions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Focusing" : {},
+    "Focusing on %@. Tap to open focus session." : {},
+    "Follows" : {},
+    "From" : {},
+    "Go to Settings and sign in with your credentials or a new API token." : {},
+    "Go to today" : {},
+    "Great job staying on top of things!" : {},
+    "Has Labels" : {},
+    "Hide All" : {},
+    "Hide token" : {},
+    "High" : {},
+    "High Priority" : {},
+    "Hours" : {},
+    "Idle %lldd" : {},
+    "Idle badge after %lld days" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Idle badge after %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Idle badge after %lld days"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "If this keeps happening, try logging out and back in." : {},
+    "Inbox" : {},
+    "Invalid date range. Start date must not be after end date." : {},
+    "Labels" : {},
+    "Large" : {},
+    "Later This Week" : {},
+    "Leave blank to keep focus history on-device only. When both fields are set, completed focus sessions are sent to your focus-service so they can be analysed across tasks (mdone#62)." : {},
+    "Link %@ as subtask" : {},
+    "Link Existing Task…" : {},
+    "Link Subtask" : {},
+    "Loading" : {},
+    "Loading..." : {},
+    "Login with your Vikunja username and password for full functionality" : {},
+    "Low" : {},
+    "Make sure your server is running a compatible version of Vikunja." : {},
+    "Mark %@ as complete" : {},
+    "Mark %@ as incomplete" : {},
+    "Mark All Read" : {},
+    "Mark Done" : {},
+    "Mark Incomplete" : {},
+    "Mark Undone" : {},
+    "Mark as Current" : {},
+    "Mark task done" : {},
+    "Medium" : {},
+    "Minutes" : {},
+    "Monday" : {},
+    "Monthly" : {},
+    "Move to" : {},
+    "Move to…" : {},
+    "Never" : {},
+    "New Project" : {},
+    "New Task" : {},
+    "Next Month" : {},
+    "Next Week" : {},
+    "Next month" : {},
+    "No Active Tasks" : {},
+    "No Archived Projects" : {},
+    "No Calendars" : {},
+    "No Date" : {},
+    "No Matches" : {},
+    "No Notifications" : {},
+    "No Overdue Tasks" : {},
+    "No Tasks" : {},
+    "No Tasks in Project" : {},
+    "No Tasks to Link" : {},
+    "No Undated Tasks" : {},
+    "No archived projects" : {},
+    "No cached tasks" : {},
+    "No color" : {},
+    "No columns" : {},
+    "No description" : {},
+    "No open task titles match your search." : {},
+    "No pending tasks" : {},
+    "No projects" : {},
+    "No results" : {},
+    "No tasks" : {},
+    "No tasks coming up." : {},
+    "No tasks due this week." : {},
+    "No tasks due tomorrow." : {},
+    "No tasks or events for this day" : {},
+    "None" : {},
+    "None (Top Level)" : {},
+    "Not configured" : {},
+    "Not synced" : {},
+    "Nothing This Week" : {},
+    "Nothing Tomorrow" : {},
+    "Nothing Upcoming" : {},
+    "Notification" : {},
+    "Notifications" : {},
+    "Notifications, %lld unread" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Notifications, %lld unread"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Notifications, %lld unread"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "OK" : {},
+    "Offline database rebuilt" : {},
+    "Only events from the calendars you turn on appear in mDone's Calendar and Today views." : {},
+    "Open Settings and verify your server URL starts with https:// or http://." : {},
+    "Opens mDone with the quick-add bar ready for a new task" : {},
+    "Optional" : {},
+    "Overdue" : {},
+    "Overdue tasks appear like any other: no red, no separate Overdue list or counts. They still show in your lists and widgets." : {},
+    "Parent" : {},
+    "Parent Project" : {},
+    "Parent Task" : {},
+    "Password" : {},
+    "Paste your API token" : {},
+    "Pause" : {},
+    "Pause focus timer" : {},
+    "Paused" : {},
+    "Pending" : {},
+    "Precedes" : {},
+    "Preview description" : {},
+    "Previous month" : {},
+    "Priority" : {},
+    "Priority: %@" : {},
+    "Progress" : {},
+    "Project" : {},
+    "Project %lld" : {},
+    "Project name" : {},
+    "Projects" : {},
+    "Projects you archive will appear here" : {},
+    "Quick Add Task" : {},
+    "Read" : {},
+    "Refresh" : {},
+    "Refresh All Data" : {},
+    "Related" : {},
+    "Related Tasks" : {},
+    "Remind before" : {},
+    "Reminder" : {},
+    "Reminder Date" : {},
+    "Reminders" : {},
+    "Remove %@ relation to %@" : {},
+    "Remove from Current" : {},
+    "Remove from Favorites" : {},
+    "Repeat" : {},
+    "Repeating" : {},
+    "Report a Bug or Request a Feature" : {},
+    "Reset" : {},
+    "Results (%lld)" : {},
+    "Resume" : {},
+    "Resume focus timer" : {},
+    "Saturday" : {},
+    "Save" : {},
+    "Schedule" : {},
+    "Search tasks" : {},
+    "Select a Section" : {},
+    "Select a Task" : {},
+    "Server" : {},
+    "Server URL" : {},
+    "Server is busy. Please try again later." : {},
+    "Set" : {},
+    "Set Progress" : {},
+    "Settings" : {},
+    "Show All" : {},
+    "Show all-day events" : {},
+    "Show board" : {},
+    "Show list" : {},
+    "Show token" : {},
+    "Similar tasks took ~%@, tap to use" : {},
+    "Single sign-on needs an https address. Your server is offering an insecure one, which iOS will not open." : {},
+    "Smart Lists" : {},
+    "Some changes could not be synced" : {},
+    "Someone" : {},
+    "Something went wrong with that request. Please try again." : {},
+    "Something went wrong. Please check your connection and try again." : {},
+    "Sort by %@, ascending" : {},
+    "Sort by %@, descending" : {},
+    "Sort tasks" : {},
+    "Sponsor on GitHub" : {},
+    "Standard" : {},
+    "Start Date" : {},
+    "Start Focus" : {},
+    "Start date must not be after end date." : {},
+    "Start week on" : {},
+    "Starts %@" : {},
+    "Status" : {},
+    "Subtask" : {},
+    "Subtasks" : {},
+    "Subtasks nest under this task in your lists. Unlinking never deletes a task." : {},
+    "Sunday" : {},
+    "Support mDone" : {},
+    "Sync now" : {},
+    "Sync triggered, check pending count" : {},
+    "Syncing…" : {},
+    "System" : {},
+    "Task row size" : {},
+    "Task row size changes how much each task takes up in your lists. Compact fits more on screen; Large makes tasks easier to read." : {},
+    "Task title" : {},
+    "Tasks" : {},
+    "Tasks you mark as Current sit at the top of your list with a progress bar. An idle badge appears when one hasn't been touched for this many days." : {},
+    "The request timed out. Please check your connection and try again." : {},
+    "The server URL doesn't look right. Please check it in Settings." : {},
+    "The server is having trouble. Please try again in a moment." : {},
+    "The server is rate limiting requests. Wait a moment and try again." : {},
+    "The server may be temporarily unavailable. Wait a moment and try again." : {},
+    "The task you pick becomes a subtask of \"%@\". It stays in its own project." : {},
+    "They will be lost if you quit before they are sent." : {},
+    "This Month" : {},
+    "This Week" : {},
+    "This action cannot be undone." : {},
+    "This permanently deletes the project and all %lld tasks in it, including any sub-projects. This can't be undone." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "This permanently deletes the project and the task in it, including any sub-projects. This can't be undone."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "This permanently deletes the project and all %lld tasks in it, including any sub-projects. This can't be undone."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "This permanently deletes the project and all of its tasks, including any sub-projects. This can't be undone." : {},
+    "This project has no Kanban columns yet" : {},
+    "This server's single sign-on address doesn't look right. Check the provider setup on your server." : {},
+    "This server's single sign-on provider is missing a client ID. Check the provider setup on your server." : {},
+    "This will remove your server configuration. You'll need to reconnect." : {},
+    "Time of day applied to tasks you add to Today without picking a time. Pick a time later in the day to avoid the task showing as overdue right away." : {},
+    "Title" : {},
+    "To" : {},
+    "Today" : {},
+    "Today's Events" : {},
+    "Tomorrow" : {},
+    "Top Level" : {},
+    "Try Again" : {},
+    "Try a different search or filter" : {},
+    "Try again. If the problem persists, check your internet connection or restart the app." : {},
+    "Try moving closer to your router or switching to a different network." : {},
+    "Turn off to hide all-day events from mDone's Calendar and Today views." : {},
+    "URL" : {},
+    "Unarchive" : {},
+    "Undo" : {},
+    "Undo Completion" : {},
+    "Undo completing “%@”?" : {},
+    "Undo completion?" : {},
+    "Undone" : {},
+    "Unknown" : {},
+    "Unread: %@, %@" : {},
+    "Untitled" : {},
+    "Upcoming" : {},
+    "Urgent" : {},
+    "Username" : {},
+    "Verify the server is running and the URL in Settings is correct." : {},
+    "Version %@ (%@)" : {},
+    "View Source on GitHub" : {},
+    "We received an unexpected response from the server. Please try again." : {},
+    "Weekly" : {},
+    "Yearly" : {},
+    "You have no tasks due today." : {},
+    "You're all caught up!" : {},
+    "You're offline. %lld changes will sync when you reconnect." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You're offline. %lld change will sync when you reconnect."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You're offline. %lld changes will sync when you reconnect."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "You're offline. Showing your last synced tasks." : {},
+    "You're offline. Your changes will sync when you're back online." : {},
+    "Your session has expired. Please log in again." : {},
+    "date range %@ to %@" : {},
+    "due %@" : {},
+    "ends %@" : {},
+    "https://focus.example.com" : {},
+    "https://vikunja.example.com" : {},
+    "mDone" : {},
+    "mDone could not open its offline database, so the cached copy of your tasks was rebuilt. Everything reloads from the server." : {},
+    "mDone could not open or recreate its offline database, so it is running without one. Your tasks still load from the server, but anything you change offline will be lost when you quit the app." : {},
+    "mDone has no calendars to show. Grant calendar access in the Calendar tab first." : {},
+    "mDone is built and maintained by one person. If it's useful to you, a tip or sponsorship helps keep it going." : {},
+    "macOS" : {},
+    "or" : {},
+    "overdue" : {},
+    "priority %@" : {},
+    "starts %@" : {},
+    "starts %@, ends %@" : {},
+    "the server rejected it" : {},
+    "·" : {}
+  },
+  "version" : "1.0"
+}

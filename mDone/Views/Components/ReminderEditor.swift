@@ -14,6 +14,17 @@ struct ReminderEditor: View {
         case oneHour = "1 hour before"
         case oneDay = "1 day before"
 
+        var label: String {
+            switch self {
+            case .atDue: String(localized: "At time of due date")
+            case .fiveMin: String(localized: "5 minutes before")
+            case .fifteenMin: String(localized: "15 minutes before")
+            case .thirtyMin: String(localized: "30 minutes before")
+            case .oneHour: String(localized: "1 hour before")
+            case .oneDay: String(localized: "1 day before")
+            }
+        }
+
         var relativePeriod: Int64 {
             switch self {
             case .atDue: 0
@@ -55,7 +66,7 @@ struct ReminderEditor: View {
         }
         .confirmationDialog("Add Reminder", isPresented: $showAddSheet) {
             ForEach(PresetReminder.allCases, id: \.self) { preset in
-                Button(preset.rawValue) {
+                Button(preset.label) {
                     reminders.append(preset.toReminder())
                 }
             }
@@ -102,22 +113,25 @@ struct ReminderEditor: View {
     private func displayText(for reminder: TaskReminder) -> String {
         if let period = reminder.relativePeriod {
             if period == 0 {
-                return "At time of due date"
+                return String(localized: "At time of due date")
             }
             let absPeriod = abs(period)
+            // Each of these is one key with a plural variation in the
+            // catalog, so a language with more than two plural forms can
+            // express them all.
             if absPeriod < 3600 {
                 let minutes = absPeriod / 60
-                return "\(minutes) min before due"
+                return String(localized: "\(minutes) min before due")
             } else if absPeriod < 86400 {
                 let hours = absPeriod / 3600
-                return hours == 1 ? "1 hour before due" : "\(hours) hours before due"
+                return String(localized: "\(hours) hours before due")
             } else {
                 let days = absPeriod / 86400
-                return days == 1 ? "1 day before due" : "\(days) days before due"
+                return String(localized: "\(days) days before due")
             }
         } else if let date = reminder.reminder {
             return date.formatted(date: .abbreviated, time: .shortened)
         }
-        return "Reminder"
+        return String(localized: "Reminder")
     }
 }

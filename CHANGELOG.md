@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Groundwork for translating mDone. All of the app's text now lives in string catalogs, so a language can be added without any code changes. No translations ship yet; Simplified Chinese is next (#163).
 - On iPad the tab bar can now expand into a sidebar, making better use of the larger screen (#34).
 - Hardware keyboard shortcuts on iPhone and iPad: Cmd-N new task, Cmd-R refresh, and Cmd-1 to Cmd-4 to switch sections. Hold Cmd to see them listed (#34).
 - You can now sign in with single sign-on. If your Vikunja is set up with an OIDC provider such as Authelia, Keycloak or Authentik, the login screen offers a "Continue with ..." button for it. Sign-in happens in the system browser, so you can see the real address of the page you are typing your password into, and the app never sees it (#153).
