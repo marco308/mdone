@@ -904,9 +904,9 @@ final class AppState {
             let title = operation.taskId.flatMap { id in
                 tasks.first(where: { $0.id == id })?.title
             }
-            let reason = operation.failureReason ?? "the server rejected it"
-            return title.map { "\"\($0)\" could not be synced: \(reason)" }
-                ?? "A queued change could not be synced: \(reason)"
+            let reason = operation.failureReason ?? String(localized: "the server rejected it")
+            return title.map { String(localized: "\"\($0)\" could not be synced: \(reason)") }
+                ?? String(localized: "A queued change could not be synced: \(reason)")
         }
         syncService.discardFailedOperations()
         refreshPendingState()

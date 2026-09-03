@@ -17,6 +17,6 @@ struct User: Codable, Identifiable, Hashable {
     }
 
     var displayName: String {
-        name ?? username ?? "Unknown"
+        name ?? username ?? String(localized: "Unknown")
     }
 }

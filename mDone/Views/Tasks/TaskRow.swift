@@ -62,7 +62,8 @@ struct TaskRow: View {
                     if isFocused {
                         focusManager.endFocus()
                     } else {
-                        let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
+                        let projectName = appState.projects
+                            .first(where: { $0.id == task.projectId })?.title ?? String(localized: "Inbox")
                         focusManager.switchFocus(task: task, projectName: projectName)
                     }
                 } label: {
@@ -114,7 +115,8 @@ struct TaskRow: View {
                     }
                 } else {
                     Button {
-                        let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
+                        let projectName = appState.projects
+                            .first(where: { $0.id == task.projectId })?.title ?? String(localized: "Inbox")
                         focusManager.switchFocus(task: task, projectName: projectName)
                     } label: {
                         Label("Start Focus", systemImage: "scope")

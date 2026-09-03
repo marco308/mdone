@@ -28,22 +28,22 @@ struct VNotification: Codable, Identifiable {
     }
 
     var descriptionText: String {
-        guard let notification else { return name ?? "Notification" }
+        guard let notification else { return name ?? String(localized: "Notification") }
 
-        let doerName = notification.doer?.displayName ?? "Someone"
+        let doerName = notification.doer?.displayName ?? String(localized: "Someone")
 
         if let task = notification.task {
             if notification.comment != nil {
-                return "\(doerName) commented on \"\(task.title)\""
+                return String(localized: "\(doerName) commented on \"\(task.title)\"")
             }
-            return "\(doerName) updated \"\(task.title)\""
+            return String(localized: "\(doerName) updated \"\(task.title)\"")
         }
 
         if let project = notification.project {
-            return "\(doerName) updated project \"\(project.title)\""
+            return String(localized: "\(doerName) updated project \"\(project.title)\"")
         }
 
-        return name ?? "Notification"
+        return name ?? String(localized: "Notification")
     }
 
     var iconName: String {

@@ -110,7 +110,7 @@ struct QuickAddBar: View {
             Button {
                 estimateSeconds = s.suggestedSeconds
             } label: {
-                Text("Similar tasks took ~\(EstimateFormatter.string(from: s.suggestedSeconds)) — tap to use")
+                Text("Similar tasks took ~\(EstimateFormatter.string(from: s.suggestedSeconds)), tap to use")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)

@@ -13,11 +13,11 @@ enum TaskFilter: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .all: "All"
-        case .highPriority: "High Priority"
-        case .dueThisWeek: "Due in 7 Days"
-        case .completed: "Completed"
-        case .hasLabels: "Has Labels"
+        case .all: String(localized: "All")
+        case .highPriority: String(localized: "High Priority")
+        case .dueThisWeek: String(localized: "Due in 7 Days")
+        case .completed: String(localized: "Completed")
+        case .hasLabels: String(localized: "Has Labels")
         }
     }
 

@@ -1,0 +1,96 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%lld" : {},
+    "%lld tasks due today" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld task due today"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tasks due today"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "+%lld more" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "+%lld more"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "+%lld more"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Add Task" : {},
+    "Add Task Button" : {},
+    "All caught up!" : {},
+    "Compact" : {},
+    "Complete %@" : {},
+    "Complete Task" : {},
+    "Customize how today's tasks appear in this widget." : {},
+    "Customize how upcoming tasks appear in this widget." : {},
+    "Font Size" : {},
+    "Large" : {},
+    "Marks a task as complete in mDone" : {},
+    "Next Task" : {},
+    "No tasks due" : {},
+    "No tasks due today" : {},
+    "No upcoming tasks" : {},
+    "Nothing overdue" : {},
+    "Open mDone to sign in" : {},
+    "Overdue" : {},
+    "Overdue Only" : {},
+    "Quick Add" : {},
+    "Quickly add a new task to mDone." : {},
+    "Show" : {},
+    "Shows tasks due today in a single line." : {},
+    "Shows the number of tasks due today." : {},
+    "Shows your next upcoming task." : {},
+    "Sign in to mDone" : {},
+    "Standard" : {},
+    "Tap to Complete Tasks" : {},
+    "Tap to return to mDone" : {},
+    "Task Count" : {},
+    "Task ID" : {},
+    "Tasks" : {},
+    "Tasks Due" : {},
+    "Tasks due today and overdue. Long-press to customise." : {},
+    "Tasks with upcoming due dates. Long-press to customise." : {},
+    "Today" : {},
+    "Today + Overdue" : {},
+    "Today Only" : {},
+    "Today's Tasks" : {},
+    "Today's Tasks Settings" : {},
+    "Tomorrow" : {},
+    "Upcoming" : {},
+    "Upcoming Deadlines" : {},
+    "Upcoming Tasks Settings" : {},
+    "mDone" : {}
+  },
+  "version" : "1.0"
+}

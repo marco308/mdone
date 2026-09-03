@@ -46,7 +46,7 @@ struct SmartListSection: View {
                     .clipShape(Capsule())
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(title), \(tasks.count) \(tasks.count == 1 ? "task" : "tasks")")
+            .accessibilityLabel(String(localized: "\(title), \(tasks.count) tasks"))
             .accessibilityAddTraits(.isHeader)
         }
     }

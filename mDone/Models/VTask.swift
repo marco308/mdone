@@ -109,13 +109,13 @@ struct VTask: Codable, Identifiable, Hashable {
         guard let interval = repeatAfter, interval > 0 else { return nil }
         let hours = interval / 3600
         let days = hours / 24
-        if days == 1 { return "Daily" }
-        if days == 7 { return "Weekly" }
-        if days >= 28 && days <= 31 { return "Monthly" }
-        if days == 365 || days == 366 { return "Yearly" }
-        if days > 0 { return "Every \(days) days" }
-        if hours > 0 { return "Every \(hours) hours" }
-        return "Repeating"
+        if days == 1 { return String(localized: "Daily") }
+        if days == 7 { return String(localized: "Weekly") }
+        if days >= 28 && days <= 31 { return String(localized: "Monthly") }
+        if days == 365 || days == 366 { return String(localized: "Yearly") }
+        if days > 0 { return String(localized: "Every \(days) days") }
+        if hours > 0 { return String(localized: "Every \(hours) hours") }
+        return String(localized: "Repeating")
     }
 
     /// Whether the due date has a specific time (not midnight)
@@ -262,12 +262,12 @@ enum PriorityLevel: Int, CaseIterable {
 
     var label: String {
         switch self {
-        case .none: "None"
-        case .low: "Low"
-        case .medium: "Medium"
-        case .high: "High"
-        case .urgent: "Urgent"
-        case .critical: "Critical"
+        case .none: String(localized: "None")
+        case .low: String(localized: "Low")
+        case .medium: String(localized: "Medium")
+        case .high: String(localized: "High")
+        case .urgent: String(localized: "Urgent")
+        case .critical: String(localized: "Critical")
         }
     }
 }

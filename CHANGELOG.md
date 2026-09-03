@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Groundwork for translating mDone. All of the app's text now lives in string catalogs, so a language can be added without any code changes. No translations ship yet; Simplified Chinese is next (#163).
 - Add tasks by voice with Siri, hands-free. Say "Add a task in mDone" and Siri asks what the task is, adds it, and reads back where it went, all without opening the app. It works wherever Siri does, including in the car over CarPlay, on AirPods and on Apple Watch. Name a project with "Add a task to Home in mDone". If you have no connection the task is kept and sent when you reconnect. The phrase that used to open the app with the quick-add bar is now "Quick add a task in mDone".
 - On iPad the tab bar can now expand into a sidebar, making better use of the larger screen (#34).
 - Hardware keyboard shortcuts on iPhone and iPad: Cmd-N new task, Cmd-R refresh, and Cmd-1 to Cmd-4 to switch sections. Hold Cmd to see them listed (#34).

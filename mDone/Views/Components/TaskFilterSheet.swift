@@ -20,12 +20,31 @@ struct TaskFilterSheet: View {
         case thisWeek = "This Week"
         case thisMonth = "This Month"
         case custom = "Custom Range"
+
+        var label: String {
+            switch self {
+            case .any: String(localized: "Any")
+            case .overdue: String(localized: "Overdue")
+            case .today: String(localized: "Today")
+            case .thisWeek: String(localized: "This Week")
+            case .thisMonth: String(localized: "This Month")
+            case .custom: String(localized: "Custom Range")
+            }
+        }
     }
 
     enum DoneFilter: String, CaseIterable {
         case any = "Any"
         case done = "Done"
         case undone = "Undone"
+
+        var label: String {
+            switch self {
+            case .any: String(localized: "Any")
+            case .done: String(localized: "Done")
+            case .undone: String(localized: "Undone")
+            }
+        }
     }
 
     var body: some View {
@@ -44,7 +63,7 @@ struct TaskFilterSheet: View {
                 Section("Due Date") {
                     Picker("Date Range", selection: $selectedDateRange) {
                         ForEach(DateRangeOption.allCases, id: \.self) { option in
-                            Text(option.rawValue).tag(option)
+                            Text(option.label).tag(option)
                         }
                     }
                     .pickerStyle(.menu)
@@ -58,7 +77,7 @@ struct TaskFilterSheet: View {
                 Section("Status") {
                     Picker("Completion", selection: $doneFilter) {
                         ForEach(DoneFilter.allCases, id: \.self) { option in
-                            Text(option.rawValue).tag(option)
+                            Text(option.label).tag(option)
                         }
                     }
                     .pickerStyle(.segmented)

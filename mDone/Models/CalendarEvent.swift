@@ -14,7 +14,7 @@ struct CalendarEvent: Identifiable, Hashable {
 
     init(from ekEvent: EKEvent) {
         id = ekEvent.eventIdentifier
-        title = ekEvent.title ?? "Untitled"
+        title = ekEvent.title ?? String(localized: "Untitled")
         startDate = ekEvent.startDate
         endDate = ekEvent.endDate
         isAllDay = ekEvent.isAllDay

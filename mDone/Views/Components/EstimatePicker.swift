@@ -63,7 +63,7 @@ struct EstimatePicker: View {
                         }
                     }
                     chip(
-                        label: "Custom…",
+                        label: String(localized: "Custom…"),
                         isSelected: isCustomValue
                     ) {
                         showingCustom = true

@@ -22,8 +22,8 @@ struct ProjectBoardView: View {
             if buckets.isEmpty, hasLoaded, !isLoading {
                 EmptyStateView(
                     icon: "rectangle.split.3x1",
-                    title: "No columns",
-                    subtitle: "This project has no Kanban columns yet"
+                    title: String(localized: "No columns"),
+                    subtitle: String(localized: "This project has no Kanban columns yet")
                 )
             } else {
                 ScrollView(.horizontal, showsIndicators: true) {
@@ -116,7 +116,7 @@ private struct BoardColumn: View {
         .padding(.horizontal, 4)
         .padding(.bottom, 8)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(bucket.title) column, \(countText) tasks")
+        .accessibilityLabel(String(localized: "\(bucket.title) column, \(countText) tasks"))
     }
 
     private var countText: String {
@@ -230,11 +230,17 @@ private struct BoardTaskCard: View {
     }
 
     private var accessibilityLabel: String {
+        // A comma-separated list of independent facts rather than a sentence,
+        // so each fragment is a key of its own.
         var parts = [task.title]
-        if task.priority > 0 { parts.append("priority \(task.priorityLevel.label)") }
+        if task.priority > 0 {
+            parts.append(String(localized: "priority \(task.priorityLevel.label)"))
+        }
         if let due = task.effectiveDueDate {
-            if task.isOverdue { parts.append("overdue") }
-            parts.append("due \(due.formatted(date: .abbreviated, time: .omitted))")
+            if task.isOverdue {
+                parts.append(String(localized: "overdue"))
+            }
+            parts.append(String(localized: "due \(due.formatted(date: .abbreviated, time: .omitted))"))
         }
         return parts.joined(separator: ", ")
     }
