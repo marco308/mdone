@@ -1,3 +1,4 @@
+import AppIntents
 import EventKit
 import Foundation
 import SwiftUI
@@ -603,6 +604,8 @@ final class AppState {
             print("[mDone] refreshAll: got \(tasks.count) tasks")
             #endif
             projects = try await fetchedProjects
+            // Siri's vocabulary for "add a task to <project> in mDone".
+            MDoneAppShortcuts.updateAppShortcutParameters()
             await updateRetryState()
             #if DEBUG
             print("[mDone] refreshAll: got \(projects.count) projects")
@@ -884,7 +887,10 @@ final class AppState {
     @MainActor
     func refreshPendingState() {
         pendingTaskIds = syncService?.pendingTaskIds() ?? []
-        pendingOperationsCount = pendingTaskIds.count
+        // Counted separately from the ids: a task created from Siri while
+        // offline is queued with no task id, and it must still be drained
+        // and shown in the banner.
+        pendingOperationsCount = syncService?.pendingOperationCount() ?? 0
     }
 
     /// Collects changes the queue gave up on so the user finds out rather than
@@ -1066,6 +1072,79 @@ final class AppState {
             handleError(error)
             return nil
         }
+    }
+
+    // MARK: - Siri and Shortcuts
+
+    /// Where a task goes when the caller names no project: the first in the
+    /// list, which is also what the quick-add bar on the Inbox uses.
+    var defaultProject: Project? {
+        projects.first
+    }
+
+    /// Creates a task on behalf of Siri or Shortcuts, where there is no UI to
+    /// fall back on. Unlike `createTask` this works from a cold background
+    /// launch: it signs in from the Keychain and reads projects from the cache
+    /// when nothing has loaded yet. When offline it queues the create rather
+    /// than refusing it. The UI refuses because a queued task has no id for a
+    /// later edit to address (issue #146); a driver talking to Siri cannot
+    /// edit anything anyway, and losing the thought is the worse outcome.
+    @MainActor
+    func createTaskFromIntent(title: String, projectId: Int64?, dueDate: Date?) async throws -> IntentTaskOutcome {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else { throw IntentTaskError.emptyTitle }
+
+        if !isAuthenticated {
+            await checkAuth()
+        }
+        guard isAuthenticated else { throw IntentTaskError.notSignedIn }
+
+        if projects.isEmpty {
+            hydrateFromCache()
+        }
+        if projects.isEmpty, !isOffline {
+            projects = await (try? projectService.fetchProjects()) ?? []
+        }
+
+        let project: Project? = if let projectId {
+            projects.first(where: { $0.id == projectId }) ?? Project(
+                id: projectId,
+                title: String(localized: "your project")
+            )
+        } else {
+            defaultProject
+        }
+        guard let project else { throw IntentTaskError.noProject }
+
+        let request = TaskCreateRequest(title: trimmedTitle, dueDate: dueDate)
+        if isOffline {
+            return try queueIntentCreate(request, in: project)
+        }
+
+        do {
+            let newTask = try await taskService.createTask(projectId: project.id, request: request)
+            tasks.append(newTask)
+            syncService?.updateCachedTask(newTask)
+            WidgetCenter.shared.reloadAllTimelines()
+            return .created(taskTitle: trimmedTitle, projectTitle: project.title, dueDate: dueDate)
+        } catch let error as NetworkError where error.isConnectivityFailure {
+            // The monitor said we were online but the server was not there:
+            // a tunnel, a car park, a dead mobile link. Same answer as offline.
+            return try queueIntentCreate(request, in: project)
+        } catch {
+            let friendly = NetworkError.friendly(from: error)
+            throw IntentTaskError.failed(friendly.errorDescription ?? error.localizedDescription)
+        }
+    }
+
+    @MainActor
+    private func queueIntentCreate(_ request: TaskCreateRequest, in project: Project) throws -> IntentTaskOutcome {
+        guard let syncService else {
+            throw IntentTaskError.failed(NetworkError.networkUnavailable.errorDescription ?? "No connection.")
+        }
+        syncService.queueOperation(endpoint: .createTask(projectId: project.id), body: request)
+        refreshPendingState()
+        return .queued(taskTitle: request.title, projectTitle: project.title, dueDate: request.dueDate)
     }
 
     @MainActor

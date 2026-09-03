@@ -6,8 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-09-03
+
 ### Added
 - Groundwork for translating mDone. All of the app's text now lives in string catalogs, so a language can be added without any code changes. No translations ship yet; Simplified Chinese is next (#163).
+- Add tasks by voice with Siri, hands-free. Say "Add a task in mDone" and Siri asks what the task is, adds it, and reads back where it went, all without opening the app. It works wherever Siri does, including in the car over CarPlay, on AirPods and on Apple Watch. Name a project with "Add a task to Home in mDone". If you have no connection the task is kept and sent when you reconnect. The phrase that used to open the app with the quick-add bar is now "Quick add a task in mDone". Tasks added this way are due today at your default due time (6:00 PM unless you have changed it), and Siri reads the due date back to you. Settings > Tasks > "Siri adds tasks due" switches that to tomorrow or to no due date.
+
+### Fixed
+- Notifications you have already read stay read. Every restart used to bring back the unread badge and mark every notification unread again, because the app looked for a "read" field that Vikunja does not send. It now reads the state from the server's read timestamp, and marking a notification read in mDone sends the flag the server needs to record it (#165).
+- A damaged local database no longer crashes the app on every launch. mDone used to stop dead if its offline database could not be opened, for instance after a failed upgrade, and the only fix was deleting and reinstalling the app, which threw away any edits you had made offline. It now rescues your unsynced changes and focus history, rebuilds the cached copy of your tasks from the server, and tells you it has done so (#155).
+
+## [1.14.0] - 2026-08-21
+
+### Added
 - On iPad the tab bar can now expand into a sidebar, making better use of the larger screen (#34).
 - Hardware keyboard shortcuts on iPhone and iPad: Cmd-N new task, Cmd-R refresh, and Cmd-1 to Cmd-4 to switch sections. Hold Cmd to see them listed (#34).
 - You can now sign in with single sign-on. If your Vikunja is set up with an OIDC provider such as Authelia, Keycloak or Authentik, the login screen offers a "Continue with ..." button for it. Sign-in happens in the system browser, so you can see the real address of the page you are typing your password into, and the app never sees it (#153).
@@ -19,8 +30,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - Actions that genuinely need a connection, such as creating a task or a project, now say so immediately instead of spending several seconds retrying first (#146).
 - Completing a task now preserves its colour and favourite status too. 1.12.2 stopped the description, priority and progress being cleared; Vikunja resets these two the same way, so every task update now carries them as well (#147).
-- Notifications you have already read stay read. Every restart used to bring back the unread badge and mark every notification unread again, because the app looked for a "read" field that Vikunja does not send. It now reads the state from the server's read timestamp, and marking a notification read in mDone sends the flag the server needs to record it (#165).
-- A damaged local database no longer crashes the app on every launch. mDone used to stop dead if its offline database could not be opened, for instance after a failed upgrade, and the only fix was deleting and reinstalling the app, which threw away any edits you had made offline. It now rescues your unsynced changes and focus history, rebuilds the cached copy of your tasks from the server, and tells you it has done so (#155).
 
 ## [1.12.2] - 2026-08-12
 
