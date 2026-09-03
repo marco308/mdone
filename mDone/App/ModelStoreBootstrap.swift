@@ -21,7 +21,9 @@ enum StoreRecovery: Equatable {
         case .none:
             return nil
         case let .cacheRebuilt(pendingOperations, focusRecords):
-            var message = "mDone could not open its offline database, so the cached copy of your tasks was rebuilt. Everything reloads from the server."
+            var message = String(
+                localized: "mDone could not open its offline database, so the cached copy of your tasks was rebuilt. Everything reloads from the server."
+            )
             if let carried = Self
                 .carriedOverSentence(pendingOperations: pendingOperations, focusRecords: focusRecords)
             {
@@ -29,26 +31,34 @@ enum StoreRecovery: Equatable {
             }
             return message
         case let .inMemory(pendingOperations, focusRecords):
-            var message = "mDone could not open or recreate its offline database, so it is running without one. Your tasks still load from the server, but anything you change offline will be lost when you quit the app."
+            var message = String(
+                localized: "mDone could not open or recreate its offline database, so it is running without one. Your tasks still load from the server, but anything you change offline will be lost when you quit the app."
+            )
             if let carried = Self
                 .carriedOverSentence(pendingOperations: pendingOperations, focusRecords: focusRecords)
             {
-                message += "\n\n\(carried) They will be lost if you quit before they are sent."
+                message += "\n\n\(carried) " + String(localized: "They will be lost if you quit before they are sent.")
             }
             return message
         }
     }
 
+    /// One whole key per combination rather than fragments joined with "and",
+    /// so a translator controls the word order. The plural forms live in the
+    /// catalog; the two-count key carries one plural variation per argument.
     private static func carriedOverSentence(pendingOperations: Int, focusRecords: Int) -> String? {
-        var parts: [String] = []
-        if pendingOperations > 0 {
-            parts.append(pendingOperations == 1 ? "1 unsynced change" : "\(pendingOperations) unsynced changes")
+        switch (pendingOperations > 0, focusRecords > 0) {
+        case (false, false):
+            return nil
+        case (true, false):
+            return String(localized: "\(pendingOperations) unsynced changes were recovered.")
+        case (false, true):
+            return String(localized: "\(focusRecords) focus sessions were recovered.")
+        case (true, true):
+            return String(
+                localized: "\(pendingOperations) unsynced changes and \(focusRecords) focus sessions were recovered."
+            )
         }
-        if focusRecords > 0 {
-            parts.append(focusRecords == 1 ? "1 focus session" : "\(focusRecords) focus sessions")
-        }
-        guard !parts.isEmpty else { return nil }
-        return "\(parts.joined(separator: " and ")) were recovered."
     }
 }
 

@@ -98,6 +98,28 @@
         }
       }
     },
+    "%lld focus sessions were recovered." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld focus session was recovered."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld focus sessions were recovered."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld h" : {},
     "%lld hours before due" : {
       "localizations" : {
@@ -145,6 +167,80 @@
       }
     },
     "%lld percent" : {},
+    "%lld unsynced changes and %lld focus sessions were recovered." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@changes@ and %#@sessions@ were recovered."
+          },
+          "substitutions" : {
+            "changes" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg unsynced change"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg unsynced changes"
+                    }
+                  }
+                }
+              }
+            },
+            "sessions" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg focus session"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg focus sessions"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld unsynced changes were recovered." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld unsynced change was recovered."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld unsynced changes were recovered."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld%%" : {},
     "%lld/%lld" : {},
     "%lld/%lld done" : {},
@@ -476,6 +572,7 @@
       }
     },
     "OK" : {},
+    "Offline database rebuilt" : {},
     "Only events from the calendars you turn on appear in mDone's Calendar and Today views." : {},
     "Open Settings and verify your server URL starts with https:// or http://." : {},
     "Opens mDone with the quick-add bar ready for a new task" : {},
@@ -577,6 +674,7 @@
     "The server is rate limiting requests. Wait a moment and try again." : {},
     "The server may be temporarily unavailable. Wait a moment and try again." : {},
     "The task you pick becomes a subtask of \"%@\". It stays in its own project." : {},
+    "They will be lost if you quit before they are sent." : {},
     "This Month" : {},
     "This Week" : {},
     "This action cannot be undone." : {},
@@ -671,6 +769,8 @@
     "https://focus.example.com" : {},
     "https://vikunja.example.com" : {},
     "mDone" : {},
+    "mDone could not open its offline database, so the cached copy of your tasks was rebuilt. Everything reloads from the server." : {},
+    "mDone could not open or recreate its offline database, so it is running without one. Your tasks still load from the server, but anything you change offline will be lost when you quit the app." : {},
     "mDone has no calendars to show. Grant calendar access in the Calendar tab first." : {},
     "mDone is built and maintained by one person. If it's useful to you, a tip or sponsorship helps keep it going." : {},
     "macOS" : {},
