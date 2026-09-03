@@ -85,6 +85,7 @@ Log in with `devuser` / `devpassword`. `./scripts/reset-dev-vikunja.sh` nukes an
 
 - `.github/workflows/ios-tests.yml` runs `mDoneTests` on the iOS Simulator for every PR to `main`, pinned to `-destination 'platform=iOS Simulator,name=iPhone 17'`. UI and snapshot targets are excluded: they need a booted app and are flaky on CI.
 - `.github/workflows/macos-tests.yml` runs `mDoneMacTests` on `-destination 'platform=macOS'` for every PR to `main`. It signs ad-hoc (`CODE_SIGN_IDENTITY=-`, `CODE_SIGNING_REQUIRED=NO`, `CODE_SIGN_STYLE=Manual`, empty `DEVELOPMENT_TEAM`) because runners have no Apple Development identity and, unlike the simulator, a real macOS bundle has to be signed to launch. Ad-hoc still applies the sandbox entitlements, so the Keychain-backed tests pass. `mDoneMacUITests` is excluded: it is the App Store screenshot run and needs a live server plus credentials.
+- `.github/workflows/vikunja-integration.yml` runs `mDoneIntegrationTests` nightly (and on demand) against a real Vikunja server: the latest release plus the pinned version the API inventory was verified against. It runs the native macOS release binary straight on the runner, never Docker, because the hosted arm64 macOS runners cannot boot a Linux VM. It never runs on a PR and cannot block a merge.
 - `.github/workflows/codeql.yml` runs CodeQL (build-only, so it uses `generic/platform=iOS Simulator`); `.github/workflows/deploy-pages.yml` publishes `website/`.
 
 ## Architecture
