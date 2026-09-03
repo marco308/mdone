@@ -36,14 +36,14 @@ final class TaskRelationTests: XCTestCase {
     }
 
     private func makeConfiguredService() async -> TaskService {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         return TaskService(apiClient: client)
     }
 
     @MainActor
     private func makeMockedAppState() async -> AppState {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         return AppState(taskService: TaskService(apiClient: client))
     }

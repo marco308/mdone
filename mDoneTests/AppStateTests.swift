@@ -16,7 +16,7 @@ final class AppStateTests: XCTestCase {
     /// Builds an `AppState` whose `TaskService` talks to `MockURLProtocol`,
     /// so tests can drive `undoLastCompletion()`'s network path deterministically.
     private func makeMockedAppState() async -> AppState {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         return AppState(taskService: TaskService(apiClient: client))
     }
@@ -24,7 +24,7 @@ final class AppStateTests: XCTestCase {
     /// Builds an `AppState` whose `ProjectService` talks to `MockURLProtocol`,
     /// so project create/edit/archive/delete paths can be driven deterministically.
     private func makeProjectMockedAppState() async -> AppState {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         return AppState(projectService: ProjectService(apiClient: client))
     }

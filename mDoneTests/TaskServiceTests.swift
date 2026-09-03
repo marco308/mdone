@@ -500,7 +500,7 @@ final class TaskServiceTests: XCTestCase {
     // MARK: - TaskService Network Tests
 
     private func makeTestService() -> (TaskService, APIClient) {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         let service = TaskService(apiClient: client)
         return (service, client)
     }

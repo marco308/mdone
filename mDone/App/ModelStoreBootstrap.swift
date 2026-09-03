@@ -87,6 +87,20 @@ enum ModelStoreBootstrap {
         makeContainer(at: ModelConfiguration(schema: schema, isStoredInMemoryOnly: false).url)
     }
 
+    /// A store that touches no disk, for the last-resort recovery below and for
+    /// the launch that only exists to host the unit tests.
+    static func makeInMemoryContainer() -> ModelContainer {
+        let schema = schema
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        guard let container = try? ModelContainer(for: schema, configurations: [config]) else {
+            // An in-memory container can only fail on a malformed schema, which
+            // is a programming error rather than anything the user can recover
+            // from.
+            fatalError("Failed to create an in-memory ModelContainer")
+        }
+        return container
+    }
+
     static func makeContainer(at url: URL) -> Outcome {
         let schema = schema
 
@@ -141,13 +155,7 @@ enum ModelStoreBootstrap {
         // Last resort: launch on a throwaway store so the app still opens. The
         // salvaged work rides along so a reconnect during this session can still
         // flush it.
-        let memoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        guard let container = try? ModelContainer(for: schema, configurations: [memoryConfig]) else {
-            // An in-memory container can only fail on a malformed schema, which
-            // is a programming error rather than anything the user can recover
-            // from.
-            fatalError("Failed to create an in-memory ModelContainer")
-        }
+        let container = makeInMemoryContainer()
         restore(salvaged, into: container)
         return Outcome(
             container: container,

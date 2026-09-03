@@ -14,7 +14,11 @@ actor APIClient {
     private(set) var isRetrying: Bool = false
 
     private let maxRetries = 3
-    private let baseRetryDelay: UInt64 = 1_000_000_000 // 1 second in nanoseconds
+    /// Base of the exponential backoff, in nanoseconds: 1s, then 2s, then 4s.
+    /// Injectable so tests can exercise the retry paths without spending seven
+    /// real seconds per request, which also kept requests in flight long after
+    /// the test that started them had finished.
+    private let baseRetryDelay: UInt64
     private static let refreshCookieName = "vikunja_refresh_token"
 
     /// Per-request timeout, in seconds. URLSession's 60s default is far too
@@ -41,8 +45,9 @@ actor APIClient {
 
     static let shared = APIClient()
 
-    init(session: URLSession = .shared) {
+    init(session: URLSession = .shared, baseRetryDelay: UInt64 = 1_000_000_000) {
         self.session = session
+        self.baseRetryDelay = baseRetryDelay
 
         decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase

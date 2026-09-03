@@ -40,96 +40,111 @@ struct mDoneApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                if appState.isAuthenticated {
-                    #if os(iOS)
-                    MainTabView()
-                    #else
-                    MacContentView()
-                    #endif
-                } else {
-                    ServerSetupView()
+            if AppDependencies.isHostingUnitTests {
+                // The unit tests drive `AppState` and the services directly, so
+                // the real UI would only add its own network traffic on top: a
+                // `checkAuth()` against whatever server the simulator has
+                // configured, and a `refreshAll()` on every scene-phase and
+                // connectivity change, none of which any test observes. See
+                // `AppDependencies.isHostingUnitTests`.
+                Color.clear
+            } else {
+                appContent
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var appContent: some View {
+        Group {
+            if appState.isAuthenticated {
+                #if os(iOS)
+                MainTabView()
+                #else
+                MacContentView()
+                #endif
+            } else {
+                ServerSetupView()
+            }
+        }
+        .environment(appState)
+        .environment(dependencies.networkMonitor)
+        #if os(iOS)
+        .environment(focusManager)
+        .environment(focusOutbox)
+        #endif
+        .modelContainer(dependencies.modelContainer)
+        .onAppear {
+            #if os(iOS)
+            appState.onTaskCompleted = { taskId in
+                focusManager.handleTaskCompleted(taskId: taskId)
+            }
+            appState.onTaskDeleted = { taskId in
+                focusManager.handleTaskDeleted(taskId: taskId)
+            }
+            #endif
+
+            #if DEBUG
+            // Support auto-login via UserDefaults for testing (set via simctl)
+            let defaults = UserDefaults.standard
+            if !appState.isAuthenticated,
+               let serverURL = defaults.string(forKey: "MDONE_SERVER_URL"),
+               let token = defaults.string(forKey: "MDONE_TOKEN"),
+               !serverURL.isEmpty, !token.isEmpty
+            {
+                defaults.removeObject(forKey: "MDONE_SERVER_URL")
+                defaults.removeObject(forKey: "MDONE_TOKEN")
+                Task {
+                    try? await appState.login(serverURL: serverURL, token: token)
+                }
+            } else {
+                Task {
+                    await appState.checkAuth()
                 }
             }
-            .environment(appState)
-            .environment(dependencies.networkMonitor)
-            #if os(iOS)
-                .environment(focusManager)
-                .environment(focusOutbox)
-            #endif
-                .modelContainer(dependencies.modelContainer)
-                .onAppear {
-                    #if os(iOS)
-                    appState.onTaskCompleted = { taskId in
-                        focusManager.handleTaskCompleted(taskId: taskId)
-                    }
-                    appState.onTaskDeleted = { taskId in
-                        focusManager.handleTaskDeleted(taskId: taskId)
-                    }
-                    #endif
-
-                    #if DEBUG
-                    // Support auto-login via UserDefaults for testing (set via simctl)
-                    let defaults = UserDefaults.standard
-                    if !appState.isAuthenticated,
-                       let serverURL = defaults.string(forKey: "MDONE_SERVER_URL"),
-                       let token = defaults.string(forKey: "MDONE_TOKEN"),
-                       !serverURL.isEmpty, !token.isEmpty
-                    {
-                        defaults.removeObject(forKey: "MDONE_SERVER_URL")
-                        defaults.removeObject(forKey: "MDONE_TOKEN")
-                        Task {
-                            try? await appState.login(serverURL: serverURL, token: token)
-                        }
-                    } else {
-                        Task {
-                            await appState.checkAuth()
-                        }
-                    }
-                    #else
-                    Task {
-                        await appState.checkAuth()
-                    }
-                    #endif
-                }
-                .onChange(of: appState.isAuthenticated) { _, isAuthenticated in
-                    if isAuthenticated {
-                        Task {
-                            await appState.requestCalendarAccess()
-                        }
-                    }
-                }
-                .onChange(of: dependencies.networkMonitor.isConnected) { _, isConnected in
-                    appState.handleConnectivityChange(isConnected: isConnected)
-                    #if os(iOS)
-                    if isConnected {
-                        Task { await focusOutbox.drain() }
-                    }
-                    #endif
-                }
-                .onChange(of: scenePhase) { _, newPhase in
-                    if newPhase == .active, appState.isAuthenticated {
-                        Task { await appState.refreshAll() }
-                        #if os(iOS)
-                        Task { await focusOutbox.drain() }
-                        #endif
-                    }
-                }
-            #if os(iOS)
-                .onOpenURL { url in
-                    guard url.scheme == "mdone" else { return }
-                    switch url.host {
-                    case "focus":
-                        if focusManager.currentSession != nil {
-                            focusManager.showFocusView = true
-                        }
-                    case "create":
-                        appState.quickAddTrigger = UUID()
-                    default:
-                        break
-                    }
-                }
+            #else
+            Task {
+                await appState.checkAuth()
+            }
             #endif
         }
+        .onChange(of: appState.isAuthenticated) { _, isAuthenticated in
+            if isAuthenticated {
+                Task {
+                    await appState.requestCalendarAccess()
+                }
+            }
+        }
+        .onChange(of: dependencies.networkMonitor.isConnected) { _, isConnected in
+            appState.handleConnectivityChange(isConnected: isConnected)
+            #if os(iOS)
+            if isConnected {
+                Task { await focusOutbox.drain() }
+            }
+            #endif
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active, appState.isAuthenticated {
+                Task { await appState.refreshAll() }
+                #if os(iOS)
+                Task { await focusOutbox.drain() }
+                #endif
+            }
+        }
+        #if os(iOS)
+        .onOpenURL { url in
+            guard url.scheme == "mdone" else { return }
+            switch url.host {
+            case "focus":
+                if focusManager.currentSession != nil {
+                    focusManager.showFocusView = true
+                }
+            case "create":
+                appState.quickAddTrigger = UUID()
+            default:
+                break
+            }
+        }
+        #endif
     }
 }
