@@ -268,6 +268,8 @@ final class AddTaskIntentTests: XCTestCase {
     }
 
     func testPerformWithoutSharedStateReportsNotSignedIn() async throws {
+        let previous = AppState.shared
+        defer { AppState.shared = previous }
         AppState.shared = nil
         var intent = AddTaskIntent()
         intent.taskTitle = "Buy milk"

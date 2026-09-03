@@ -1,3 +1,4 @@
+import AppIntents
 import EventKit
 import Foundation
 import SwiftUI
@@ -1106,7 +1107,10 @@ final class AppState {
         }
 
         let project: Project? = if let projectId {
-            projects.first(where: { $0.id == projectId }) ?? Project(id: projectId, title: String(localized: "your project"))
+            projects.first(where: { $0.id == projectId }) ?? Project(
+                id: projectId,
+                title: String(localized: "your project")
+            )
         } else {
             defaultProject
         }
