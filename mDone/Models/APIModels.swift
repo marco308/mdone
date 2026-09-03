@@ -115,6 +115,18 @@ enum NetworkError: LocalizedError {
         }
     }
 
+    /// Failures that mean the server could not be reached at all, as opposed
+    /// to reaching it and being refused. A change that hits one of these is
+    /// safe to queue and replay later.
+    var isConnectivityFailure: Bool {
+        switch self {
+        case .networkUnavailable, .timeout, .serverUnreachable:
+            true
+        default:
+            false
+        }
+    }
+
     /// Whether this error is critical and requires user action (should not auto-dismiss).
     var isCritical: Bool {
         switch self {
