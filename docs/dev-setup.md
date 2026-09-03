@@ -91,6 +91,32 @@ Add new unit tests in `mDoneTests/` following the existing pattern: inject a `UR
 
 After `docker compose up -d` and the seed script, run the app and exercise the path you're changing. The Vikunja web UI is the ground-truth view: open it side-by-side with the Simulator to confirm what landed server-side.
 
+### Automated integration — against a live Vikunja
+
+`mDoneIntegrationTests` drives the real services (`TaskService`, `ProjectService`, `LabelService`, `APIClient`) against a running server instead of `MockURLProtocol`, so it catches the thing the unit suite structurally cannot: a Vikunja release changing the v1 API under us.
+
+```bash
+docker compose -f docker-compose.dev.yml up -d && ./scripts/seed-dev-vikunja.sh
+
+xcodebuild -project mDone.xcodeproj -scheme mDone \
+  -sdk iphonesimulator \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -only-testing:mDoneIntegrationTests test
+```
+
+Every test skips itself when nothing answers on the server URL, so a whole-scheme run stays green with Docker switched off. Point them elsewhere with `MDONE_INTEGRATION_SERVER_URL`, `MDONE_INTEGRATION_USER` and `MDONE_INTEGRATION_PASSWORD` (defaults: `http://localhost:3456`, `devuser`, `devpassword`). From `xcodebuild` those need the `TEST_RUNNER_` prefix to reach the test process:
+
+```bash
+TEST_RUNNER_MDONE_INTEGRATION_SERVER_URL=http://localhost:3457 xcodebuild ... test
+```
+
+Two things to know before adding tests here:
+
+- **Log in through `IntegrationSession`, never per test.** Vikunja rate-limits `POST /login` per user, and a login per test method starts returning 429 around the tenth test.
+- **Work inside `scratchProject`**, the per-test project the base class creates and deletes, so a run leaves the server as it found it.
+
+[.github/workflows/vikunja-integration.yml](../.github/workflows/vikunja-integration.yml) runs these nightly on a macOS runner (Colima provides the Docker daemon), against both `vikunja/vikunja:latest` and the pinned version below. It is never run on a PR: it tests a moving upstream target, so it must not be able to block a merge. A failure opens or comments on an issue labelled `vikunja-nightly`.
+
 ### Common scenarios
 
 - **First-run / onboarding** — reset Vikunja, skip the seed, install the app fresh (Simulator → Device → Erase All Content and Settings).
@@ -245,6 +271,8 @@ it as an optional array.
 `docker-compose.dev.yml` currently uses `vikunja/vikunja:latest`. When you start noticing odd behaviour after a `docker compose pull`, check the [Vikunja release notes](https://kolaente.dev/vikunja/vikunja/-/releases) and pin to a known-good tag.
 
 If you're chasing a bug that may be Vikunja-side, pin your dev compose file to the same version your prod instance runs to ensure the API shape matches.
+
+The nightly integration workflow tests two tags: `latest`, which tells us upstream changed something, and a pinned floor (currently `2.5.0`, the version [vikunja-api-inventory.md](vikunja-api-inventory.md) was verified against), which tells us we did. Bump the pin in the workflow matrix whenever that document is re-verified.
 
 ## When to update the Apple Review test server
 

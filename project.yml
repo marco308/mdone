@@ -68,6 +68,7 @@ targets:
         - mDoneTests
         - mDoneUITests
         - mDoneWidgetRenderTests
+        - mDoneIntegrationTests
       gatherCoverageData: true
 
   mDone-macOS:
@@ -164,6 +165,26 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.tests
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/mDone.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/mDone"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+  # Live-server tests: they drive the real services against a running Vikunja
+  # instead of MockURLProtocol. They skip themselves when no server answers on
+  # MDONE_INTEGRATION_SERVER_URL (default http://localhost:3456), so they are
+  # safe to leave in the scheme; PR CI passes -only-testing:mDoneTests, so it
+  # compiles them but never runs them. The nightly run lives in
+  # .github/workflows/vikunja-integration.yml.
+  mDoneIntegrationTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - mDoneIntegrationTests
+    dependencies:
+      - target: mDone
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.integrationtests
         GENERATE_INFOPLIST_FILE: "YES"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/mDone.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/mDone"
         BUNDLE_LOADER: "$(TEST_HOST)"
