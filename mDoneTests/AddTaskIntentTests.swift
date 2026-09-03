@@ -78,9 +78,9 @@ final class AddTaskIntentTests: XCTestCase {
             )
         }
 
-        let outcome = try await state.createTaskFromIntent(title: "Buy milk", projectId: 8)
+        let outcome = try await state.createTaskFromIntent(title: "Buy milk", projectId: 8, dueDate: nil)
 
-        XCTAssertEqual(outcome, .created(taskTitle: "Buy milk", projectTitle: "Home"))
+        XCTAssertEqual(outcome, .created(taskTitle: "Buy milk", projectTitle: "Home", dueDate: nil))
         let request = try XCTUnwrap(MockURLProtocol.capturedRequests.first)
         XCTAssertEqual(request.httpMethod, "PUT")
         XCTAssertEqual(request.url?.path, "/api/v1/projects/8/tasks")
@@ -99,9 +99,9 @@ final class AddTaskIntentTests: XCTestCase {
             )
         }
 
-        let outcome = try await state.createTaskFromIntent(title: "  Call the dentist \n", projectId: nil)
+        let outcome = try await state.createTaskFromIntent(title: "  Call the dentist \n", projectId: nil, dueDate: nil)
 
-        XCTAssertEqual(outcome, .created(taskTitle: "Call the dentist", projectTitle: "Inbox"))
+        XCTAssertEqual(outcome, .created(taskTitle: "Call the dentist", projectTitle: "Inbox", dueDate: nil))
         XCTAssertEqual(MockURLProtocol.capturedRequests.first?.url?.path, "/api/v1/projects/7/tasks")
     }
 
@@ -120,9 +120,9 @@ final class AddTaskIntentTests: XCTestCase {
             )
         }
 
-        let outcome = try await state.createTaskFromIntent(title: "Send invoice", projectId: nil)
+        let outcome = try await state.createTaskFromIntent(title: "Send invoice", projectId: nil, dueDate: nil)
 
-        XCTAssertEqual(outcome, .created(taskTitle: "Send invoice", projectTitle: "Work"))
+        XCTAssertEqual(outcome, .created(taskTitle: "Send invoice", projectTitle: "Work", dueDate: nil))
         XCTAssertEqual(state.projects.map(\.id), [3])
         XCTAssertEqual(MockURLProtocol.capturedRequests.last?.url?.path, "/api/v1/projects/3/tasks")
     }
@@ -134,7 +134,7 @@ final class AddTaskIntentTests: XCTestCase {
         }
 
         do {
-            _ = try await state.createTaskFromIntent(title: "Nope", projectId: 8)
+            _ = try await state.createTaskFromIntent(title: "Nope", projectId: 8, dueDate: nil)
             XCTFail("a 403 must surface as an error")
         } catch let error as IntentTaskError {
             guard case .failed = error else { return XCTFail("expected .failed, got \(error)") }
@@ -151,9 +151,9 @@ final class AddTaskIntentTests: XCTestCase {
             throw URLError(.notConnectedToInternet)
         }
 
-        let outcome = try await state.createTaskFromIntent(title: "Buy milk", projectId: 8)
+        let outcome = try await state.createTaskFromIntent(title: "Buy milk", projectId: 8, dueDate: nil)
 
-        XCTAssertEqual(outcome, .queued(taskTitle: "Buy milk", projectTitle: "Home"))
+        XCTAssertEqual(outcome, .queued(taskTitle: "Buy milk", projectTitle: "Home", dueDate: nil))
         let queued = try pendingOperations(in: container)
         XCTAssertEqual(queued.count, 1)
         XCTAssertEqual(queued.first?.method, "PUT")
@@ -170,15 +170,15 @@ final class AddTaskIntentTests: XCTestCase {
         let (state, container) = try await makeAppState(connected: true)
         MockURLProtocol.requestHandler = { _ in throw URLError(.notConnectedToInternet) }
 
-        let outcome = try await state.createTaskFromIntent(title: "Buy milk", projectId: 8)
+        let outcome = try await state.createTaskFromIntent(title: "Buy milk", projectId: 8, dueDate: nil)
 
-        XCTAssertEqual(outcome, .queued(taskTitle: "Buy milk", projectTitle: "Home"))
+        XCTAssertEqual(outcome, .queued(taskTitle: "Buy milk", projectTitle: "Home", dueDate: nil))
         XCTAssertEqual(try pendingOperations(in: container).count, 1)
     }
 
     func testQueuedCreateReplaysWhenTheConnectionReturns() async throws {
         let (state, container) = try await makeAppState(connected: false)
-        _ = try await state.createTaskFromIntent(title: "Buy milk", projectId: 8)
+        _ = try await state.createTaskFromIntent(title: "Buy milk", projectId: 8, dueDate: nil)
 
         MockURLProtocol.requestHandler = { request in
             (
@@ -212,7 +212,7 @@ final class AddTaskIntentTests: XCTestCase {
         }
 
         do {
-            _ = try await state.createTaskFromIntent(title: "   ", projectId: nil)
+            _ = try await state.createTaskFromIntent(title: "   ", projectId: nil, dueDate: nil)
             XCTFail("expected emptyTitle")
         } catch let error as IntentTaskError {
             XCTAssertEqual(error, .emptyTitle)
@@ -226,7 +226,7 @@ final class AddTaskIntentTests: XCTestCase {
         defer { AuthService.shared.clearAll() }
 
         do {
-            _ = try await state.createTaskFromIntent(title: "Buy milk", projectId: nil)
+            _ = try await state.createTaskFromIntent(title: "Buy milk", projectId: nil, dueDate: nil)
             XCTFail("expected notSignedIn")
         } catch let error as IntentTaskError {
             XCTAssertEqual(error, .notSignedIn)
@@ -239,7 +239,7 @@ final class AddTaskIntentTests: XCTestCase {
         state.projects = []
 
         do {
-            _ = try await state.createTaskFromIntent(title: "Buy milk", projectId: nil)
+            _ = try await state.createTaskFromIntent(title: "Buy milk", projectId: nil, dueDate: nil)
             XCTFail("expected noProject")
         } catch let error as IntentTaskError {
             XCTAssertEqual(error, .noProject)
@@ -284,13 +284,59 @@ final class AddTaskIntentTests: XCTestCase {
 
     func testDialogNamesTheTaskAndProject() {
         XCTAssertEqual(
-            AddTaskIntent.dialog(for: .created(taskTitle: "Buy milk", projectTitle: "Home")),
+            AddTaskIntent.dialog(for: .created(taskTitle: "Buy milk", projectTitle: "Home", dueDate: nil)),
             "Added \"Buy milk\" to Home."
         )
         XCTAssertEqual(
-            AddTaskIntent.dialog(for: .queued(taskTitle: "Buy milk", projectTitle: "Home")),
+            AddTaskIntent.dialog(for: .queued(taskTitle: "Buy milk", projectTitle: "Home", dueDate: nil)),
             "Added \"Buy milk\" to Home. It will sync when you're back online."
         )
+    }
+
+    func testDialogReadsTheDueDateBack() throws {
+        let due = try XCTUnwrap(Calendar.current.date(bySettingHour: 18, minute: 0, second: 0, of: Date()))
+        let spoken = AddTaskIntent.dueText(due)
+        XCTAssertEqual(
+            AddTaskIntent.dialog(for: .created(taskTitle: "Buy milk", projectTitle: "Home", dueDate: due)),
+            "Added \"Buy milk\" to Home, due \(spoken)."
+        )
+        XCTAssertEqual(
+            AddTaskIntent.dialog(for: .queued(taskTitle: "Buy milk", projectTitle: "Home", dueDate: due)),
+            "Added \"Buy milk\" to Home, due \(spoken). It will sync when you're back online."
+        )
+        // The relative formatter says "Today", not the calendar date, so the
+        // driver hears something they can act on.
+        XCTAssertFalse(spoken.contains(String(Calendar.current.component(.year, from: due))))
+    }
+
+    func testCreateSendsTheDueDate() async throws {
+        let (state, _) = try await makeAppState()
+        let due = Date(timeIntervalSince1970: 1_788_544_800) // 2026-09-04T18:00:00Z
+        MockURLProtocol.requestHandler = { request in
+            (
+                MockURLProtocol.makeResponse(statusCode: 201, url: request.url),
+                Self.createdTaskJSON(id: 105, title: "Buy milk", projectId: 8)
+            )
+        }
+
+        let outcome = try await state.createTaskFromIntent(title: "Buy milk", projectId: 8, dueDate: due)
+
+        XCTAssertEqual(outcome, .created(taskTitle: "Buy milk", projectTitle: "Home", dueDate: due))
+        let body = try XCTUnwrap(try MockURLProtocol.bodyData(from: XCTUnwrap(MockURLProtocol.capturedRequests.first)))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(json["due_date"] as? String, "2026-09-04T18:00:00Z")
+    }
+
+    func testQueuedCreateKeepsTheDueDate() async throws {
+        let (state, container) = try await makeAppState(connected: false)
+        let due = Date(timeIntervalSince1970: 1_788_544_800)
+
+        let outcome = try await state.createTaskFromIntent(title: "Buy milk", projectId: 8, dueDate: due)
+
+        XCTAssertEqual(outcome, .queued(taskTitle: "Buy milk", projectTitle: "Home", dueDate: due))
+        let body = try XCTUnwrap(try pendingOperations(in: container).first?.bodyData)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(json["due_date"] as? String, "2026-09-04T18:00:00Z")
     }
 
     // MARK: - Project entity

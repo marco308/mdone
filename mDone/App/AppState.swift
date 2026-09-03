@@ -1090,7 +1090,7 @@ final class AppState {
     /// later edit to address (issue #146); a driver talking to Siri cannot
     /// edit anything anyway, and losing the thought is the worse outcome.
     @MainActor
-    func createTaskFromIntent(title: String, projectId: Int64?) async throws -> IntentTaskOutcome {
+    func createTaskFromIntent(title: String, projectId: Int64?, dueDate: Date?) async throws -> IntentTaskOutcome {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else { throw IntentTaskError.emptyTitle }
 
@@ -1116,7 +1116,7 @@ final class AppState {
         }
         guard let project else { throw IntentTaskError.noProject }
 
-        let request = TaskCreateRequest(title: trimmedTitle)
+        let request = TaskCreateRequest(title: trimmedTitle, dueDate: dueDate)
         if isOffline {
             return try queueIntentCreate(request, in: project)
         }
@@ -1126,7 +1126,7 @@ final class AppState {
             tasks.append(newTask)
             syncService?.updateCachedTask(newTask)
             WidgetCenter.shared.reloadAllTimelines()
-            return .created(taskTitle: trimmedTitle, projectTitle: project.title)
+            return .created(taskTitle: trimmedTitle, projectTitle: project.title, dueDate: dueDate)
         } catch let error as NetworkError where error.isConnectivityFailure {
             // The monitor said we were online but the server was not there:
             // a tunnel, a car park, a dead mobile link. Same answer as offline.
@@ -1144,7 +1144,7 @@ final class AppState {
         }
         syncService.queueOperation(endpoint: .createTask(projectId: project.id), body: request)
         refreshPendingState()
-        return .queued(taskTitle: request.title, projectTitle: project.title)
+        return .queued(taskTitle: request.title, projectTitle: project.title, dueDate: request.dueDate)
     }
 
     @MainActor

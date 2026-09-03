@@ -8,6 +8,7 @@ struct SettingsScreen: View {
     @AppStorage(WeekStartPreference.storageKey) private var firstWeekday = WeekStartPreference.system.rawValue
     @AppStorage(DefaultDueTimePreference.storageKey) private var defaultDueTime = DefaultDueTimePreference
         .defaultRawValue
+    @AppStorage(SiriDueDatePreference.storageKey) private var siriDueDate = SiriDueDatePreference.defaultValue.rawValue
     @AppStorage("calmMode") private var calmMode = false
     @AppStorage(AllDayEventPreference.storageKey) private var hideAllDayEvents = false
     @AppStorage("currentStallDays") private var currentStallDays = 7
@@ -61,11 +62,16 @@ struct SettingsScreen: View {
                         Text(preference.label).tag(preference.rawValue)
                     }
                 }
+                Picker("Siri adds tasks due", selection: $siriDueDate) {
+                    ForEach(SiriDueDatePreference.allCases) { preference in
+                        Text(preference.label).tag(preference.rawValue)
+                    }
+                }
             } header: {
                 Text("Tasks")
             } footer: {
                 Text(
-                    "Time of day applied to tasks you add to Today without picking a time. Pick a time later in the day to avoid the task showing as overdue right away."
+                    "Time of day applied to tasks you add to Today without picking a time, and to tasks you add through Siri. Pick a time later in the day to avoid the task showing as overdue right away."
                 )
             }
 

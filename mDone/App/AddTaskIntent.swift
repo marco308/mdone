@@ -25,35 +25,68 @@ struct AddTaskIntent: AppIntent {
     @Parameter(title: "Project")
     var project: ProjectEntity?
 
+    /// Optional so Siri never asks for it. Left empty, the task falls due
+    /// according to Settings > Tasks > "Siri adds tasks due" (today at the
+    /// default due time unless changed).
+    @Parameter(title: "Due date")
+    var dueDate: Date?
+
     static var parameterSummary: some ParameterSummary {
-        Summary("Add \(\.$taskTitle) to \(\.$project)")
+        Summary("Add \(\.$taskTitle) to \(\.$project)") {
+            \.$dueDate
+        }
     }
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         guard let state = AppState.shared else { throw IntentTaskError.notSignedIn }
-        let outcome = try await state.createTaskFromIntent(title: taskTitle, projectId: project?.projectId)
+        let outcome = try await state.createTaskFromIntent(
+            title: taskTitle,
+            projectId: project?.projectId,
+            dueDate: dueDate ?? SiriDueDatePreference.dueDate()
+        )
         return .result(dialog: IntentDialog("\(Self.dialog(for: outcome))"))
     }
 
-    /// What Siri says back. Spoken as well as shown, so it names the task and
-    /// the project: in the car that is the only confirmation the user gets.
+    /// What Siri says back. Spoken as well as shown, so it names the task,
+    /// the project and the due date: in the car that is the only
+    /// confirmation the user gets.
     static func dialog(for outcome: IntentTaskOutcome) -> String {
         switch outcome {
-        case let .created(taskTitle, projectTitle):
-            String(localized: "Added \"\(taskTitle)\" to \(projectTitle).")
-        case let .queued(taskTitle, projectTitle):
-            String(localized: "Added \"\(taskTitle)\" to \(projectTitle). It will sync when you're back online.")
+        case let .created(taskTitle, projectTitle, dueDate):
+            if let dueDate {
+                String(localized: "Added \"\(taskTitle)\" to \(projectTitle), due \(dueText(dueDate)).")
+            } else {
+                String(localized: "Added \"\(taskTitle)\" to \(projectTitle).")
+            }
+        case let .queued(taskTitle, projectTitle, dueDate):
+            if let dueDate {
+                String(
+                    localized: "Added \"\(taskTitle)\" to \(projectTitle), due \(dueText(dueDate)). It will sync when you're back online."
+                )
+            } else {
+                String(localized: "Added \"\(taskTitle)\" to \(projectTitle). It will sync when you're back online.")
+            }
         }
+    }
+
+    /// "Today at 6:00 PM", "Tomorrow at 9:00 AM", or a short date for anything
+    /// further out. Foundation localizes the relative words.
+    static func dueText(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.doesRelativeDateFormatting = true
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 }
 
 /// How a task created from outside the UI ended up.
 enum IntentTaskOutcome: Equatable {
     /// Reached the server; the task exists there with an id.
-    case created(taskTitle: String, projectTitle: String)
+    case created(taskTitle: String, projectTitle: String, dueDate: Date?)
     /// No connection; queued for replay when one returns.
-    case queued(taskTitle: String, projectTitle: String)
+    case queued(taskTitle: String, projectTitle: String, dueDate: Date?)
 }
 
 /// Failures the intent reports back through Siri. The wording is spoken, so
