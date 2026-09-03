@@ -62,7 +62,7 @@ struct TaskListScreen: View {
             .onSubmit(of: .search) {
                 Task { await appState.searchTasks(query: appState.searchQuery) }
             }
-            .navigationTitle(projectFilter?.title ?? "Inbox")
+            .navigationTitle(projectFilter?.title ?? String(localized: "Inbox"))
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

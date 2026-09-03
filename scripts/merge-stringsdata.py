@@ -50,7 +50,7 @@ def extract(build_dirs: list[Path]) -> dict[str, str]:
 
 
 def merge(catalog_path: Path, found: dict[str, str]) -> tuple[int, int, int]:
-    catalog = json.loads(catalog_path.read_text())
+    catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
     strings = catalog.setdefault("strings", {})
     added = revived = stale = 0
 
@@ -90,7 +90,8 @@ def write_catalog(path: Path, catalog: dict) -> None:
     in a whitespace diff.
     """
     path.write_text(
-        json.dumps(catalog, indent=2, ensure_ascii=False, separators=(",", " : ")) + "\n"
+        json.dumps(catalog, indent=2, ensure_ascii=False, separators=(",", " : ")) + "\n",
+        encoding="utf-8",
     )
 
 

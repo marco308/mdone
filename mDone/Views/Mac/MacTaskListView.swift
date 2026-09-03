@@ -198,20 +198,20 @@ struct MacTaskListView: View {
     }
 
     private var sectionTitle: String {
-        guard let section else { return "Tasks" }
+        guard let section else { return String(localized: "Tasks") }
         switch section {
-        case .inbox: return "Inbox"
-        case .today: return "Today"
-        case .tomorrow: return "Tomorrow"
-        case .thisWeek: return "This Week"
-        case .upcoming: return "Upcoming"
-        case .overdue: return "Overdue"
-        case .noDate: return "No Date"
+        case .inbox: return String(localized: "Inbox")
+        case .today: return String(localized: "Today")
+        case .tomorrow: return String(localized: "Tomorrow")
+        case .thisWeek: return String(localized: "This Week")
+        case .upcoming: return String(localized: "Upcoming")
+        case .overdue: return String(localized: "Overdue")
+        case .noDate: return String(localized: "No Date")
         case let .project(project): return project.title
-        case .archived: return "Archived"
-        case .notifications: return "Notifications"
-        case .calendar: return "Calendar"
-        case .settings: return "Settings"
+        case .archived: return String(localized: "Archived")
+        case .notifications: return String(localized: "Notifications")
+        case .calendar: return String(localized: "Calendar")
+        case .settings: return String(localized: "Settings")
         }
     }
 

@@ -1,8 +1,12 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "\"%@\" could not be synced: %@" : {},
     "%@ - %@" : {},
     "%@ column, %@ tasks" : {},
+    "%@ commented on \"%@\"" : {},
+    "%@ updated \"%@\"" : {},
+    "%@ updated project \"%@\"" : {},
     "%@ · %lld sessions" : {
       "localizations" : {
         "en" : {
@@ -41,6 +45,29 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%@, %lld tasks"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%@, today" : {},
+    "%@, today, %lld tasks" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%@, today, %lld task"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%@, today, %lld tasks"
                 }
               }
             }
@@ -122,29 +149,6 @@
     "%lld/%lld" : {},
     "%lld/%lld done" : {},
     "+24h" : {},
-    ", %lld tasks" : {
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : ", %lld task"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : ", %lld tasks"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    ", today" : {},
     "1 day before" : {},
     "1 hour before" : {},
     "12:00 PM" : {},
@@ -156,6 +160,7 @@
     "9:00 AM" : {},
     "9:00 PM" : {},
     "A native task manager for Vikunja." : {},
+    "A queued change could not be synced: %@" : {},
     "API Token" : {},
     "API tokens have limited permissions. Use Login for full functionality including task reordering." : {},
     "About" : {},
@@ -446,6 +451,7 @@
     "Nothing This Week" : {},
     "Nothing Tomorrow" : {},
     "Nothing Upcoming" : {},
+    "Notification" : {},
     "Notifications" : {},
     "Notifications, %lld unread" : {
       "localizations" : {
@@ -537,6 +543,7 @@
     "Single sign-on needs an https address. Your server is offering an insecure one, which iOS will not open." : {},
     "Smart Lists" : {},
     "Some changes could not be synced" : {},
+    "Someone" : {},
     "Something went wrong with that request. Please try again." : {},
     "Something went wrong. Please check your connection and try again." : {},
     "Sort by %@, ascending" : {},
@@ -621,6 +628,7 @@
     "Undone" : {},
     "Unknown" : {},
     "Unread: %@, %@" : {},
+    "Untitled" : {},
     "Upcoming" : {},
     "Urgent" : {},
     "Username" : {},
@@ -658,6 +666,7 @@
     "You're offline. Your changes will sync when you're back online." : {},
     "Your session has expired. Please log in again." : {},
     "date range %@ to %@" : {},
+    "due %@" : {},
     "ends %@" : {},
     "https://focus.example.com" : {},
     "https://vikunja.example.com" : {},
@@ -666,8 +675,11 @@
     "mDone is built and maintained by one person. If it's useful to you, a tip or sponsorship helps keep it going." : {},
     "macOS" : {},
     "or" : {},
+    "overdue" : {},
+    "priority %@" : {},
     "starts %@" : {},
     "starts %@, ends %@" : {},
+    "the server rejected it" : {},
     "·" : {}
   },
   "version" : "1.0"

@@ -102,7 +102,8 @@ struct TaskDetailSheet: View {
                         }
                     } else {
                         Button {
-                            let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
+                            let projectName = appState.projects
+                                .first(where: { $0.id == task.projectId })?.title ?? String(localized: "Inbox")
                             focusManager.startFocus(task: task, projectName: projectName)
                         } label: {
                             Label("Focus on This Task", systemImage: "scope")
