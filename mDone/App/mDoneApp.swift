@@ -28,6 +28,7 @@ struct mDoneApp: App {
             ),
             networkMonitor: deps.networkMonitor
         )
+        state.storeRecoveryMessage = deps.storeRecovery.userMessage
         _appState = State(initialValue: state)
 
         #if os(iOS)

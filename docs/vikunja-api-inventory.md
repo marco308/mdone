@@ -542,7 +542,12 @@ Machine accounts owned by a user, for automation that should not use the owner's
 
 Query params: `page`, `per_page`
 
-**DatabaseNotification fields:** `id`, `name` (event name), `notification` (payload), `read`, `read_at`, `created`
+**DatabaseNotification fields:** `id`, `name` (event name), `notification` (payload), `read_at`, `created`
+
+There is no `read` field in the response. Read state is carried by `read_at` alone, which holds the
+zero date (`0001-01-01T00:00:00Z`) while the notification is unread. The mark-as-read request does
+take a `read` boolean in its body, and the server writes `read_at` from it, so a request with an empty
+body marks the notification *unread*.
 
 ---
 

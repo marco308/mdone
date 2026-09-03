@@ -75,6 +75,7 @@ targets:
         - mDoneTests
         - mDoneUITests
         - mDoneWidgetRenderTests
+        - mDoneIntegrationTests
       gatherCoverageData: true
 
   mDone-macOS:
@@ -91,6 +92,11 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_EMIT_LOC_STRINGS: "YES"
         SUPPORTS_MACCATALYST: "NO"
+        # PRODUCT_NAME is $(TARGET_NAME), which would make the Swift module
+        # `mDone_macOS` and break the `@testable import mDone` in every shared
+        # test file. Pin the module name so one test source tree serves both
+        # platforms; the bundle is still mDone-macOS.app.
+        PRODUCT_MODULE_NAME: mDone
     postBuildScripts:
       - script: |
           if which swiftlint > /dev/null; then
@@ -102,6 +108,7 @@ targets:
         basedOnDependencyAnalysis: false
     scheme:
       testTargets:
+        - mDoneMacTests
         - mDoneMacUITests
       gatherCoverageData: true
 
@@ -117,6 +124,24 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.macuitests
         GENERATE_INFOPLIST_FILE: "YES"
         TEST_TARGET_NAME: mDone-macOS
+
+  # Same source tree as mDoneTests, compiled against and hosted by the macOS
+  # app, so the shared mDone/ + mDoneShared/ code is covered on both platforms.
+  # iOS-only cases (Live Activity, focus outbox) already self-exclude behind
+  # `#if os(iOS)` in their own files.
+  mDoneMacTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - mDoneTests
+    dependencies:
+      - target: mDone-macOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.mactests
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/mDone-macOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/mDone-macOS"
+        BUNDLE_LOADER: "$(TEST_HOST)"
 
   mDoneWidgets:
     type: app-extension
@@ -150,6 +175,26 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.tests
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/mDone.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/mDone"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+  # Live-server tests: they drive the real services against a running Vikunja
+  # instead of MockURLProtocol. They skip themselves when no server answers on
+  # MDONE_INTEGRATION_SERVER_URL (default http://localhost:3456), so they are
+  # safe to leave in the scheme; PR CI passes -only-testing:mDoneTests, so it
+  # compiles them but never runs them. The nightly run lives in
+  # .github/workflows/vikunja-integration.yml.
+  mDoneIntegrationTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - mDoneIntegrationTests
+    dependencies:
+      - target: mDone
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.integrationtests
         GENERATE_INFOPLIST_FILE: "YES"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/mDone.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/mDone"
         BUNDLE_LOADER: "$(TEST_HOST)"

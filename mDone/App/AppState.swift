@@ -96,7 +96,7 @@ final class AppState {
     var projectTaskCache: [Int64: [VTask]] = [:]
 
     var unreadNotificationCount: Int {
-        notifications.filter { $0.read != true }.count
+        notifications.filter(\.isUnread).count
     }
 
     /// The live instance backing the UI, set on init. App Intents run in the
@@ -828,6 +828,10 @@ final class AppState {
 
     /// Changes abandoned after repeated failures, surfaced once and then cleared.
     var failedSyncMessages: [String] = []
+
+    /// Set at launch when the local store had to be rebuilt or fell back to
+    /// memory, so the rebuild is announced rather than silent (issue #155).
+    var storeRecoveryMessage: String?
 
     func hasPendingChanges(_ taskId: Int64) -> Bool {
         pendingTaskIds.contains(taskId)
@@ -1822,11 +1826,11 @@ final class AppState {
     @MainActor
     func markNotificationRead(_ id: Int64) async {
         do {
-            // Send empty body to mark as read
-            struct EmptyBody: Encodable {}
+            // Vikunja reads the `read` flag off the body and writes read_at from it.
+            // An empty body decodes as read = false, which clears read_at instead.
             let _: VNotification = try await APIClient.shared.send(
                 Endpoint.markNotificationRead(id: id),
-                body: EmptyBody()
+                body: MarkNotificationReadRequest(read: true)
             )
             if let index = notifications.firstIndex(where: { $0.id == id }) {
                 notifications[index].read = true
@@ -1842,8 +1846,10 @@ final class AppState {
     @MainActor
     func markAllNotificationsRead() async {
         do {
-            struct EmptyBody: Encodable {}
-            try await APIClient.shared.sendExpectingEmpty(Endpoint.markAllNotificationsRead, body: EmptyBody())
+            try await APIClient.shared.sendExpectingEmpty(
+                Endpoint.markAllNotificationsRead,
+                body: MarkNotificationReadRequest(read: true)
+            )
             for index in notifications.indices {
                 notifications[index].read = true
                 notifications[index].readAt = Date()
