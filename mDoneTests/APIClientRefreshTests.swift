@@ -19,7 +19,7 @@ final class APIClientRefreshTests: XCTestCase {
     }
 
     private func makeClient() -> APIClient {
-        APIClient(session: MockURLProtocol.mockSession())
+        MockURLProtocol.mockClient()
     }
 
     // MARK: - Cookie capture

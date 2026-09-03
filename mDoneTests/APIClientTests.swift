@@ -191,7 +191,7 @@ final class APIClientTests: XCTestCase {
     // MARK: - APIClient Network Tests (using MockURLProtocol)
 
     private func makeTestClient() -> APIClient {
-        APIClient(session: MockURLProtocol.mockSession())
+        MockURLProtocol.mockClient()
     }
 
     override func setUp() {

@@ -115,7 +115,7 @@ final class KanbanTests: XCTestCase {
     // MARK: - ProjectService.fetchBuckets
 
     func testFetchBucketsReturnsBuckets() async throws {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         let service = ProjectService(apiClient: client)
 
@@ -192,7 +192,7 @@ final class KanbanTests: XCTestCase {
     }
 
     private func makeBucketService() async -> ProjectService {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         return ProjectService(apiClient: client)
     }
@@ -301,7 +301,7 @@ final class KanbanTests: XCTestCase {
     // MARK: - TaskService.moveTaskToBucket
 
     func testMoveTaskToBucketSendsTaskId() async throws {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         let service = TaskService(apiClient: client)
 
@@ -323,7 +323,7 @@ final class KanbanTests: XCTestCase {
 
     @MainActor
     func testAppStateFetchBucketsSortsAndMergesTasks() async {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         let appState = AppState(projectService: ProjectService(apiClient: client))
 
@@ -376,7 +376,7 @@ final class KanbanTests: XCTestCase {
 
     @MainActor
     func testAppStateMoveTaskUpdatesBucketLocally() async {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         let appState = AppState(taskService: TaskService(apiClient: client))
 
@@ -400,7 +400,7 @@ final class KanbanTests: XCTestCase {
 
     @MainActor
     func testAppStateMoveTaskInsertsMissingTask() async {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         let appState = AppState(taskService: TaskService(apiClient: client))
 

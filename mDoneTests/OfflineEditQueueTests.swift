@@ -32,7 +32,7 @@ final class OfflineEditQueueTests: XCTestCase {
     }
 
     private func makeSyncService(container: ModelContainer) async -> SyncService {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         return SyncService(
             taskService: TaskService(apiClient: client),
@@ -43,7 +43,7 @@ final class OfflineEditQueueTests: XCTestCase {
     }
 
     private func makeAppState(sync: SyncService, connected: Bool) async -> AppState {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         let state = AppState(
             taskService: TaskService(apiClient: client),

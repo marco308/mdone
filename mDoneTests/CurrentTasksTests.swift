@@ -19,7 +19,7 @@ final class CurrentTasksTests: XCTestCase {
 
     /// AppState whose task and label services both talk to `MockURLProtocol`.
     private func makeAppState() async -> AppState {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         return AppState(
             taskService: TaskService(apiClient: client),

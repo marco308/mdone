@@ -25,12 +25,32 @@ jobs:
           brew install xcodegen
           xcodegen generate
 
+      # The simulator intermittently fails to inject the test bundle into the
+      # host app: the app launches and idles in its run loop, XCTest never
+      # connects, and the run fails without executing a single test. It is an
+      # Xcode/CoreSimulator flake rather than anything in the code, so retry it
+      # once, and only for that signature. A run that actually executed tests
+      # fails the job as it always did.
       - name: Run unit tests
         run: |
-          xcodebuild \
-            -project mDone.xcodeproj \
-            -scheme mDone \
-            -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 17' \
-            -only-testing:mDoneTests \
-            test
+          set -o pipefail
+          run_tests() {
+            xcodebuild \
+              -project mDone.xcodeproj \
+              -scheme mDone \
+              -sdk iphonesimulator \
+              -destination 'platform=iOS Simulator,name=iPhone 17' \
+              -only-testing:mDoneTests \
+              test 2>&1 | tee "$1"
+          }
+
+          if run_tests test-run-1.log; then
+            exit 0
+          fi
+
+          if grep -qE 'hung before establishing connection|never finished bootstrapping' test-run-1.log; then
+            echo "::warning::Test bundle never connected to the host app; retrying once."
+            run_tests test-run-2.log
+          else
+            exit 1
+          fi
