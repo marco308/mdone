@@ -41,9 +41,9 @@ struct AddTaskIntent: AppIntent {
     static func dialog(for outcome: IntentTaskOutcome) -> String {
         switch outcome {
         case let .created(taskTitle, projectTitle):
-            "Added \"\(taskTitle)\" to \(projectTitle)."
+            String(localized: "Added \"\(taskTitle)\" to \(projectTitle).")
         case let .queued(taskTitle, projectTitle):
-            "Added \"\(taskTitle)\" to \(projectTitle). It will sync when you're back online."
+            String(localized: "Added \"\(taskTitle)\" to \(projectTitle). It will sync when you're back online.")
         }
     }
 }

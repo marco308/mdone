@@ -1106,7 +1106,7 @@ final class AppState {
         }
 
         let project: Project? = if let projectId {
-            projects.first(where: { $0.id == projectId }) ?? Project(id: projectId, title: "your project")
+            projects.first(where: { $0.id == projectId }) ?? Project(id: projectId, title: String(localized: "your project"))
         } else {
             defaultProject
         }
