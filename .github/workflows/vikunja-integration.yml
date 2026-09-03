@@ -32,36 +32,59 @@ jobs:
       fail-fast: false
       matrix:
         # `latest` is the canary: a failure there means upstream changed
-        # something. The pinned tag is the version docs/vikunja-api-inventory.md
-        # was verified against, so a failure there means *we* changed something.
-        # Bump it whenever that doc gets re-verified.
-        vikunja: ["latest", "2.5.0"]
+        # something. The pinned release is the version
+        # docs/vikunja-api-inventory.md was verified against, so a failure
+        # there means *we* changed something. Bump it whenever that doc gets
+        # re-verified. Values are GitHub release tags of go-vikunja/vikunja.
+        vikunja: ["latest", "v2.5.0"]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Start a Docker daemon
-        # macOS runners ship the Docker CLI but no daemon; Colima provides one.
+      - name: Download Vikunja ${{ matrix.vikunja }}
+        # Every Vikunja release ships a native darwin binary, so the server
+        # runs straight on the runner. No Docker on purpose: the hosted arm64
+        # macOS runners are VMs without nested virtualisation, so Colima (or
+        # anything else that has to boot a Linux guest) dies before the daemon
+        # is up.
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          brew list colima >/dev/null 2>&1 || brew install colima
-          brew list docker >/dev/null 2>&1 || brew install docker
-          colima start --cpu 2 --memory 4
+          tag='${{ matrix.vikunja }}'
+          if [ "$tag" = latest ]; then
+            tag=$(gh release view --repo go-vikunja/vikunja --json tagName --jq .tagName)
+          fi
+          arch=$(uname -m)
+          if [ "$arch" = x86_64 ]; then arch=amd64; fi
+          mkdir -p vikunja-server
+          gh release download "$tag" --repo go-vikunja/vikunja \
+            --pattern "vikunja-${tag}-darwin-*-${arch}-full.zip" --dir vikunja-server
+          cd vikunja-server
+          unzip -q vikunja-*.zip
+          shasum -a 256 -c vikunja-*.sha256
+          binary=$(find . -maxdepth 1 -type f -name "vikunja-${tag}-darwin-*" ! -name '*.zip' ! -name '*.sha256')
+          chmod +x "$binary"
+          mv "$binary" vikunja
+          echo "VIKUNJA_RELEASE_TAG=$tag" >> "$GITHUB_ENV"
 
       - name: Start Vikunja ${{ matrix.vikunja }}
-        # No volume on purpose: CI wants an empty server every night, and the
-        # image's own /app/vikunja/files needs a mount or a writable basepath
-        # before it will start at all.
+        # Fresh SQLite database in a scratch directory: CI wants an empty
+        # server every night. The process outlives the step because it is
+        # detached with nohup; "Server logs" below reads what it wrote.
+        working-directory: vikunja-server
+        env:
+          VIKUNJA_SERVICE_PUBLICURL: http://localhost:3456
+          VIKUNJA_SERVICE_INTERFACE: ":3456"
+          VIKUNJA_SERVICE_SECRET: ci-only-not-a-real-secret
+          VIKUNJA_SERVICE_ENABLEREGISTRATION: "true"
+          VIKUNJA_DATABASE_TYPE: sqlite
+          VIKUNJA_DATABASE_PATH: ${{ github.workspace }}/vikunja-server/data/vikunja.db
+          VIKUNJA_FILES_BASEPATH: ${{ github.workspace }}/vikunja-server/data/files
         run: |
-          docker run -d --name vikunja -p 3456:3456 \
-            -e VIKUNJA_SERVICE_PUBLICURL=http://localhost:3456 \
-            -e VIKUNJA_SERVICE_SECRET=ci-only-not-a-real-secret \
-            -e VIKUNJA_DATABASE_TYPE=sqlite \
-            -e VIKUNJA_DATABASE_PATH=/tmp/vikunja/vikunja.db \
-            -e VIKUNJA_FILES_BASEPATH=/tmp/vikunja/files \
-            -e VIKUNJA_SERVICE_ENABLEREGISTRATION=true \
-            vikunja/vikunja:${{ matrix.vikunja }}
-          for i in $(seq 1 60); do
+          mkdir -p data
+          nohup ./vikunja > vikunja.log 2>&1 &
+          for _ in $(seq 1 30); do
             curl -fsS --max-time 2 http://localhost:3456/api/v1/info >/dev/null 2>&1 && break
             sleep 2
           done
@@ -73,7 +96,7 @@ jobs:
         run: |
           version=$(curl -fsS --max-time 5 http://localhost:3456/api/v1/info | jq -r .version)
           echo "VIKUNJA_SERVER_VERSION=$version" >> "$GITHUB_ENV"
-          echo "Image tag \`${{ matrix.vikunja }}\` is Vikunja \`$version\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Matrix entry \`${{ matrix.vikunja }}\` resolved to release \`$VIKUNJA_RELEASE_TAG\`, server reports \`$version\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Seed a user and sample data
         run: ./scripts/seed-dev-vikunja.sh
@@ -115,7 +138,7 @@ jobs:
 
       - name: Server logs
         if: failure()
-        run: docker logs vikunja 2>&1 | tail -100
+        run: tail -100 vikunja-server/vikunja.log
 
       - name: Open or update the tracking issue
         if: failure()
@@ -128,7 +151,7 @@ jobs:
             --description "Raised by the nightly Vikunja integration run" 2>/dev/null || true
 
           body=$(cat <<EOF
-          The nightly run failed against \`vikunja/vikunja:${{ matrix.vikunja }}\`, which reported version \`${VIKUNJA_SERVER_VERSION:-unknown}\`.
+          The nightly run failed against Vikunja release \`${VIKUNJA_RELEASE_TAG:-unknown}\` (matrix entry \`${{ matrix.vikunja }}\`), which reported version \`${VIKUNJA_SERVER_VERSION:-unknown}\`.
 
           Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 

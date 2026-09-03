@@ -115,7 +115,7 @@ Two things to know before adding tests here:
 - **Log in through `IntegrationSession`, never per test.** Vikunja rate-limits `POST /login` per user, and a login per test method starts returning 429 around the tenth test.
 - **Work inside `scratchProject`**, the per-test project the base class creates and deletes, so a run leaves the server as it found it.
 
-[.github/workflows/vikunja-integration.yml](../.github/workflows/vikunja-integration.yml) runs these nightly on a macOS runner (Colima provides the Docker daemon), against both `vikunja/vikunja:latest` and the pinned version below. It is never run on a PR: it tests a moving upstream target, so it must not be able to block a merge. A failure opens or comments on an issue labelled `vikunja-nightly`.
+[.github/workflows/vikunja-integration.yml](../.github/workflows/vikunja-integration.yml) runs these nightly on a macOS runner, against both the latest Vikunja release and the pinned version below. It downloads the native macOS binary from the GitHub release rather than using Docker: the hosted arm64 macOS runners are VMs without nested virtualisation, so no Linux guest (Colima included) can boot on them. It is never run on a PR: it tests a moving upstream target, so it must not be able to block a merge. A failure opens or comments on an issue labelled `vikunja-nightly`.
 
 ### Common scenarios
 
