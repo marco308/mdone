@@ -6,43 +6,62 @@ touches Swift.
 
 ## Adding a language
 
-Add a translation for each key in the catalogs listed below. That is the whole
-job: no project settings to change, no Swift to touch. The catalogs are the
-source of truth, and a language appears in the built bundle as soon as it has
-translations in them.
+Translators never edit the catalogs directly. Each language has one flat file,
+`localization/<lang>.json`, of `"English text" : "translation"` pairs, and
+`scripts/localization.py` moves translations between that file and the
+catalogs. The flat file needs no Mac and no Xcode: it is plain JSON, one line
+per string, and a PR that touches only that file is a complete contribution.
 
-It needs no Mac and no Xcode either. A `.xcstrings` file is JSON, so a
-translator can add their language in any text editor and open a PR against
-those files alone.
-
-A `zh-Hans` entry looks like this:
-
-```json
-"Inbox" : {
-  "localizations" : {
-    "zh-Hans" : {
-      "stringUnit" : { "state" : "translated", "value" : "收件箱" }
-    }
-  }
-}
+```bash
+./scripts/localization.py export zh-Hans          # catalogs -> localization/zh-Hans.json
+./scripts/localization.py import zh-Hans          # localization/zh-Hans.json -> catalogs
+./scripts/localization.py import zh-Hans --check  # validate only, writes nothing
 ```
 
-and a plural like this, with one `stringUnit` per category the language uses
-(Chinese uses only `other`; English uses `one` and `other`):
+To start a language, run `export` once and commit the file it writes. The
+translator fills in the right-hand sides, in any order, over as many PRs as
+they like. A translation left as `""` falls back to English. The maintainer
+runs `import` on each PR, which is what puts the language in the built bundle;
+if the translator only sends the flat file, that is expected.
+
+Most entries are one line:
+
+```json
+"Inbox" : "收件箱",
+```
+
+For a language with a single plural form, such as Chinese, a string with a
+count is the same one line, with the placeholder kept:
+
+```json
+"%lld hours before due" : "%lld 小时前到期",
+```
+
+For a language with several plural forms, export writes one slot per form the
+language uses and shows the English forms as context:
 
 ```json
 "%lld hours before due" : {
-  "localizations" : {
-    "zh-Hans" : {
-      "variations" : {
-        "plural" : {
-          "other" : { "stringUnit" : { "state" : "translated", "value" : "..." } }
-        }
-      }
-    }
-  }
-}
+  "en" : { "one" : "%lld hour before due", "other" : "%lld hours before due" },
+  "plural" : { "one" : "", "other" : "" }
+},
 ```
+
+`en` and `comment` fields are context written by `export` and ignored by
+`import`. The two InfoPlist keys are the one place the key is not the English
+text, so those carry an `en` field too. Keys with no words in them, like
+`"%@, %@"`, are left out of the file because there is nothing to translate.
+
+`import` validates before it writes anything. It refuses a file where a
+translation drops or changes a format specifier (`%@`, `%lld`), mixes indexed
+(`%1$@`) and plain specifiers in one string, fills only some of a string's
+plural forms, or names a key that no catalog has. A dropped `%@` is a crash at
+runtime, not a typo, which is why this is an error and not a warning.
+
+`export` is safe to re-run at any time: it keeps every translation already in
+the catalogs and adds the keys that new copy introduced. `import` writes a
+translation to every catalog that has the key, which is what makes the
+two-bundle rule below the maintainer's problem rather than the translator's.
 
 ## Where the strings are
 
@@ -80,6 +99,9 @@ platform or `#if` branch that this run did not compile.
 
 Xcode's IDE does this sync on every build. `xcodebuild` does not, which is why
 the script exists: it reads the same `.stringsdata` the IDE reads.
+
+After refreshing, re-run `./scripts/localization.py export <lang>` for each
+language in `localization/` so translators see the new keys.
 
 ## Writing localizable Swift
 

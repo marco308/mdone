@@ -22,7 +22,8 @@ Beyond plain task CRUD the app also covers: focus sessions with a Live Activity,
 | `mDoneUITests/`, `mDoneMacUITests/` | XCUITests, including the App Store screenshot runs |
 | `mDoneWidgetRenderTests/` | Unhosted logic tests that render widget views to PNGs for the marketing site |
 | `docs/` | Dev setup, App Store metadata, Vikunja API inventory, research notes |
-| `scripts/` | `seed-dev-vikunja.sh`, `reset-dev-vikunja.sh` for the local dev server |
+| `scripts/` | `seed-dev-vikunja.sh`, `reset-dev-vikunja.sh` for the local dev server; `localization.py` moves translations between `localization/<lang>.json` and the string catalogs |
+| `localization/` | One flat `<lang>.json` per translated language, the file translators edit (see `docs/localization.md`) |
 | `website/` | The GitHub Pages site (deployed by `.github/workflows/deploy-pages.yml`) |
 
 ## Build & Development
