@@ -15,6 +15,11 @@ struct TaskListScreen: View {
     @AppStorage("calmMode") private var calmMode = false
     #if os(iOS)
     @State private var showBoard = false
+    /// On iPad, a task opens in a pane beside the list when there is room;
+    /// see `InlineTaskSelection`. Held here so Inbox and each project screen
+    /// keep their own selection.
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var inlineSelection = InlineTaskSelection()
     #endif
 
     /// A board (Kanban) view is offered only for real, editable projects that
@@ -49,7 +54,7 @@ struct TaskListScreen: View {
 
     var body: some View {
         @Bindable var bindableAppState = appState
-        content
+        adaptiveContent
             .task(id: projectFilter?.id) {
                 if let projectFilter {
                     await appState.fetchProjectTasks(project: projectFilter)
@@ -78,6 +83,51 @@ struct TaskListScreen: View {
                     }
                 }
     }
+
+    /// The list (or board) alone on iPhone; on iPad with room, the same beside
+    /// the selected task's detail pane. The size is read here, not at the
+    /// row, because Split View and Stage Manager can resize the window with
+    /// the list on screen: the pane then gives way and taps go back to
+    /// opening a sheet (issue #34).
+    @ViewBuilder
+    private var adaptiveContent: some View {
+        #if os(iOS)
+        GeometryReader { geometry in
+            let showsPane = InlineTaskDetailLayout.showsPane(
+                isRegularWidth: horizontalSizeClass == .regular,
+                containerWidth: geometry.size.width
+            )
+            HStack(spacing: 0) {
+                content
+                    .environment(showsPane ? inlineSelection : nil)
+
+                if showsPane, let task = inlineTask {
+                    Divider()
+                    TaskDetailSheet(task: task, presentation: .inline { inlineSelection.task = nil })
+                        // Fresh editing state per task; without this the
+                        // pane would keep the previous task's edits.
+                        .id(task.id)
+                        .frame(width: InlineTaskDetailLayout.paneWidth(for: geometry.size.width))
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
+            }
+            .animation(.snappy, value: showsPane && inlineTask != nil)
+        }
+        #else
+        content
+        #endif
+    }
+
+    #if os(iOS)
+    /// The task to show in the pane: the live copy from `AppState` when it
+    /// has one, so edits made from the row are reflected, else the snapshot
+    /// the row was tapped with (board cards can carry tasks the main list
+    /// does not hold).
+    private var inlineTask: VTask? {
+        guard let selected = inlineSelection.task else { return nil }
+        return appState.tasks.first(where: { $0.id == selected.id }) ?? selected
+    }
+    #endif
 
     @ViewBuilder
     private var content: some View {

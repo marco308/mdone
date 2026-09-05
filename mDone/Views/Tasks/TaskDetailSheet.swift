@@ -1,5 +1,16 @@
 import SwiftUI
 
+/// How `TaskDetailSheet` is shown.
+enum TaskDetailPresentation {
+    /// A modal sheet with Cancel and Save in its navigation bar: iPhone, and
+    /// any iPad layout too narrow for a pane.
+    case sheet
+    /// A pane beside the task list on iPad, with its own header row in place
+    /// of a navigation bar. `onClose` replaces dismiss: it runs when the user
+    /// cancels, saves or deletes (issue #34).
+    case inline(onClose: () -> Void)
+}
+
 struct TaskDetailSheet: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
@@ -7,6 +18,7 @@ struct TaskDetailSheet: View {
     @Environment(FocusManager.self) private var focusManager
     #endif
     let task: VTask
+    var presentation: TaskDetailPresentation = .sheet
 
     @State private var title: String
     @State private var description: String
@@ -23,8 +35,9 @@ struct TaskDetailSheet: View {
     @State private var estimateSeconds: TimeInterval?
     @State private var percentDone: Double
 
-    init(task: VTask) {
+    init(task: VTask, presentation: TaskDetailPresentation = .sheet) {
         self.task = task
+        self.presentation = presentation
         let initialDescription = task.userVisibleDescription ?? ""
         _title = State(initialValue: task.title)
         _description = State(initialValue: initialDescription)
@@ -48,197 +61,251 @@ struct TaskDetailSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("Task title", text: $title)
-                        .font(.headline)
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Description")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Button {
-                                isShowingDescriptionPreview.toggle()
-                            } label: {
-                                Image(systemName: isShowingDescriptionPreview ? "pencil" : "eye")
-                                    .font(.caption)
-                            }
-                            .buttonStyle(.borderless)
-                            .accessibilityLabel(isShowingDescriptionPreview ? "Edit description" :
-                                "Preview description")
+        switch presentation {
+        case .sheet:
+            NavigationStack {
+                form
+                    .navigationTitle("Edit Task")
+                    #if os(iOS)
+                    .navigationBarTitleDisplayMode(.inline)
+                    #endif
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") { close() }
                         }
-
-                        if isShowingDescriptionPreview {
-                            if description.isEmpty {
-                                Text("No description")
-                                    .font(.body)
-                                    .foregroundStyle(.secondary)
-                                    .italic()
-                            } else {
-                                Text(RichTextRenderer.render(description))
-                                    .font(.body)
-                                    .textSelection(.enabled)
-                            }
-                        } else {
-                            TextEditor(text: $description)
-                                .font(.body)
-                                .frame(minHeight: 80)
-                                .scrollContentBackground(.hidden)
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Save") { saveTask() }
+                                .fontWeight(.semibold)
+                                .disabled(!canSave)
                         }
                     }
-                }
+            }
+            #if os(iOS)
+            .presentationDetents([.medium, .large])
+            #endif
+        case .inline:
+            VStack(spacing: 0) {
+                inlineHeader
+                Divider()
+                form
+            }
+            #if os(iOS)
+            // Match the list's grouped background, and carry it up under the
+            // floating top bar the way the list does, so the pane does not
+            // sit on a white strip.
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            #endif
+        }
+    }
 
-                #if os(iOS)
-                Section("Focus") {
-                    if focusManager.focusedTaskId == task.id {
+    /// The header the inline pane shows instead of a navigation bar. Escape
+    /// and Cmd-S mirror the sheet's Cancel and Save for an iPad keyboard.
+    private var inlineHeader: some View {
+        ZStack {
+            Text("Edit Task")
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+
+            HStack {
+                Button("Cancel") { close() }
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("Save") { saveTask() }
+                    .fontWeight(.semibold)
+                    .keyboardShortcut("s", modifiers: .command)
+                    .disabled(!canSave)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 12)
+        .background(.bar)
+    }
+
+    private var canSave: Bool {
+        !title.isEmpty && TaskScheduleEditor.isValid(startDate: startDate, endDate: endDate)
+    }
+
+    /// Leaves the detail view the way it was shown: dismissing the sheet, or
+    /// telling the hosting screen to clear the pane.
+    private func close() {
+        switch presentation {
+        case .sheet:
+            dismiss()
+        case let .inline(onClose):
+            onClose()
+        }
+    }
+
+    private var form: some View {
+        Form {
+            Section {
+                TextField("Task title", text: $title)
+                    .font(.headline)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Description")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Spacer()
                         Button {
-                            focusManager.endFocus()
+                            isShowingDescriptionPreview.toggle()
                         } label: {
-                            Label("End Focus", systemImage: "scope")
-                                .foregroundStyle(.orange)
+                            Image(systemName: isShowingDescriptionPreview ? "pencil" : "eye")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel(isShowingDescriptionPreview ? "Edit description" :
+                            "Preview description")
+                    }
+
+                    if isShowingDescriptionPreview {
+                        if description.isEmpty {
+                            Text("No description")
+                                .font(.body)
+                                .foregroundStyle(.secondary)
+                                .italic()
+                        } else {
+                            Text(RichTextRenderer.render(description))
+                                .font(.body)
+                                .textSelection(.enabled)
                         }
                     } else {
-                        Button {
-                            let projectName = appState.projects
-                                .first(where: { $0.id == task.projectId })?.title ?? String(localized: "Inbox")
-                            focusManager.startFocus(task: task, projectName: projectName)
-                        } label: {
-                            Label("Focus on This Task", systemImage: "scope")
-                        }
+                        TextEditor(text: $description)
+                            .font(.body)
+                            .frame(minHeight: 80)
+                            .scrollContentBackground(.hidden)
                     }
-                    FocusHistoryRow(taskId: task.id)
                 }
-                #endif
+            }
 
-                Section("Current") {
+            #if os(iOS)
+            Section("Focus") {
+                if focusManager.focusedTaskId == task.id {
                     Button {
-                        Task { await appState.toggleCurrent(task) }
+                        focusManager.endFocus()
                     } label: {
-                        Label(
-                            isCurrentNow ? "Remove from Current" : "Mark as Current",
-                            systemImage: isCurrentNow ? "pin.slash" : "pin"
-                        )
+                        Label("End Focus", systemImage: "scope")
+                            .foregroundStyle(.orange)
                     }
+                } else {
+                    Button {
+                        let projectName = appState.projects
+                            .first(where: { $0.id == task.projectId })?.title ?? String(localized: "Inbox")
+                        focusManager.startFocus(task: task, projectName: projectName)
+                    } label: {
+                        Label("Focus on This Task", systemImage: "scope")
+                    }
+                }
+                FocusHistoryRow(taskId: task.id)
+            }
+            #endif
 
-                    VStack(alignment: .leading, spacing: 4) {
+            Section("Current") {
+                Button {
+                    Task { await appState.toggleCurrent(task) }
+                } label: {
+                    Label(
+                        isCurrentNow ? "Remove from Current" : "Mark as Current",
+                        systemImage: isCurrentNow ? "pin.slash" : "pin"
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Progress")
+                        Spacer()
+                        Text("\(Int((percentDone * 100).rounded()))%")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                    Slider(value: $percentDone, in: 0 ... 1, step: 0.05)
+                        .accessibilityLabel("Progress")
+                        .accessibilityValue("\(Int((percentDone * 100).rounded())) percent")
+                }
+            }
+
+            TaskRelationsSections(task: task)
+
+            TaskScheduleEditor(
+                dueDate: $dueDate,
+                startDate: $startDate,
+                endDate: $endDate
+            )
+
+            Section {
+                EstimatePicker(estimateSeconds: $estimateSeconds)
+            }
+
+            Section("Repeat") {
+                Picker("Repeat", selection: $repeatInterval) {
+                    Text("Never").tag(Int64(0))
+                    Text("Daily").tag(Int64(86400))
+                    Text("Weekly").tag(Int64(604_800))
+                    Text("Every 2 Weeks").tag(Int64(1_209_600))
+                    Text("Monthly").tag(Int64(2_592_000))
+                    Text("Yearly").tag(Int64(31_536_000))
+                }
+            }
+
+            Section("Reminders") {
+                ReminderEditor(reminders: $reminders)
+            }
+
+            Section("Priority") {
+                Picker("Priority", selection: $priority) {
+                    ForEach(PriorityLevel.allCases, id: \.rawValue) { level in
                         HStack {
-                            Text("Progress")
-                            Spacer()
-                            Text("\(Int((percentDone * 100).rounded()))%")
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
+                            PriorityBadge(priority: level)
+                            Text(level.label)
                         }
-                        Slider(value: $percentDone, in: 0 ... 1, step: 0.05)
-                            .accessibilityLabel("Progress")
-                            .accessibilityValue("\(Int((percentDone * 100).rounded())) percent")
+                        .tag(Int64(level.rawValue))
                     }
                 }
+                .pickerStyle(.menu)
+            }
 
-                TaskRelationsSections(task: task)
-
-                TaskScheduleEditor(
-                    dueDate: $dueDate,
-                    startDate: $startDate,
-                    endDate: $endDate
-                )
-
-                Section {
-                    EstimatePicker(estimateSeconds: $estimateSeconds)
-                }
-
-                Section("Repeat") {
-                    Picker("Repeat", selection: $repeatInterval) {
-                        Text("Never").tag(Int64(0))
-                        Text("Daily").tag(Int64(86400))
-                        Text("Weekly").tag(Int64(604_800))
-                        Text("Every 2 Weeks").tag(Int64(1_209_600))
-                        Text("Monthly").tag(Int64(2_592_000))
-                        Text("Yearly").tag(Int64(31_536_000))
-                    }
-                }
-
-                Section("Reminders") {
-                    ReminderEditor(reminders: $reminders)
-                }
-
-                Section("Priority") {
-                    Picker("Priority", selection: $priority) {
-                        ForEach(PriorityLevel.allCases, id: \.rawValue) { level in
-                            HStack {
-                                PriorityBadge(priority: level)
-                                Text(level.label)
-                            }
-                            .tag(Int64(level.rawValue))
+            if !appState.projects.isEmpty {
+                Section("Project") {
+                    Picker("Project", selection: $selectedProjectId) {
+                        ForEach(appState.projects.projectHierarchy().flattened { _ in true }) { row in
+                            Text(String(repeating: "  ", count: row.depth) + row.project.title)
+                                .tag(row.project.id)
                         }
                     }
                     .pickerStyle(.menu)
                 }
+            }
 
-                if !appState.projects.isEmpty {
-                    Section("Project") {
-                        Picker("Project", selection: $selectedProjectId) {
-                            ForEach(appState.projects.projectHierarchy().flattened { _ in true }) { row in
-                                Text(String(repeating: "  ", count: row.depth) + row.project.title)
-                                    .tag(row.project.id)
-                            }
+            if let labels = task.labels, !labels.isEmpty {
+                Section("Labels") {
+                    FlowLayout(spacing: 8) {
+                        ForEach(labels) { label in
+                            LabelChip(label: label)
                         }
-                        .pickerStyle(.menu)
-                    }
-                }
-
-                if let labels = task.labels, !labels.isEmpty {
-                    Section("Labels") {
-                        FlowLayout(spacing: 8) {
-                            ForEach(labels) { label in
-                                LabelChip(label: label)
-                            }
-                        }
-                    }
-                }
-
-                Section {
-                    Button("Delete Task", role: .destructive) {
-                        showDeleteConfirm = true
                     }
                 }
             }
-            .navigationTitle("Edit Task")
-            #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
-            #endif
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { dismiss() }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Save") { saveTask() }
-                            .fontWeight(.semibold)
-                            .disabled(
-                                title.isEmpty || !TaskScheduleEditor.isValid(
-                                    startDate: startDate,
-                                    endDate: endDate
-                                )
-                            )
-                    }
+
+            Section {
+                Button("Delete Task", role: .destructive) {
+                    showDeleteConfirm = true
                 }
-                .alert("Delete Task?", isPresented: $showDeleteConfirm) {
-                    Button("Delete", role: .destructive) {
-                        Task {
-                            await appState.deleteTask(task)
-                            dismiss()
-                        }
-                    }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("This action cannot be undone.")
-                }
+            }
         }
-        #if os(iOS)
-        .presentationDetents([.medium, .large])
-        #endif
+        .alert("Delete Task?", isPresented: $showDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                // Explicitly main-actor: `close()` touches view state
+                // (dismiss, or the pane's selection) after the await.
+                Task { @MainActor in
+                    await appState.deleteTask(task)
+                    close()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This action cannot be undone.")
+        }
     }
 
     private func saveTask() {
@@ -265,9 +332,9 @@ struct TaskDetailSheet: View {
             clearStartDate: startDate == nil,
             clearEndDate: endDate == nil
         )
-        Task {
+        Task { @MainActor in
             await appState.updateTask(id: task.id, request: request)
-            dismiss()
+            close()
         }
     }
 }

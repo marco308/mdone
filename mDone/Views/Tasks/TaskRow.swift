@@ -4,6 +4,9 @@ struct TaskRow: View {
     @Environment(AppState.self) private var appState
     #if os(iOS)
     @Environment(FocusManager.self) private var focusManager
+    /// Present only while the hosting screen shows an inline detail pane
+    /// (iPad, regular width). Absent, a tap opens the sheet as on iPhone.
+    @Environment(InlineTaskSelection.self) private var inlineSelection: InlineTaskSelection?
     #endif
     let task: VTask
     /// When true, the row is display-only: no completion toggle, swipe actions,
@@ -33,6 +36,21 @@ struct TaskRow: View {
     private var isFocused: Bool {
         focusManager.focusedTaskId == task.id
     }
+
+    /// True while this task is the one open in the inline detail pane.
+    private var isSelectedInline: Bool {
+        inlineSelection?.task?.id == task.id
+    }
+
+    private var rowBackground: Color? {
+        if isFocused {
+            return Color.orange.opacity(0.08)
+        }
+        if isSelectedInline {
+            return Color.accentColor.opacity(0.12)
+        }
+        return nil
+    }
     #endif
 
     var body: some View {
@@ -40,11 +58,14 @@ struct TaskRow: View {
         #if os(iOS)
         .contentShape(Rectangle())
         .onTapGesture {
-            if !readOnly {
+            guard !readOnly else { return }
+            if let inlineSelection {
+                inlineSelection.task = task
+            } else {
                 showDetail = true
             }
         }
-        .listRowBackground(isFocused ? Color.orange.opacity(0.08) : nil)
+        .listRowBackground(rowBackground)
         #endif
         .swipeActions(edge: .leading) {
             if !readOnly {

@@ -140,6 +140,11 @@ private struct BoardColumn: View {
 /// to" submenu and a done toggle via its context menu.
 private struct BoardTaskCard: View {
     @Environment(AppState.self) private var appState
+    #if os(iOS)
+    /// Present while the hosting screen shows an inline detail pane (iPad,
+    /// regular width); absent, a tap opens the sheet.
+    @Environment(InlineTaskSelection.self) private var inlineSelection: InlineTaskSelection?
+    #endif
     let task: VTask
     let otherBuckets: [Bucket]
     let project: Project
@@ -151,7 +156,15 @@ private struct BoardTaskCard: View {
         card
             #if os(iOS)
             .contentShape(Rectangle())
-            .onTapGesture { showDetail = true }
+            .onTapGesture {
+                if let inlineSelection {
+                    inlineSelection.task = task
+                } else {
+                    showDetail = true
+                }
+            }
+            // Cards lift under a trackpad or mouse pointer on iPad.
+            .hoverEffect(.lift)
             .sheet(isPresented: $showDetail) {
                 TaskDetailSheet(task: task)
             }
