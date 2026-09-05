@@ -295,7 +295,9 @@ struct TaskDetailSheet: View {
         }
         .alert("Delete Task?", isPresented: $showDeleteConfirm) {
             Button("Delete", role: .destructive) {
-                Task {
+                // Explicitly main-actor: `close()` touches view state
+                // (dismiss, or the pane's selection) after the await.
+                Task { @MainActor in
                     await appState.deleteTask(task)
                     close()
                 }
@@ -330,7 +332,7 @@ struct TaskDetailSheet: View {
             clearStartDate: startDate == nil,
             clearEndDate: endDate == nil
         )
-        Task {
+        Task { @MainActor in
             await appState.updateTask(id: task.id, request: request)
             close()
         }
