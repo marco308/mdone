@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- On iPad, tapping a task now opens it in a panel beside the list instead of a sheet, so you can work through tasks without covering the list. The panel appears whenever the window is wide enough, including in Split View and Stage Manager, and hands back to the sheet when it is not. Escape cancels and Cmd-S saves from a hardware keyboard, and Kanban cards lift under a trackpad pointer (#34).
+
 ## [1.15.0] - 2026-09-03
 
 ### Added
