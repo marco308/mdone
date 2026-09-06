@@ -348,7 +348,9 @@ final class AppState {
     /// exists to stop us copying three times (noted in the PR #103 review).
     private enum LoginMethod {
         case apiToken(String)
-        case credentials(username: String, password: String)
+        /// `totpPasscode` is nil when the user left the two-factor field
+        /// empty, so the request omits it rather than sending "".
+        case credentials(username: String, password: String, totpPasscode: String?)
         /// `redirectURI` must be byte-identical to the one sent on the
         /// authorization request, or Vikunja's exchange fails with
         /// `invalid_grant`. Thread the same constant through, never rebuild it.
@@ -360,9 +362,21 @@ final class AppState {
         try await completeLogin(serverURL: serverURL, using: .apiToken(token))
     }
 
+    /// Signs in with a username and password, plus the account's two-factor
+    /// passcode when it has one (issue #179). Throws `NetworkError.totpRequired`
+    /// when the account needs a passcode and none was given, so the setup
+    /// screen can reveal the field.
     @MainActor
-    func loginWithCredentials(serverURL: String, username: String, password: String) async throws {
-        try await completeLogin(serverURL: serverURL, using: .credentials(username: username, password: password))
+    func loginWithCredentials(
+        serverURL: String,
+        username: String,
+        password: String,
+        totpPasscode: String? = nil
+    ) async throws {
+        try await completeLogin(
+            serverURL: serverURL,
+            using: .credentials(username: username, password: password, totpPasscode: totpPasscode)
+        )
     }
 
     /// Finishes an OIDC login with the code the auth session brought back.
@@ -436,13 +450,18 @@ final class AppState {
             // refresh it", which cannot work for an API token.
             return (token, nil)
 
-        case let .credentials(username, password):
+        case let .credentials(username, password, totpPasscode):
             await APIClient.shared.configure(serverURL: serverURL, token: "")
-            let response: LoginResponse = try await APIClient.shared.send(
-                Endpoint.login,
-                body: LoginRequest(username: username, password: password)
-            )
-            return await (response.token, APIClient.shared.currentRefreshToken())
+            do {
+                let response: LoginResponse = try await APIClient.shared.send(
+                    Endpoint.login,
+                    body: LoginRequest(username: username, password: password, totpPasscode: totpPasscode)
+                )
+                return await (response.token, APIClient.shared.currentRefreshToken())
+            } catch let error as NetworkError {
+                // Vikunja cannot tell a missing passcode from a wrong one; we can.
+                throw error.forCredentialLogin(sentPasscode: totpPasscode != nil)
+            }
 
         case let .oidc(provider, code, redirectURI):
             await APIClient.shared.configure(serverURL: serverURL, token: "")

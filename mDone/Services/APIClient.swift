@@ -272,7 +272,7 @@ actor APIClient {
             throw NetworkError.rateLimited
         default:
             let apiError = try? decoder.decode(APIError.self, from: data)
-            throw NetworkError.serverError(statusCode: httpResponse.statusCode, message: apiError?.message)
+            throw NetworkError.fromResponse(statusCode: httpResponse.statusCode, apiError: apiError)
         }
     }
 

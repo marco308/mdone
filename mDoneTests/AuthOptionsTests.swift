@@ -257,5 +257,59 @@ final class AuthOptionsTests: XCTestCase {
         XCTAssertTrue(options.showsCredentials)
         XCTAssertTrue(options.showsAPIToken)
         XCTAssertTrue(options.providers.isEmpty)
+        XCTAssertFalse(options.showsTOTP)
+    }
+
+    // MARK: - Two-factor (issue #179)
+
+    /// `totp_enabled` sits at the top level of `/info`, beside `version`, not
+    /// inside `auth`. Copied from a real v2.4.0 response.
+    private let totpJSON = """
+    {
+      "version": "v2.4.0",
+      "totp_enabled": true,
+      "auth": {
+        "local": { "enabled": true, "registration_enabled": true },
+        "ldap": { "enabled": false },
+        "openid_connect": { "enabled": false, "providers": null }
+      }
+    }
+    """
+
+    func testTOTPEnabledInstanceOffersTheCodeField() throws {
+        let info = try decode(totpJSON)
+        XCTAssertTrue(info.totpEnabled)
+        XCTAssertTrue(AuthOptions(info: info).showsTOTP)
+    }
+
+    func testTOTPDisabledInstanceHidesTheCodeField() throws {
+        let info = try decode(stockJSON.replacingOccurrences(
+            of: "\"version\": \"v2.4.0\",",
+            with: "\"version\": \"v2.4.0\", \"totp_enabled\": false,"
+        ))
+        XCTAssertFalse(info.totpEnabled)
+        XCTAssertFalse(AuthOptions(info: info).showsTOTP)
+    }
+
+    func testMissingTOTPFlagMeansNoCodeField() throws {
+        // The field is only a convenience. A server that does not say either
+        // way gets the plain form, and the field is revealed on demand if a
+        // login is refused for lack of a code.
+        let info = try decode(stockJSON)
+        XCTAssertFalse(info.totpEnabled)
+        XCTAssertFalse(AuthOptions(info: info).showsTOTP)
+    }
+
+    func testTOTPFieldIsIndependentOfSSO() throws {
+        // An instance can have two-factor on for password accounts and SSO
+        // for everyone else; the flags must not interfere.
+        let info = try decode(oidcJSON.replacingOccurrences(
+            of: "\"version\": \"v2.4.0\",",
+            with: "\"version\": \"v2.4.0\", \"totp_enabled\": true,"
+        ))
+        let options = AuthOptions(info: info)
+        XCTAssertTrue(options.showsTOTP)
+        XCTAssertTrue(options.showsCredentials)
+        XCTAssertEqual(options.providers.map(\.key), ["authelia"])
     }
 }
