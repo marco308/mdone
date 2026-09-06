@@ -71,6 +71,22 @@ final class TOTPLoginTests: XCTestCase {
         XCTAssertEqual(message, "Totp is not enabled for this user.")
     }
 
+    func testLoginCodeUnderAnotherStatusStaysAServerError() async {
+        // The mapping is on status and code together. Code 1017 under a
+        // status Vikunja does not use for it is not the login refusal this
+        // was written for, and must not masquerade as one.
+        let error = await login(status: 400, body: #"{"code":1017,"message":"Invalid totp passcode."}"#)
+        guard case let .serverError(status, _) = error else {
+            return XCTFail("Expected .serverError, got \(String(describing: error))")
+        }
+        XCTAssertEqual(status, 400)
+
+        let mismatched = await login(status: 412, body: #"{"code":1011,"message":"Wrong username or password."}"#)
+        guard case .serverError = mismatched else {
+            return XCTFail("Expected .serverError, got \(String(describing: mismatched))")
+        }
+    }
+
     func testBodyWithoutCodeStaysAServerError() async {
         let error = await login(status: 412, body: "not json")
         guard case let .serverError(status, message) = error else {

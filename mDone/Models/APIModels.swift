@@ -195,12 +195,14 @@ enum NetworkError: LocalizedError {
     /// server's message. The two Vikunja login refusals get their own cases so
     /// the setup screen can react to them (issue #179): a 403 with code 1011 is
     /// a wrong username or password, a 412 with code 1017 is a two-factor
-    /// passcode problem. Both come only from `POST /login`.
+    /// passcode problem. Both come only from `POST /login`. The status is part
+    /// of the match on purpose: the same code under a different status is not
+    /// the response this was written for, and stays generic.
     static func fromResponse(statusCode: Int, apiError: APIError?) -> NetworkError {
-        switch apiError?.code {
-        case APIError.Code.wrongUsernameOrPassword:
+        switch (statusCode, apiError?.code) {
+        case (403, APIError.Code.wrongUsernameOrPassword):
             .invalidCredentials
-        case APIError.Code.invalidTOTPPasscode:
+        case (412, APIError.Code.invalidTOTPPasscode):
             .invalidTOTPPasscode
         default:
             .serverError(statusCode: statusCode, message: apiError?.message)

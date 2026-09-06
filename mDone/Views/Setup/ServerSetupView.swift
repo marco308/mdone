@@ -304,7 +304,10 @@ struct ServerSetupView: View {
     /// The passcode as sent: whitespace stripped, since authenticator apps
     /// display codes as "123 456", and nil when empty so the request omits
     /// the field rather than sending "" (which Vikunja treats as wrong).
+    /// Nothing is sent while the field is hidden, so a code typed for one
+    /// server can never ride along invisibly to another.
     private var totpPasscodeToSend: String? {
+        guard showsTOTPField else { return nil }
         let code = totpCode.filter { !$0.isWhitespace }
         return code.isEmpty ? nil : code
     }
@@ -336,8 +339,10 @@ struct ServerSetupView: View {
     private func checkServer(debounce: Bool) {
         probeTask?.cancel()
 
-        // A new server may not want a code at all.
+        // A new server may not want a code at all, and a code typed for the
+        // previous one must not carry over.
         totpRevealed = false
+        totpCode = ""
 
         guard let url = ServerURL.normalized(serverURL) else {
             authOptions = .unknownServer
