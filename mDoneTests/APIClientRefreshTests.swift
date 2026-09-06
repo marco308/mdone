@@ -226,6 +226,194 @@ final class APIClientRefreshTests: XCTestCase {
         XCTAssertEqual(expiredFlag.value, true)
     }
 
+    // MARK: - API token scope vs revoked token (#178)
+
+    func testAPIToken401WithLiveProbeThrowsMissingPermissionWithoutExpiring() async {
+        let client = makeClient()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "tk_apikey_abcdef123456")
+
+        let expiredFlag = AsyncBox<Bool>()
+        await client.setOnSessionExpired { expiredFlag.set(true) }
+
+        let counter = RequestCounter()
+        MockURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+            counter.record(
+                path: path,
+                authorization: request.value(forHTTPHeaderField: "Authorization") ?? "",
+                cookie: nil
+            )
+            if path.hasSuffix("/projects") {
+                return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), Data("[]".utf8))
+            }
+            // The token was created without the notifications permission.
+            return (MockURLProtocol.makeResponse(statusCode: 401, url: request.url), Data())
+        }
+
+        do {
+            let _: [VNotification] = try await client.fetch(Endpoint.notifications())
+            XCTFail("Expected missingPermission")
+        } catch let error as NetworkError {
+            guard case .missingPermission = error else {
+                return XCTFail("Expected .missingPermission, got \(error)")
+            }
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+
+        XCTAssertNil(expiredFlag.value, "A token that still reads projects is alive; the session must survive")
+        let probes = counter.entries(forPath: "/api/v1/projects")
+        XCTAssertEqual(probes.count, 1, "Exactly one liveness probe")
+        XCTAssertEqual(
+            probes.first?.authorization,
+            "Bearer tk_apikey_abcdef123456",
+            "The probe must use the same token that was refused"
+        )
+        XCTAssertEqual(counter.totalCount, 2, "Original request plus one probe, nothing else")
+    }
+
+    func testAPIToken401WithDeadProbeSurfacesUnauthorizedAndExpires() async {
+        let client = makeClient()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "tk_apikey_abcdef123456")
+
+        let expiredFlag = AsyncBox<Bool>()
+        await client.setOnSessionExpired { expiredFlag.set(true) }
+
+        let counter = RequestCounter()
+        MockURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+            counter.record(path: path, authorization: "", cookie: nil)
+            // Revoked token: every route 401s, including the probe.
+            return (MockURLProtocol.makeResponse(statusCode: 401, url: request.url), Data())
+        }
+
+        do {
+            let _: [VNotification] = try await client.fetch(Endpoint.notifications())
+            XCTFail("Expected unauthorized")
+        } catch let error as NetworkError {
+            guard case .unauthorized = error else {
+                return XCTFail("Expected .unauthorized, got \(error)")
+            }
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+
+        XCTAssertEqual(expiredFlag.value, true, "A token the probe route also refuses is dead")
+        XCTAssertEqual(counter.count(forPath: "/api/v1/projects"), 1)
+    }
+
+    func testAPIToken401OnTheProbeRouteItselfExpiresWithoutProbing() async {
+        let client = makeClient()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "tk_apikey_abcdef123456")
+
+        let expiredFlag = AsyncBox<Bool>()
+        await client.setOnSessionExpired { expiredFlag.set(true) }
+
+        let counter = RequestCounter()
+        MockURLProtocol.requestHandler = { request in
+            counter.record(path: request.url?.path ?? "", authorization: "", cookie: nil)
+            return (MockURLProtocol.makeResponse(statusCode: 401, url: request.url), Data())
+        }
+
+        do {
+            let _: [Project] = try await client.fetch(Endpoint.projects(page: 1, perPage: 50))
+            XCTFail("Expected unauthorized")
+        } catch let error as NetworkError {
+            guard case .unauthorized = error else {
+                return XCTFail("Expected .unauthorized, got \(error)")
+            }
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+
+        XCTAssertEqual(expiredFlag.value, true)
+        XCTAssertEqual(counter.totalCount, 1, "Probing the route that just 401'd would only repeat the answer")
+    }
+
+    func testAPIToken401WithProbeTransportFailureDoesNotExpire() async {
+        let client = makeClient()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "tk_apikey_abcdef123456")
+
+        let expiredFlag = AsyncBox<Bool>()
+        await client.setOnSessionExpired { expiredFlag.set(true) }
+
+        MockURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+            if path.hasSuffix("/projects") {
+                throw URLError(.notConnectedToInternet)
+            }
+            return (MockURLProtocol.makeResponse(statusCode: 401, url: request.url), Data())
+        }
+
+        do {
+            let _: [VNotification] = try await client.fetch(Endpoint.notifications())
+            XCTFail("Expected a connectivity error")
+        } catch let error as NetworkError {
+            XCTAssertTrue(error.isConnectivityFailure, "Expected a connectivity error, got \(error)")
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+
+        XCTAssertNil(expiredFlag.value, "Not knowing whether the token is alive must never clear the Keychain")
+    }
+
+    func testConcurrentAPIToken401sShareOneProbe() async {
+        let client = makeClient()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "tk_apikey_abcdef123456")
+
+        let expiredFlag = AsyncBox<Bool>()
+        await client.setOnSessionExpired { expiredFlag.set(true) }
+
+        let counter = RequestCounter()
+        let probeGate = HeldRequests()
+        MockURLProtocol.asynchronousRequestHandler = { request, proto in
+            let path = request.url?.path ?? ""
+            counter.record(path: path, authorization: "", cookie: nil)
+            if path.hasSuffix("/projects") {
+                // Hold the probe open until both 401s have queued behind it.
+                probeGate.hold(proto, url: request.url)
+                return
+            }
+            proto.complete(response: MockURLProtocol.makeResponse(statusCode: 401, url: request.url), data: Data())
+        }
+
+        let outcomes = OutcomeBox()
+        let firstDone = Task {
+            do {
+                let _: [VNotification] = try await client.fetch(Endpoint.notifications())
+                outcomes.append(nil)
+            } catch {
+                outcomes.append(error)
+            }
+        }
+        let secondDone = Task {
+            do {
+                let _: [VNotification] = try await client.fetch(Endpoint.notifications())
+                outcomes.append(nil)
+            } catch {
+                outcomes.append(error)
+            }
+        }
+
+        await probeGate.waitUntilHeld(count: 1)
+        // Give the second 401 time to reach the single-flight join before the
+        // probe answers, otherwise it could legitimately start its own.
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        probeGate.releaseAll(statusCode: 200, data: Data("[]".utf8))
+        await firstDone.value
+        await secondDone.value
+
+        XCTAssertEqual(outcomes.errors.count, 2)
+        for error in outcomes.errors {
+            guard case NetworkError.missingPermission? = error as? NetworkError else {
+                return XCTFail("Expected .missingPermission, got \(String(describing: error))")
+            }
+        }
+
+        XCTAssertNil(expiredFlag.value)
+        XCTAssertEqual(counter.count(forPath: "/api/v1/projects"), 1, "Both 401s must share one probe")
+    }
+
     // MARK: - Callback contract
 
     func testRefreshFiresOnTokensUpdatedCallback() async throws {
@@ -509,5 +697,56 @@ private final class RequestCounter: @unchecked Sendable {
     func entries(forPath path: String) -> [Entry] {
         lock.lock(); defer { lock.unlock() }
         return perPath[path] ?? []
+    }
+}
+
+/// Collects the errors (or nil for success) of concurrently finishing tasks.
+private final class OutcomeBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [Error?] = []
+
+    var errors: [Error?] {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored
+    }
+
+    func append(_ error: Error?) {
+        lock.lock()
+        defer { lock.unlock() }
+        stored.append(error)
+    }
+}
+
+/// Parks in-flight mock requests so a test can release them together.
+private final class HeldRequests: @unchecked Sendable {
+    private let lock = NSLock()
+    private var held: [(MockURLProtocol, URL?)] = []
+
+    func hold(_ proto: MockURLProtocol, url: URL?) {
+        lock.lock()
+        defer { lock.unlock() }
+        held.append((proto, url))
+    }
+
+    func waitUntilHeld(count: Int) async {
+        for _ in 0 ..< 200 {
+            let current = lock.withLock { held.count }
+            if current >= count {
+                return
+            }
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+    }
+
+    func releaseAll(statusCode: Int, data: Data) {
+        let toRelease = lock.withLock { () -> [(MockURLProtocol, URL?)] in
+            let copy = held
+            held = []
+            return copy
+        }
+        for (proto, url) in toRelease {
+            proto.complete(response: MockURLProtocol.makeResponse(statusCode: statusCode, url: url), data: data)
+        }
     }
 }

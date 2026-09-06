@@ -61,6 +61,10 @@ enum NetworkError: LocalizedError {
     case totpRequired
     /// `POST /login` rejected the two-factor passcode that was sent.
     case invalidTOTPPasscode
+    /// The API token is valid but was created without the permission this
+    /// request needs. Distinct from `.unauthorized` so callers do not end the
+    /// session over it (#178).
+    case missingPermission
     case serverError(statusCode: Int, message: String?)
     case decodingError(Error)
     case networkUnavailable
@@ -85,6 +89,8 @@ enum NetworkError: LocalizedError {
             String(
                 localized: "That two-factor code wasn't accepted. Codes change every 30 seconds, so check your authenticator app and try again."
             )
+        case .missingPermission:
+            String(localized: "Your API token doesn't have permission for this.")
         case let .serverError(code, _):
             if code >= 500 {
                 String(localized: "The server is having trouble. Please try again in a moment.")
@@ -118,6 +124,10 @@ enum NetworkError: LocalizedError {
             String(localized: "Open your authenticator app and enter the current six-digit code.")
         case .invalidTOTPPasscode:
             String(localized: "Make sure your device's clock is correct, then enter a fresh code.")
+        case .missingPermission:
+            String(
+                localized: "In Vikunja, create a new API token with every permission ticked, then sign in with it in Settings."
+            )
         case let .serverError(code, _):
             if code >= 500 {
                 String(localized: "The server may be temporarily unavailable. Wait a moment and try again.")
@@ -150,6 +160,8 @@ enum NetworkError: LocalizedError {
             "person.badge.key"
         case .totpRequired, .invalidTOTPPasscode:
             "lock.shield"
+        case .missingPermission:
+            "person.badge.key"
         case .serverError:
             "exclamationmark.icloud"
         case .decodingError:
@@ -182,7 +194,7 @@ enum NetworkError: LocalizedError {
     /// Whether this error is critical and requires user action (should not auto-dismiss).
     var isCritical: Bool {
         switch self {
-        case .unauthorized, .invalidURL:
+        case .unauthorized, .invalidURL, .missingPermission:
             true
         default:
             false

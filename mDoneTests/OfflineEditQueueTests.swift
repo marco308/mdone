@@ -289,9 +289,15 @@ final class OfflineEditQueueTests: XCTestCase {
         await state.toggleTaskDone(state.tasks[1])
         XCTAssertEqual(sync.pendingOperationCount(), 2)
 
-        var requestCount = 0
+        var replayCount = 0
         MockURLProtocol.requestHandler = { request in
-            requestCount += 1
+            // "test-token" is not a JWT, so on a 401 APIClient asks the projects
+            // route once to tell a revoked token from a missing permission
+            // (#178). That probe is not an operation replay.
+            let isLivenessProbe = request.url?.path.hasSuffix("/projects") ?? false
+            if !isLivenessProbe {
+                replayCount += 1
+            }
             return (MockURLProtocol.makeResponse(statusCode: 401, url: request.url), Data())
         }
 
@@ -299,7 +305,7 @@ final class OfflineEditQueueTests: XCTestCase {
 
         XCTAssertEqual(sync.pendingOperationCount(), 2, "nothing may be dropped for an expired session")
         XCTAssertTrue(sync.failedOperations().isEmpty)
-        XCTAssertEqual(requestCount, 1, "should stop after the first 401, not retry every operation")
+        XCTAssertEqual(replayCount, 1, "should stop after the first 401, not retry every operation")
     }
 
     // MARK: - Things that genuinely can't be done offline
