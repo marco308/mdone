@@ -10,13 +10,35 @@ name: "CodeQL"
 # configurations conflict. The `actions` language is included here so disabling
 # default setup does not lose the (already-passing) Actions analysis.
 
+# Only the Swift sources, the project definition, and the workflows themselves
+# can change what CodeQL finds, so PRs and pushes that touch nothing else
+# (docs, website, localisation, tests, changelog) skip the run. The weekly
+# schedule still analyses everything regardless of what changed.
 on:
   push:
     branches: [main]
+    paths:
+      - "mDone/**"
+      - "mDoneShared/**"
+      - "mDoneWidgets/**"
+      - "project.yml"
+      - ".github/workflows/**"
   pull_request:
     branches: [main]
+    paths:
+      - "mDone/**"
+      - "mDoneShared/**"
+      - "mDoneWidgets/**"
+      - "project.yml"
+      - ".github/workflows/**"
   schedule:
     - cron: "27 4 * * 1"
+
+# A new push to a PR cancels the analysis still running for its previous
+# commit, so superseded runs stop tying up the three-core macOS runner.
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   analyze:
