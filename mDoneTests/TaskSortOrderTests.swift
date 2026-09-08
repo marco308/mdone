@@ -127,6 +127,19 @@ final class TaskSortOrderTests: XCTestCase {
         XCTAssertEqual(TaskSortPreference.load(for: .project(7), defaults: defaults), .default)
         XCTAssertNil(TaskSortPreference(storedValue: ""))
         XCTAssertNil(TaskSortPreference(storedValue: "sideways:asc"))
+        XCTAssertNil(TaskSortPreference(storedValue: "dueDate:sideways"), "only asc and desc are directions")
+    }
+
+    /// A comparator that negates its result for descending is not a strict
+    /// weak ordering: equal elements would sort "before" each other both
+    /// ways. Ties must compare false in both directions.
+    func testDescendingComparatorKeepsTiesStable() {
+        let tied = (1 ... 6).map { task(Int64($0), priority: 3) }
+        XCTAssertEqual(TaskSortOrder.priority.apply(to: tied, ascending: false).map(\.id), [1, 2, 3, 4, 5, 6])
+        XCTAssertEqual(TaskSortOrder.priority.apply(to: tied, ascending: true).map(\.id), [1, 2, 3, 4, 5, 6])
+
+        let mixed = [task(1, priority: 1), task(2, priority: 5), task(3, priority: 1), task(4, priority: 5)]
+        XCTAssertEqual(TaskSortOrder.priority.apply(to: mixed, ascending: false).map(\.id), [1, 3, 2, 4])
     }
 
     func testStoredValueFormat() {

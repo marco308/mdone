@@ -276,6 +276,15 @@ final class TaskReorderTests: XCTestCase {
             views: [ProjectView(id: 200, title: "Kanban", projectId: 7, viewKind: "kanban")]
         )
         XCTAssertTrue(unspecified.boardAllowsManualPlacement)
+
+        // No kanban view at all: nothing to drag on.
+        let listOnly = Project(
+            id: 7,
+            title: "Work",
+            views: [ProjectView(id: 100, title: "List", projectId: 7, viewKind: "list")]
+        )
+        XCTAssertFalse(listOnly.boardAllowsManualPlacement)
+        XCTAssertFalse(Project(id: 7, title: "Work").boardAllowsManualPlacement)
     }
 
     // MARK: - Board state

@@ -37,19 +37,26 @@ enum TaskSortOrder: String, CaseIterable, Identifiable {
         case .manual:
             tasks
         case .dueDate, .priority, .title:
+            // Descending swaps the operands rather than negating the result,
+            // so equal elements still compare `false` both ways and the
+            // comparator stays a strict weak ordering.
             tasks.sorted { a, b in
-                let result: Bool = switch self {
-                case .dueDate:
-                    (a.effectiveDueDate ?? .distantFuture) < (b.effectiveDueDate ?? .distantFuture)
-                case .priority:
-                    a.priority > b.priority
-                case .title:
-                    a.title.localizedCompare(b.title) == .orderedAscending
-                case .manual:
-                    true
-                }
-                return ascending ? result : !result
+                ascending ? precedes(a, b) : precedes(b, a)
             }
+        }
+    }
+
+    /// Whether `a` sorts before `b` in this order's ascending direction.
+    private func precedes(_ a: VTask, _ b: VTask) -> Bool {
+        switch self {
+        case .dueDate:
+            (a.effectiveDueDate ?? .distantFuture) < (b.effectiveDueDate ?? .distantFuture)
+        case .priority:
+            a.priority > b.priority
+        case .title:
+            a.title.localizedCompare(b.title) == .orderedAscending
+        case .manual:
+            false
         }
     }
 }
@@ -121,7 +128,12 @@ struct TaskSortPreference: Equatable {
     init?(storedValue: String) {
         let parts = storedValue.split(separator: ":", maxSplits: 1).map(String.init)
         guard let order = TaskSortOrder(rawValue: parts.first ?? "") else { return nil }
-        let ascending = parts.count < 2 || parts[1] != "desc"
+        let ascending: Bool
+        switch parts.count < 2 ? "asc" : parts[1] {
+        case "asc": ascending = true
+        case "desc": ascending = false
+        default: return nil
+        }
         self.init(order: order, ascending: ascending)
     }
 

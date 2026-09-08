@@ -40,7 +40,8 @@ struct Project: Codable, Identifiable, Hashable {
     /// expressions, so the server has nowhere to put a manual placement;
     /// Vikunja's own board disables dragging there too.
     var boardAllowsManualPlacement: Bool {
-        views?.first(where: { $0.viewKind == "kanban" })?.bucketConfigurationMode != "filter"
+        guard let kanban = views?.first(where: { $0.viewKind == "kanban" }) else { return false }
+        return kanban.bucketConfigurationMode != "filter"
     }
 }
 
