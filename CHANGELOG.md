@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - Dragging a task to a new place in a project list no longer snaps back. The move was saved on the server but the list kept sorting by due date, so it never showed. Drag handles now appear only when the list is sorted by "Manual", where the order you make is the order you see. The Inbox's date sections, which span every project, no longer offer a drag that could not be shown (#183).
+- Signing in with single sign-on on a Mac no longer crashes the app the moment your identity provider hands back to it. macOS delivers the sign-in result on a background thread, and mDone insisted it was on the main one, which brought the app down on macOS 26 before the account could be added. The result is now passed to the main thread first (#182).
 - Signing in with an API token that was created without some permissions no longer throws you back to the login screen. Vikunja answers a missing permission with the same status it uses for a revoked token, and mDone used to take it as a revoked token, so a token without the notifications permission was logged out the moment the app opened. The app now checks whether the token still works before ending the session, keeps you signed in, and tells you which action the token cannot do so you can create one with more permissions (#178).
 
 ## [1.15.0] - 2026-09-03

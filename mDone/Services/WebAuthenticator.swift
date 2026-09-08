@@ -40,6 +40,20 @@ protocol WebAuthenticating: AnyObject {
     func authenticate(url: URL, callbackScheme: String, prefersEphemeralSession: Bool) async throws -> URL
 }
 
+/// The slice of `ASWebAuthenticationSession` that `WebAuthenticator` drives.
+///
+/// A real session opens the browser on `start()`, so a unit test substitutes a
+/// stand-in that opens nothing and invokes the completion handler from
+/// whatever thread the test chooses.
+protocol WebAuthenticationSession: AnyObject {
+    var prefersEphemeralWebBrowserSession: Bool { get set }
+    var presentationContextProvider: (any ASWebAuthenticationPresentationContextProviding)? { get set }
+    func start() -> Bool
+    func cancel()
+}
+
+extension ASWebAuthenticationSession: WebAuthenticationSession {}
+
 /// Runs the OIDC authorization request in the system's own browser.
 ///
 /// Chosen over an embedded `WKWebView` because it shows a real URL bar, which is
@@ -48,8 +62,23 @@ protocol WebAuthenticating: AnyObject {
 /// `docs/oidc-callback-decision.md`.
 @MainActor
 final class WebAuthenticator: NSObject, WebAuthenticating {
-    private var session: ASWebAuthenticationSession?
+    typealias SessionFactory = (
+        _ url: URL,
+        _ callbackScheme: String,
+        _ completion: @escaping ASWebAuthenticationSession.CompletionHandler
+    ) -> any WebAuthenticationSession
+
+    private let makeSession: SessionFactory
+    private var session: (any WebAuthenticationSession)?
     private var continuation: CheckedContinuation<URL, Error>?
+
+    /// `makeSession` exists for tests. The default builds the real thing.
+    init(makeSession: @escaping SessionFactory = { url, scheme, completion in
+        ASWebAuthenticationSession(url: url, callback: .customScheme(scheme), completionHandler: completion)
+    }) {
+        self.makeSession = makeSession
+        super.init()
+    }
 
     func authenticate(
         url: URL,
@@ -60,20 +89,15 @@ final class WebAuthenticator: NSObject, WebAuthenticating {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
                 self.continuation = continuation
 
-                let session = ASWebAuthenticationSession(
-                    url: url,
-                    callback: .customScheme(callbackScheme)
-                ) { [weak self] callbackURL, error in
-                    guard let self else { return }
-                    MainActor.assumeIsolated {
-                        self.session = nil
-                        if let error {
-                            self.finish(.failure(Self.mapped(error)))
-                        } else if let callbackURL {
-                            self.finish(.success(callbackURL))
-                        } else {
-                            self.finish(.failure(WebAuthenticationError.failed("No callback URL")))
-                        }
+                // AuthenticationServices promises no thread for this handler.
+                // On macOS it arrives on the browser agent's XPC reply queue,
+                // so it must not assume the main actor: doing so trapped on
+                // every SSO sign-in there (#182). @Sendable keeps the closure
+                // out of this class's main-actor isolation, so the runtime
+                // does not assert on entry either; the hop happens inside.
+                let session = makeSession(url, callbackScheme) { @Sendable [weak self] callbackURL, error in
+                    Task { @MainActor in
+                        self?.sessionDidComplete(callbackURL: callbackURL, error: error)
                     }
                 }
 
@@ -103,6 +127,17 @@ final class WebAuthenticator: NSObject, WebAuthenticating {
         session?.cancel()
         session = nil
         finish(.failure(WebAuthenticationError.cancelled))
+    }
+
+    private func sessionDidComplete(callbackURL: URL?, error: (any Error)?) {
+        session = nil
+        if let error {
+            finish(.failure(Self.mapped(error)))
+        } else if let callbackURL {
+            finish(.success(callbackURL))
+        } else {
+            finish(.failure(WebAuthenticationError.failed("No callback URL")))
+        }
     }
 
     /// Resume-once. `cancel()` may or may not also run the completion handler,
