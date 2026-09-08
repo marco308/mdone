@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- You can now sign in with a username and password on an account that has two-factor authentication turned on. If your server supports two-factor, the login screen shows a "Two-factor code" field beside the password; leave it empty if your account does not use one. If a sign-in is refused because a code is needed, the field appears and tells you so, and a wrong or expired code says that rather than a generic error. Previously such accounts could only use an API token or single sign-on (#179).
+
+### Changed
+- The login screen's note about API tokens no longer claims they cannot reorder tasks. A token created with every permission can do everything mDone does. The note now explains the real difference: a token can be revoked on its own without changing your password, and needs every permission when you create it (#179).
+- A wrong username or password now says so, instead of "Something went wrong with that request" (#179).
 - On iPad, tapping a task now opens it in a panel beside the list instead of a sheet, so you can work through tasks without covering the list. The panel appears whenever the window is wide enough, including in Split View and Stage Manager, and hands back to the sheet when it is not. Escape cancels and Cmd-S saves from a hardware keyboard, and Kanban cards lift under a trackpad pointer (#34).
 
 ## [1.15.0] - 2026-09-03

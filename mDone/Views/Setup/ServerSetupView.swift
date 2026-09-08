@@ -7,6 +7,13 @@ struct ServerSetupView: View {
     @State private var serverURL = AuthService.shared.getServerURL() ?? ""
     @State private var username = ""
     @State private var password = ""
+    /// The two-factor code, when the account has one (issue #179). Optional
+    /// on the form: `authOptions.showsTOTP` is an instance setting, so the
+    /// field appears for everyone on such a server, enrolled or not.
+    @State private var totpCode = ""
+    /// Set when a login was refused for want of a passcode. Reveals the field
+    /// even on a server whose probe failed, and keeps it visible for the retry.
+    @State private var totpRevealed = false
     @State private var apiToken = ""
     @State private var isConnecting = false
     @State private var errorMessage: String?
@@ -118,6 +125,23 @@ struct ServerSetupView: View {
                                     .textContentType(.password)
                                 #endif
                             }
+
+                            if showsTOTPField {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Two-factor code")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .textCase(.uppercase)
+
+                                    TextField(totpPlaceholder, text: $totpCode)
+                                        .textFieldStyle(.roundedBorder)
+                                        #if os(iOS)
+                                        .textContentType(.oneTimeCode)
+                                        .keyboardType(.numberPad)
+                                        #endif
+                                        .autocorrectionDisabled()
+                                }
+                            }
                         } else {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("API Token")
@@ -170,15 +194,21 @@ struct ServerSetupView: View {
                         ssoSection
                     }
 
+                    // The real trade-off between the two, now that API tokens
+                    // reach every route mDone uses (issue #179). Earlier copy
+                    // warned that tokens could not reorder tasks, which stopped
+                    // being true when the position endpoint opened to them.
                     if authMode == .credentials {
-                        Text("Login with your Vikunja username and password for full functionality")
+                        Text(
+                            "Sign in with your Vikunja username and password. If your account has two-factor authentication turned on, enter the code from your authenticator app as well."
+                        )
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
                     } else {
                         Text(
-                            "API tokens have limited permissions. Use Login for full functionality including task reordering."
+                            "An API token can be revoked on its own without changing your password. Create it in Vikunja under Settings, API Tokens, with every permission, or some actions in mDone will fail."
                         )
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
@@ -260,6 +290,28 @@ struct ServerSetupView: View {
         .frame(height: 44)
     }
 
+    /// The field is offered when the instance supports two-factor, and forced
+    /// open when a login has already been refused for lack of a code.
+    private var showsTOTPField: Bool {
+        authOptions.showsTOTP || totpRevealed
+    }
+
+    /// "Optional" is only honest while the server has not yet asked for one.
+    private var totpPlaceholder: String {
+        totpRevealed ? String(localized: "6-digit code") : String(localized: "6-digit code (if enabled)")
+    }
+
+    /// The passcode as sent: whitespace stripped, since authenticator apps
+    /// display codes as "123 456", and nil when empty so the request omits
+    /// the field rather than sending "" (which Vikunja treats as wrong).
+    /// Nothing is sent while the field is hidden, so a code typed for one
+    /// server can never ride along invisibly to another.
+    private var totpPasscodeToSend: String? {
+        guard showsTOTPField else { return nil }
+        let code = totpCode.filter { !$0.isWhitespace }
+        return code.isEmpty ? nil : code
+    }
+
     /// True when there is no password form for SSO to sit politely beneath.
     private var ssoIsPrimary: Bool {
         !authOptions.providers.isEmpty && !authOptions.showsCredentials
@@ -286,6 +338,11 @@ struct ServerSetupView: View {
     /// an in-flight request surfaces as one.
     private func checkServer(debounce: Bool) {
         probeTask?.cancel()
+
+        // A new server may not want a code at all, and a code typed for the
+        // previous one must not carry over.
+        totpRevealed = false
+        totpCode = ""
 
         guard let url = ServerURL.normalized(serverURL) else {
             authOptions = .unknownServer
@@ -396,12 +453,18 @@ struct ServerSetupView: View {
                     try await appState.loginWithCredentials(
                         serverURL: url,
                         username: username.trimmingCharacters(in: .whitespacesAndNewlines),
-                        password: password
+                        password: password,
+                        totpPasscode: totpPasscodeToSend
                     )
                 } else {
                     let token = apiToken.trimmingCharacters(in: .whitespacesAndNewlines)
                     try await appState.login(serverURL: url, token: token)
                 }
+            } catch NetworkError.totpRequired {
+                // The password was right; the account just wants a second
+                // factor. Open the field and say so, keeping what was typed.
+                totpRevealed = true
+                errorMessage = NetworkError.totpRequired.localizedDescription
             } catch {
                 #if DEBUG
                 print("[mDone] Login error: \(error)")

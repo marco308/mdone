@@ -442,7 +442,7 @@ Saved filters appear as virtual projects with negative IDs (calculated as `-(fil
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/login` | Login with username/password, returns JWT |
+| POST | `/login` | Login with username/password, returns JWT. Body also takes `totp_passcode`, required when the account has TOTP on; a missing, empty or wrong passcode is 412 with code 1017, a wrong password 403 with code 1011. mDone sends it when the user fills in the two-factor field (#179). |
 | POST | `/user/token` | Renew JWT token |
 | POST | `/user/token/refresh` | Refresh token (uses cookie, unauthenticated) |
 | POST | `/user/logout` | Logout / invalidate session |
@@ -917,7 +917,7 @@ Reaction body: `{"value": "emoji_string"}` -- the emoji character or shortcode.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/info` | Get instance info (version, features, auth methods, motd) |
+| GET | `/info` | Get instance info (version, features, auth methods, motd). Top-level `totp_enabled` says whether accounts may enrol in TOTP; mDone uses it to offer the two-factor field on the login screen (#179). |
 | GET | `/routes` | List all available API routes (for API token permission scoping) |
 | GET | `/user/timezones` | List available timezones |
 | GET | `/docs.json` | OpenAPI/Swagger specification (JSON) |
