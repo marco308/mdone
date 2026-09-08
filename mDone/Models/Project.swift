@@ -34,6 +34,15 @@ struct Project: Codable, Identifiable, Hashable {
     var kanbanViewId: Int64? {
         views?.first(where: { $0.viewKind == "kanban" })?.id
     }
+
+    /// Whether cards on this project's board can be dragged. A view whose
+    /// `bucket_configuration_mode` is `filter` fills its columns from filter
+    /// expressions, so the server has nowhere to put a manual placement;
+    /// Vikunja's own board disables dragging there too.
+    var boardAllowsManualPlacement: Bool {
+        guard let kanban = views?.first(where: { $0.viewKind == "kanban" }) else { return false }
+        return kanban.bucketConfigurationMode != "filter"
+    }
 }
 
 struct ProjectView: Codable, Identifiable {

@@ -96,6 +96,15 @@ final class AppState {
     /// Per-project ordered task lists fetched from the view endpoint (preserves positions).
     var projectTaskCache: [Int64: [VTask]] = [:]
 
+    /// Sort choices changed this session, keyed by list. Lives here rather
+    /// than in view state so it survives navigation and so every screen
+    /// showing the same project agrees; `UserDefaults` holds the rest.
+    private var sortPreferences: [TaskSortScope: TaskSortPreference] = [:]
+
+    /// Bumped by every reorder so a refetch started by an earlier drag cannot
+    /// overwrite the order a later drag produced.
+    @ObservationIgnored private var reorderGeneration = 0
+
     var unreadNotificationCount: Int {
         notifications.filter(\.isUnread).count
     }
@@ -1566,27 +1575,41 @@ final class AppState {
     /// Fetches tasks for a specific project via the view endpoint, which returns correct positions.
     @MainActor
     func fetchProjectTasks(project: Project) async {
-        guard let viewId = project.listViewId else { return }
+        guard let viewTasks = await loadProjectTasks(project: project) else { return }
+        applyProjectTasks(viewTasks, projectId: project.id)
+    }
+
+    /// Reads the project's list view. `nil` when the project has no list view
+    /// or the request failed; the caller keeps whatever it was showing.
+    @MainActor
+    private func loadProjectTasks(project: Project) async -> [VTask]? {
+        guard let viewId = project.listViewId else { return nil }
         do {
             let viewTasks: [VTask] = try await taskService.fetchProjectTasks(
                 projectId: project.id, viewId: viewId
             )
-            // Store in cache — these have correct per-view positions.
             // Dedupe by id: Vikunja's view-tasks endpoint can return the same task
             // more than once when task_positions has duplicate rows for the view.
-            projectTaskCache[project.id] = Self.uniquedById(viewTasks)
-            // Also update the global task list with any new tasks
-            for viewTask in viewTasks {
-                if let index = tasks.firstIndex(where: { $0.id == viewTask.id }) {
-                    tasks[index] = viewTask
-                } else {
-                    tasks.append(viewTask)
-                }
-            }
+            return Self.uniquedById(viewTasks)
         } catch {
             #if DEBUG
             print("[mDone] fetchProjectTasks error: \(error)")
             #endif
+            return nil
+        }
+    }
+
+    /// Stores a view's tasks as the project's order (they carry per-view
+    /// positions) and folds them into the global task list.
+    @MainActor
+    private func applyProjectTasks(_ viewTasks: [VTask], projectId: Int64) {
+        projectTaskCache[projectId] = viewTasks
+        for viewTask in viewTasks {
+            if let index = tasks.firstIndex(where: { $0.id == viewTask.id }) {
+                tasks[index] = viewTask
+            } else {
+                tasks.append(viewTask)
+            }
         }
     }
 
@@ -1966,25 +1989,91 @@ final class AppState {
         return project?.listViewId ?? 0
     }
 
+    /// Moves `task` to `position` in its project's list view.
+    ///
+    /// `newOrder` is the list as the user just dropped it. It is shown at once
+    /// so the row stays where it landed, then the view is refetched so the
+    /// server's positions win: Vikunja repairs colliding or too-small
+    /// positions and answers with a different number than it was sent. A
+    /// failed request puts the old order back. Returns `true` on success.
+    ///
+    /// Not queued for offline replay: a stale position replayed against a
+    /// list that has since moved on would land the task somewhere random, so
+    /// this asks for a connection instead.
     @MainActor
-    func moveTask(_ task: VTask, toPosition position: Double, viewId: Int64 = 0) async {
-        let resolvedViewId = viewId > 0 ? viewId : listViewId(for: task)
-        guard resolvedViewId > 0 else { return }
+    @discardableResult
+    func moveTask(_ task: VTask, toPosition position: Double, newOrder: [VTask]? = nil) async -> Bool {
+        let viewId = listViewId(for: task)
+        guard viewId > 0 else { return false }
+        if isEffectivelyOffline {
+            rejectOffline("Reordering tasks")
+            return false
+        }
+
+        reorderGeneration += 1
+        let generation = reorderGeneration
+        let previousOrder = projectTaskCache[task.projectId]
+        if let newOrder {
+            projectTaskCache[task.projectId] = newOrder
+        }
+
         do {
-            try await taskService.updatePosition(taskId: task.id, position: position, viewId: resolvedViewId)
-            if let index = tasks.firstIndex(where: { $0.id == task.id }) {
-                tasks[index].position = position
+            try await taskService.updatePosition(taskId: task.id, position: position, viewId: viewId)
+        } catch {
+            if generation == reorderGeneration {
+                projectTaskCache[task.projectId] = previousOrder
             }
-            // Update cached project task order
-            if var cached = projectTaskCache[task.projectId] {
-                if let cacheIndex = cached.firstIndex(where: { $0.id == task.id }) {
-                    cached[cacheIndex].position = position
-                }
-                projectTaskCache[task.projectId] = cached.sorted { ($0.position ?? 0) < ($1.position ?? 0) }
-            }
+            handleError(error)
+            return false
+        }
+
+        if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+            tasks[index].position = position
+        }
+        guard let project = projects.first(where: { $0.id == task.projectId }) else { return true }
+        if let refreshed = await loadProjectTasks(project: project), generation == reorderGeneration {
+            applyProjectTasks(refreshed, projectId: project.id)
+        }
+        return true
+    }
+
+    /// Puts `task` at `position` on the project's board, moving it into
+    /// `bucketId` first when it is in another column. The position row is per
+    /// view, not per bucket, so a cross-column drop is the bucket move plus
+    /// the same position write as a same-column one. Returns `true` when
+    /// every call succeeded.
+    @MainActor
+    @discardableResult
+    func placeTask(_ task: VTask, inBucket bucketId: Int64, at position: Double, in project: Project) async -> Bool {
+        guard let viewId = project.kanbanViewId else { return false }
+        if isEffectivelyOffline {
+            rejectOffline("Moving tasks on the board")
+            return false
+        }
+        if task.bucketId != bucketId {
+            guard await moveTask(task, toBucket: bucketId, in: project) else { return false }
+        }
+        do {
+            try await taskService.updatePosition(taskId: task.id, position: position, viewId: viewId)
+            return true
         } catch {
             handleError(error)
+            return false
         }
+    }
+
+    // MARK: - Sort Preferences
+
+    /// The sort for a list. Falls through to `UserDefaults` until the list is
+    /// changed in this session; no write happens here, since views ask for
+    /// it mid-body.
+    func sortPreference(for scope: TaskSortScope) -> TaskSortPreference {
+        sortPreferences[scope] ?? TaskSortPreference.load(for: scope)
+    }
+
+    func setSortPreference(_ preference: TaskSortPreference, for scope: TaskSortScope) {
+        sortPreferences[scope] = preference
+        preference.save(for: scope)
     }
 
     func datesWithTasks(in month: Date) -> [Date: [VTask]] {

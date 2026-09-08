@@ -10,8 +10,6 @@ struct TaskListScreen: View {
     /// When true, hides the quick-add bar — used for archived (read-only) projects.
     var readOnly: Bool = false
     @State private var showAdvancedFilter = false
-    @State private var sortOrder: SortOrder = .dueDate
-    @State private var sortAscending: Bool = true
     @AppStorage("calmMode") private var calmMode = false
     #if os(iOS)
     @State private var showBoard = false
@@ -38,18 +36,18 @@ struct TaskListScreen: View {
         #endif
     }
 
-    enum SortOrder: String, CaseIterable {
-        case dueDate = "Due Date"
-        case priority = "Priority"
-        case title = "Title"
+    private var sortScope: TaskSortScope {
+        projectFilter.map { .project($0.id) } ?? .inbox
+    }
 
-        var label: String {
-            switch self {
-            case .dueDate: String(localized: "Due Date")
-            case .priority: String(localized: "Priority")
-            case .title: String(localized: "Title")
-            }
-        }
+    private var sortPreference: TaskSortPreference {
+        appState.sortPreference(for: sortScope)
+    }
+
+    /// Rows can only be dragged when the list shows the server's order;
+    /// under any other sort the drop would be sorted straight back.
+    private var manualOrderActive: Bool {
+        projectFilter != nil && sortPreference.order == .manual
     }
 
     var body: some View {
@@ -71,17 +69,17 @@ struct TaskListScreen: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-                .toolbar { toolbarContent }
-                .sheet(isPresented: $showAdvancedFilter) {
-                    TaskFilterSheet { filterString in
-                        Task { await appState.applyAdvancedFilter(filterString) }
-                    }
+            .toolbar { toolbarContent }
+            .sheet(isPresented: $showAdvancedFilter) {
+                TaskFilterSheet { filterString in
+                    Task { await appState.applyAdvancedFilter(filterString) }
                 }
-                .overlay {
-                    if appState.isLoading, appState.tasks.isEmpty {
-                        LoadingOverlay()
-                    }
+            }
+            .overlay {
+                if appState.isLoading, appState.tasks.isEmpty {
+                    LoadingOverlay()
                 }
+            }
     }
 
     /// The list (or board) alone on iPhone; on iPad with room, the same beside
@@ -181,12 +179,12 @@ struct TaskListScreen: View {
                                 // row identity survives the list gaining/losing
                                 // nesting (else a presented detail sheet gets
                                 // dismissed when the first subtask is linked).
-                                // Reorder is flat-only; when flat, `rows`
-                                // preserves `projectTasks`' order so the move
-                                // indices line up.
+                                // Reorder is flat-only and manual-sort-only;
+                                // when flat, `rows` preserves `projectTasks`'
+                                // order so the move indices line up.
                                 ForEach(rows) { row in
                                     TaskRow(task: row.task, readOnly: readOnly, indentLevel: row.depth)
-                                        .moveDisabled(readOnly || hasNesting)
+                                        .moveDisabled(readOnly || hasNesting || !manualOrderActive)
                                 }
                                 .onMove { source, destination in
                                     handleMove(tasks: projectTasks, from: source, to: destination)
@@ -247,30 +245,7 @@ struct TaskListScreen: View {
             }
 
             ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    ForEach(SortOrder.allCases, id: \.self) { order in
-                        Button {
-                            if sortOrder == order {
-                                sortAscending.toggle()
-                            } else {
-                                sortOrder = order
-                                sortAscending = true
-                            }
-                        } label: {
-                            HStack {
-                                Text(order.label)
-                                if sortOrder == order {
-                                    Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    Image(systemName: "arrow.up.arrow.down")
-                }
-                .accessibilityLabel(sortAscending
-                    ? String(localized: "Sort by \(sortOrder.label), ascending")
-                    : String(localized: "Sort by \(sortOrder.label), descending"))
+                TaskSortMenu(scope: sortScope)
             }
         }
     }
@@ -441,46 +416,13 @@ struct TaskListScreen: View {
     }
 
     private func sorted(_ tasks: [VTask]) -> [VTask] {
-        tasks.sorted { a, b in
-            let result: Bool = switch sortOrder {
-            case .dueDate:
-                (a.effectiveDueDate ?? .distantFuture) < (b.effectiveDueDate ?? .distantFuture)
-            case .priority:
-                a.priority > b.priority
-            case .title:
-                a.title.localizedCompare(b.title) == .orderedAscending
-            }
-            return sortAscending ? result : !result
-        }
+        sortPreference.apply(to: tasks)
     }
 
     private func handleMove(tasks: [VTask], from source: IndexSet, to destination: Int) {
-        var reordered = tasks
-        reordered.move(fromOffsets: source, toOffset: destination)
-
-        guard let movedIndex = source.first else { return }
-        let task = tasks[movedIndex]
-
-        // Calculate the new position as midpoint between neighbors
-        let actualDestination = movedIndex < destination ? destination - 1 : destination
-        let newPosition: Double
-        if reordered.count <= 1 {
-            newPosition = 0
-        } else if actualDestination == 0 {
-            newPosition = (reordered[1].position ?? 1) - 1
-        } else if actualDestination >= reordered.count - 1 {
-            newPosition = (reordered[reordered.count - 2].position ?? Double(reordered.count - 2)) + 1
-        } else {
-            let before = reordered[actualDestination - 1].position ?? Double(actualDestination - 1)
-            let after = reordered[actualDestination + 1].position ?? Double(actualDestination + 1)
-            newPosition = (before + after) / 2
-        }
-
-        // Default view ID; ideally this would come from the project's default view
-        let viewId: Int64 = 0
-
+        guard let move = TaskPositioning.move(tasks, fromOffsets: source, toOffset: destination) else { return }
         Task {
-            await appState.moveTask(task, toPosition: newPosition, viewId: viewId)
+            await appState.moveTask(move.task, toPosition: move.position, newOrder: move.reordered)
         }
     }
 

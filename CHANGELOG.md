@@ -7,14 +7,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Sort a project by "Manual" to put its tasks in whatever order you like. Drag the handle on a row to move it, on iPhone, iPad and Mac. The order is the same one Vikunja's web app shows, so a list you arrange in one place looks the same in the other, and it does not touch due dates: a task due tomorrow can sit below one due next month if that is how you want it. The sort you pick is remembered per project, and the Inbox keeps its date sections (#183).
+- Drag cards up and down a Kanban column, or into another column, to reorder them. Drop a card on the top half of another card to put it above, on the bottom half to put it below, or on empty space in a column to add it at the end. "Move to" in a card's menu still reaches columns that are off screen. Boards whose columns are filled by filters cannot be rearranged, as in the web app (#183).
+
 - You can now sign in with a username and password on an account that has two-factor authentication turned on. If your server supports two-factor, the login screen shows a "Two-factor code" field beside the password; leave it empty if your account does not use one. If a sign-in is refused because a code is needed, the field appears and tells you so, and a wrong or expired code says that rather than a generic error. Previously such accounts could only use an API token or single sign-on (#179).
 
 ### Changed
+- The sort menu remembers your choice for each project and for the Inbox, instead of going back to "Due Date" every time you open the list (#183).
 - The login screen's note about API tokens no longer claims they cannot reorder tasks. A token created with every permission can do everything mDone does. The note now explains the real difference: a token can be revoked on its own without changing your password, and needs every permission when you create it (#179).
 - A wrong username or password now says so, instead of "Something went wrong with that request" (#179).
 - On iPad, tapping a task now opens it in a panel beside the list instead of a sheet, so you can work through tasks without covering the list. The panel appears whenever the window is wide enough, including in Split View and Stage Manager, and hands back to the sheet when it is not. Escape cancels and Cmd-S saves from a hardware keyboard, and Kanban cards lift under a trackpad pointer (#34).
 
 ### Fixed
+- Dragging a task to a new place in a project list no longer snaps back. The move was saved on the server but the list kept sorting by due date, so it never showed. Drag handles now appear only when the list is sorted by "Manual", where the order you make is the order you see. The Inbox's date sections, which span every project, no longer offer a drag that could not be shown (#183).
 - Signing in with single sign-on on a Mac no longer crashes the app the moment your identity provider hands back to it. macOS delivers the sign-in result on a background thread, and mDone insisted it was on the main one, which brought the app down on macOS 26 before the account could be added. The result is now passed to the main thread first (#182).
 - Signing in with an API token that was created without some permissions no longer throws you back to the login screen. Vikunja answers a missing permission with the same status it uses for a revoked token, and mDone used to take it as a revoked token, so a token without the notifications permission was logged out the moment the app opened. The app now checks whether the token still works before ending the session, keeps you signed in, and tells you which action the token cannot do so you can create one with more permissions (#178).
 

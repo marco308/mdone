@@ -167,6 +167,8 @@ Relations are bidirectional: creating subtask(A->B) also creates parenttask(B->A
 
 Positions are per-view. When sorting by position, you must be within a view context.
 
+The same endpoint orders cards inside a kanban bucket: send the kanban view's id. A task with no position row reads back as `0` and sorts last. The server does not reject any value, but from v1.0 it repairs collisions and anything under `0.01` by redistributing the whole view, and it can also settle on a different number than the one sent (observed on v2.4.0 for a drop at the top of a list view). Read the view back after a write rather than trusting the number that went out. `TaskPositioning` in the app produces the same numbers as the web app's `calculateItemPosition`: midpoint between neighbours, half the first position at the top, last position plus 2^16 at the bottom.
+
 ### 1.8 Task Bucket Assignment (Kanban)
 
 | Method | Path | Description |
