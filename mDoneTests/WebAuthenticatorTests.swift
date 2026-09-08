@@ -16,6 +16,8 @@ final class WebAuthenticatorTests: XCTestCase {
         var startReturns = true
         var onStart: () -> Void = {}
         var onCancel: () -> Void = {}
+        /// Runs on the background queue once the completion handler has returned.
+        var onCompletionDelivered: () -> Void = {}
         private(set) var startCount = 0
         private(set) var cancelCount = 0
 
@@ -33,9 +35,10 @@ final class WebAuthenticatorTests: XCTestCase {
         /// Reports the result the way AuthenticationServices does on macOS:
         /// on a thread that is not the main one.
         func completeOffMainThread(url: URL?, error: (any Error)?) {
-            DispatchQueue.global().async { [completion] in
+            DispatchQueue.global().async { [completion, onCompletionDelivered] in
                 XCTAssertFalse(Thread.isMainThread, "the test must exercise the off-main-thread path")
                 completion?(url, error)
+                onCompletionDelivered()
             }
         }
     }
@@ -109,14 +112,16 @@ final class WebAuthenticatorTests: XCTestCase {
 
     // MARK: - Cancellation
 
-    func testCancelResumesOnceEvenWhenTheSessionAlsoReportsIt() async throws {
+    func testCancelResumesOnceEvenWhenTheSessionAlsoReportsIt() async {
         let started = expectation(description: "session started")
         session.onStart = { started.fulfill() }
         // The real session may echo cancel() back through its completion
         // handler. That second report must be swallowed, not resumed again.
+        let echoed = expectation(description: "echoed cancellation delivered")
         session.onCancel = { [session] in
             session.completeOffMainThread(url: nil, error: ASWebAuthenticationSessionError(.canceledLogin))
         }
+        session.onCompletionDelivered = { echoed.fulfill() }
 
         let task = Task { [authenticator, authorizationURL] in
             try await authenticator!.authenticate(url: authorizationURL!, callbackScheme: "mdone")
@@ -130,8 +135,12 @@ final class WebAuthenticatorTests: XCTestCase {
             return XCTFail("expected cancellation, got \(result)")
         }
         XCTAssertEqual(error as? WebAuthenticationError, .cancelled)
-        // Let the echoed report land. Resuming twice would trap here.
-        try await Task.sleep(for: .milliseconds(100))
+        // Wait for the echo to be handed over, then let the main actor run
+        // once more: the echo's hop was queued before this one, so by the
+        // time this task runs the echo has landed. Resuming twice would
+        // have trapped.
+        await fulfillment(of: [echoed], timeout: 1)
+        await Task { @MainActor in }.value
     }
 
     func testTaskCancellationCancelsTheSession() async {
