@@ -395,10 +395,14 @@ final class APIClientRefreshTests: XCTestCase {
             }
         }
 
-        await probeGate.waitUntilHeld(count: 1)
-        // Give the second 401 time to reach the single-flight join before the
-        // probe answers, otherwise it could legitimately start its own.
-        try? await Task.sleep(nanoseconds: 200_000_000)
+        let probeHeld = await probeGate.waitUntilHeld(count: 1)
+        XCTAssertTrue(probeHeld, "The first 401 should have started a probe that the mock is holding")
+        // Release the probe only once the second 401 has actually joined it.
+        // Released any earlier, the second caller could legitimately start a
+        // probe of its own and the shared-probe assertion below would be
+        // testing a race rather than the client.
+        let secondJoined = await waitUntil { await client.tokenProbeWaiterCount == 1 }
+        XCTAssertTrue(secondJoined, "The second 401 should be parked on the first caller's probe")
         probeGate.releaseAll(statusCode: 200, data: Data("[]".utf8))
         await firstDone.value
         await secondDone.value
@@ -729,14 +733,12 @@ private final class HeldRequests: @unchecked Sendable {
         held.append((proto, url))
     }
 
-    func waitUntilHeld(count: Int) async {
-        for _ in 0 ..< 200 {
-            let current = lock.withLock { held.count }
-            if current >= count {
-                return
-            }
-            try? await Task.sleep(nanoseconds: 10_000_000)
-        }
+    /// Polls until at least `count` requests are parked. Returns `false` if
+    /// that never happens within the bound, so a test can fail on the
+    /// precondition instead of carrying on into an assertion that then fails
+    /// for a confusing reason.
+    func waitUntilHeld(count: Int) async -> Bool {
+        await waitUntil { [self] in lock.withLock { held.count } >= count }
     }
 
     func releaseAll(statusCode: Int, data: Data) {
@@ -749,4 +751,17 @@ private final class HeldRequests: @unchecked Sendable {
             proto.complete(response: MockURLProtocol.makeResponse(statusCode: statusCode, url: url), data: data)
         }
     }
+}
+
+/// Polls `condition` every 10ms for up to two seconds. Returns whether it
+/// became true, so tests can assert the state they were waiting for rather
+/// than sleeping for a fixed time and hoping the other side got there.
+private func waitUntil(_ condition: () async -> Bool) async -> Bool {
+    for _ in 0 ..< 200 {
+        if await condition() {
+            return true
+        }
+        try? await Task.sleep(nanoseconds: 10_000_000)
+    }
+    return false
 }

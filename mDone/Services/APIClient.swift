@@ -48,6 +48,12 @@ actor APIClient {
     /// and one probe answers for all of them.
     private var inFlightTokenProbe: Task<Bool, Error>?
 
+    /// How many callers are currently parked on `inFlightTokenProbe` waiting
+    /// for someone else's probe to answer. Read by the single-flight test so it
+    /// can release a held probe only once the second 401 has actually joined
+    /// it, instead of sleeping and hoping.
+    private(set) var tokenProbeWaiterCount = 0
+
     /// The route used to tell a revoked API token from one that merely lacks a
     /// permission. Login proves a token by fetching projects, so no token that
     /// cannot read projects ever gets past the login screen. A 401 here means
@@ -379,6 +385,8 @@ actor APIClient {
     /// showing a connectivity error and letting the caller retry.
     private func probeAPITokenLiveness() async throws -> Bool {
         if let inFlightTokenProbe {
+            tokenProbeWaiterCount += 1
+            defer { tokenProbeWaiterCount -= 1 }
             return try await inFlightTokenProbe.value
         }
         let task = Task<Bool, Error> { [self] in
