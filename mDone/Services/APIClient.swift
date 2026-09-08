@@ -43,6 +43,24 @@ actor APIClient {
     /// racing each other with the now-invalidated cookie.
     private var inFlightRefresh: Task<Void, Error>?
 
+    /// Single-flight for `probeAPITokenLiveness()`, same reasoning as
+    /// `inFlightRefresh`: several requests can 401 at once right after launch
+    /// and one probe answers for all of them.
+    private var inFlightTokenProbe: Task<Bool, Error>?
+
+    /// How many callers are currently parked on `inFlightTokenProbe` waiting
+    /// for someone else's probe to answer. Read by the single-flight test so it
+    /// can release a held probe only once the second 401 has actually joined
+    /// it, instead of sleeping and hoping.
+    private(set) var tokenProbeWaiterCount = 0
+
+    /// The route used to tell a revoked API token from one that merely lacks a
+    /// permission. Login proves a token by fetching projects, so no token that
+    /// cannot read projects ever gets past the login screen. A 401 here means
+    /// the token itself is dead; a 200 here after a 401 elsewhere means the
+    /// token is alive and the other route was simply not granted (#178).
+    private static let tokenLivenessEndpoint = Endpoint.projects(page: 1, perPage: 1)
+
     static let shared = APIClient()
 
     init(session: URLSession = .shared, baseRetryDelay: UInt64 = 1_000_000_000) {
@@ -292,8 +310,26 @@ actor APIClient {
             return (data, httpResponse)
         }
 
-        // 401 with no refresh capability — let the caller see it.
-        guard isJWTSession, refreshToken != nil else {
+        // API-token session. Vikunja answers 401 both for a revoked token and
+        // for a route the token was never granted, so the status alone cannot
+        // say whether the session is over. Ask a route every token has before
+        // logging the user out: a token created without, say, the
+        // notifications permission used to be kicked to the login screen by
+        // the first notification fetch after launch (#178).
+        guard isJWTSession else {
+            if request.url?.path == Self.tokenLivenessPath {
+                notifySessionExpired()
+                return (data, httpResponse)
+            }
+            if try await probeAPITokenLiveness() {
+                throw NetworkError.missingPermission
+            }
+            notifySessionExpired()
+            return (data, httpResponse)
+        }
+
+        // JWT with no refresh capability — let the caller see it.
+        guard refreshToken != nil else {
             notifySessionExpired()
             return (data, httpResponse)
         }
@@ -334,6 +370,37 @@ actor APIClient {
             notifySessionExpired()
         }
         return (retryData, retryResponse)
+    }
+
+    /// Path of `tokenLivenessEndpoint`, for recognising the probe route when it
+    /// is the request that 401'd in the first place.
+    private static let tokenLivenessPath = tokenLivenessEndpoint.path
+
+    /// Whether the current API token is still accepted by the server.
+    ///
+    /// Returns `true` when the liveness route answers 2xx and `false` when it
+    /// answers 401. Any other outcome (transport failure, 5xx, rate limit)
+    /// throws the matching `NetworkError` rather than guessing, because a
+    /// wrong "dead" verdict clears the Keychain, which is far worse than
+    /// showing a connectivity error and letting the caller retry.
+    private func probeAPITokenLiveness() async throws -> Bool {
+        if let inFlightTokenProbe {
+            tokenProbeWaiterCount += 1
+            defer { tokenProbeWaiterCount -= 1 }
+            return try await inFlightTokenProbe.value
+        }
+        let task = Task<Bool, Error> { [self] in
+            defer { self.inFlightTokenProbe = nil }
+            let request = try buildRequest(for: Self.tokenLivenessEndpoint)
+            let (data, response) = try await performRequest(request)
+            if response.statusCode == 401 {
+                return false
+            }
+            _ = try handleResponse(data: data, httpResponse: response)
+            return true
+        }
+        inFlightTokenProbe = task
+        return try await task.value
     }
 
     /// Single-flight wrapper around `performRefresh()`. Concurrent callers
