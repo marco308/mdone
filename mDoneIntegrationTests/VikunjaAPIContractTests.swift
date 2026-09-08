@@ -252,4 +252,63 @@ final class VikunjaAPIContractTests: VikunjaIntegrationCase {
         let landed = after.first { ($0.tasks ?? []).contains { task in task.id == created.id } }
         XCTAssertEqual(landed?.id, destination.id, "Task did not land in the destination bucket")
     }
+
+    // MARK: - Manual order (issue #183)
+
+    /// Dragging the last task of a project list to the top: the position
+    /// endpoint takes the list view's id, and the list view reads back in the
+    /// new order. The starting order is read, not assumed: v2.4.0 lists a
+    /// fresh project's tasks newest first. The number sent is what
+    /// `TaskPositioning` produces for "drop at the top", so a server that
+    /// started repairing such values differently would show up here.
+    func testTaskPositionReordersTheListView() async throws {
+        for title in ["first", "second", "third"] {
+            try await makeTask(TaskCreateRequest(title: title))
+        }
+        let listViewId = try await viewId(kind: "list")
+
+        let before = try await tasks.fetchProjectTasks(projectId: scratchProject.id, viewId: listViewId)
+        XCTAssertEqual(before.count, 3)
+        XCTAssertTrue(before.allSatisfy { ($0.position ?? 0) > 0 }, "view tasks must carry positions")
+
+        let move = try XCTUnwrap(TaskPositioning.move(before, fromOffsets: [before.count - 1], toOffset: 0))
+        try await tasks.updatePosition(taskId: move.task.id, position: move.position, viewId: listViewId)
+
+        let after = try await tasks.fetchProjectTasks(projectId: scratchProject.id, viewId: listViewId)
+        XCTAssertEqual(after.map(\.id), move.reordered.map(\.id), "list view did not honour the position")
+    }
+
+    /// Positions are per view: a position sent with the kanban view's id
+    /// reorders the cards inside their bucket and leaves the list view alone.
+    func testTaskPositionOnTheKanbanViewReordersCardsWithinABucket() async throws {
+        for title in ["first card", "second card"] {
+            try await makeTask(TaskCreateRequest(title: title))
+        }
+        let kanbanViewId = try await viewId(kind: "kanban")
+        let listViewId = try await viewId(kind: "list")
+
+        func cardOrder() async throws -> [VTask] {
+            let buckets = try await projects.fetchBuckets(projectId: scratchProject.id, viewId: kanbanViewId)
+            let bucket = try XCTUnwrap(buckets.first { !$0.activeTasks.isEmpty }, "no bucket holds the cards")
+            return bucket.activeTasks
+        }
+
+        let listBefore = try await tasks.fetchProjectTasks(projectId: scratchProject.id, viewId: listViewId)
+        let cards = try await cardOrder()
+        XCTAssertEqual(cards.count, 2, "both cards should sit in the default bucket")
+        let last = try XCTUnwrap(cards.last)
+
+        let position = TaskPositioning.position(forInserting: last, at: 0, into: cards)
+        try await tasks.updatePosition(taskId: last.id, position: position, viewId: kanbanViewId)
+
+        let reordered = try await cardOrder()
+        XCTAssertEqual(
+            reordered.map(\.id),
+            [last.id] + cards.dropLast().map(\.id),
+            "kanban view did not honour the position"
+        )
+
+        let listAfter = try await tasks.fetchProjectTasks(projectId: scratchProject.id, viewId: listViewId)
+        XCTAssertEqual(listAfter.map(\.id), listBefore.map(\.id), "a kanban position leaked into the list view")
+    }
 }

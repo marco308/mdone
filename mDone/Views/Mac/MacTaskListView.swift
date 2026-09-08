@@ -4,23 +4,29 @@ struct MacTaskListView: View {
     @Environment(AppState.self) private var appState
     let section: MacContentView.SidebarSection?
     @Binding var selectedTask: VTask?
-    @State private var sortOrder: SortOrder = .dueDate
-    @State private var sortAscending: Bool = true
     @State private var showAdvancedFilter = false
     @AppStorage("calmMode") private var calmMode = false
 
-    enum SortOrder: String, CaseIterable {
-        case dueDate = "Due Date"
-        case priority = "Priority"
-        case title = "Title"
-
-        var label: String {
-            switch self {
-            case .dueDate: String(localized: "Due Date")
-            case .priority: String(localized: "Priority")
-            case .title: String(localized: "Title")
-            }
+    private var sortScope: TaskSortScope {
+        if case let .project(project) = section {
+            return .project(project.id)
         }
+        return .inbox
+    }
+
+    private var sortPreference: TaskSortPreference {
+        appState.sortPreference(for: sortScope)
+    }
+
+    /// Rows can be dragged only while a project list shows the server's
+    /// order, with nothing filtered out: under another sort the drop would
+    /// be sorted straight back, and a filtered list's indices don't line up
+    /// with the project's order.
+    private var manualOrderActive: Bool {
+        guard case .project = section else { return false }
+        return sortPreference.order == .manual
+            && appState.activeFilter == nil
+            && appState.searchQuery.isEmpty
     }
 
     var body: some View {
@@ -116,22 +122,22 @@ struct MacTaskListView: View {
                 }
                 .listStyle(.inset)
             } else {
-                List(TaskNesting.rows(for: tasks), selection: $selectedTask) { row in
-                    TaskRow(task: row.task, indentLevel: row.depth)
-                        .tag(row.task)
-                        .draggable(String(row.task.id)) {
-                            Text(row.task.title)
-                                .padding(8)
-                                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-                        }
+                let rows = TaskNesting.rows(for: tasks)
+                let hasNesting = rows.contains { $0.depth > 0 }
+                List(selection: $selectedTask) {
+                    // Reorder is flat-only and manual-sort-only; when flat,
+                    // `rows` preserves `tasks`' order so the move indices
+                    // line up.
+                    ForEach(rows) { row in
+                        TaskRow(task: row.task, indentLevel: row.depth)
+                            .tag(row.task)
+                            .moveDisabled(hasNesting || !manualOrderActive)
+                    }
+                    .onMove { source, destination in
+                        handleMove(tasks: tasks, from: source, to: destination)
+                    }
                 }
                 .listStyle(.inset)
-                .dropDestination(for: String.self) { droppedIds, location in
-                    guard let draggedIdStr = droppedIds.first,
-                          let draggedId = Int64(draggedIdStr) else { return false }
-                    handleDrop(taskId: draggedId, in: tasks, at: location)
-                    return true
-                }
             }
         }
         .searchable(text: $appState.searchQuery, prompt: "Filter tasks")
@@ -158,31 +164,7 @@ struct MacTaskListView: View {
             }
 
             ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    ForEach(SortOrder.allCases, id: \.self) { order in
-                        Button {
-                            if sortOrder == order {
-                                sortAscending.toggle()
-                            } else {
-                                sortOrder = order
-                                sortAscending = true
-                            }
-                        } label: {
-                            HStack {
-                                Text(order.label)
-                                if sortOrder == order {
-                                    Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    Image(systemName: "arrow.up.arrow.down")
-                }
-                .help("Sort tasks")
-                .accessibilityLabel(sortAscending
-                    ? String(localized: "Sort by \(sortOrder.label), ascending")
-                    : String(localized: "Sort by \(sortOrder.label), descending"))
+                TaskSortMenu(scope: sortScope)
             }
 
             ToolbarItem(placement: .primaryAction) {
@@ -236,32 +218,10 @@ struct MacTaskListView: View {
         currentIds.isEmpty ? tasks : tasks.filter { !currentIds.contains($0.id) }
     }
 
-    private func handleDrop(taskId: Int64, in tasks: [VTask], at location: CGPoint) {
-        guard let task = tasks.first(where: { $0.id == taskId }) else { return }
-
-        // Estimate the target index based on list position
-        // Use a simple approach: calculate position as midpoint between neighbors
-        let estimatedRowHeight: CGFloat = 60
-        let targetIndex = min(max(Int(location.y / estimatedRowHeight), 0), tasks.count - 1)
-
-        let newPosition: Double
-        if tasks.count <= 1 {
-            newPosition = 0
-        } else if targetIndex == 0 {
-            newPosition = (tasks[0].position ?? 0) - 1
-        } else if targetIndex >= tasks.count - 1 {
-            newPosition = (tasks[tasks.count - 1].position ?? Double(tasks.count)) + 1
-        } else {
-            let before = tasks[targetIndex].position ?? Double(targetIndex)
-            let after = tasks[targetIndex + 1].position ?? Double(targetIndex + 1)
-            newPosition = (before + after) / 2
-        }
-
-        // Default view ID; ideally this would come from the project's default view
-        let viewId: Int64 = 0
-
+    private func handleMove(tasks: [VTask], from source: IndexSet, to destination: Int) {
+        guard let move = TaskPositioning.move(tasks, fromOffsets: source, toOffset: destination) else { return }
         Task {
-            await appState.moveTask(task, toPosition: newPosition, viewId: viewId)
+            await appState.moveTask(move.task, toPosition: move.position, newOrder: move.reordered)
         }
     }
 
@@ -277,19 +237,7 @@ struct MacTaskListView: View {
             tasks = tasks.filter { $0.title.lowercased().contains(query) }
         }
 
-        tasks.sort { a, b in
-            let result: Bool = switch sortOrder {
-            case .dueDate:
-                (a.effectiveDueDate ?? .distantFuture) < (b.effectiveDueDate ?? .distantFuture)
-            case .priority:
-                a.priority > b.priority
-            case .title:
-                a.title.localizedCompare(b.title) == .orderedAscending
-            }
-            return sortAscending ? result : !result
-        }
-
-        return tasks
+        return sortPreference.apply(to: tasks)
     }
 
     private var emptyStateIcon: String {
