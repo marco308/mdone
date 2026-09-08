@@ -97,11 +97,16 @@ One thing that did check out: `mDoneApp`'s `onOpenURL` is `#if os(iOS)`, so a
 `mdone://` URL arriving on macOS through LaunchServices is inert. A callback
 that escapes the session cannot be consumed by accident.
 
-### Still to verify on macOS
+### The return leg on macOS, confirmed by issue #182
 
-Completing a sign-in in an external default browser and confirming the code
-reaches the app. Everything up to the provider's login page is confirmed; the
-return leg is not.
+A user completing a Keycloak sign-in on macOS 26 showed that the code does
+reach the app, and showed how: the completion handler runs on the browser
+agent's XPC reply queue (`com.apple.NSXPCConnection.m-user.com.apple.SafariLaunchAgent`),
+not the main thread. AuthenticationServices never promised a thread for it,
+and `WebAuthenticator` used to assume the main actor there, which trapped on
+every macOS sign-in. The handler now hops to the main actor instead of
+assuming it, and `WebAuthenticatorTests` delivers the callback from a
+background queue to keep it that way.
 
 ## Option B: https callback via Associated Domains (not viable)
 
