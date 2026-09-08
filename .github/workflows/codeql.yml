@@ -53,6 +53,10 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
 
+      # The generic simulator destination builds a universal binary (arm64 +
+      # x86_64), which doubles the number of swift-frontend invocations the
+      # CodeQL tracer has to intercept and extract. CodeQL sees the same source
+      # either way, so build the runner's own architecture only.
       - name: Build Swift
         if: matrix.build-mode == 'manual'
         run: |
@@ -63,6 +67,8 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=YES \
+            ARCHS=arm64 \
             build
 
       - name: Perform CodeQL Analysis
