@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - On iPad, tapping a task now opens it in a panel beside the list instead of a sheet, so you can work through tasks without covering the list. The panel appears whenever the window is wide enough, including in Split View and Stage Manager, and hands back to the sheet when it is not. Escape cancels and Cmd-S saves from a hardware keyboard, and Kanban cards lift under a trackpad pointer (#34).
 
 ### Fixed
+- Signing in with single sign-on on a Mac no longer crashes the app the moment your identity provider hands back to it. macOS delivers the sign-in result on a background thread, and mDone insisted it was on the main one, which brought the app down on macOS 26 before the account could be added. The result is now passed to the main thread first (#182).
 - Signing in with an API token that was created without some permissions no longer throws you back to the login screen. Vikunja answers a missing permission with the same status it uses for a revoked token, and mDone used to take it as a revoked token, so a token without the notifications permission was logged out the moment the app opened. The app now checks whether the token still works before ending the session, keeps you signed in, and tells you which action the token cannot do so you can create one with more permissions (#178).
 
 ## [1.15.0] - 2026-09-03
