@@ -38,7 +38,11 @@ final class TaskReorderTests: XCTestCase {
     private func makeAppState() async -> AppState {
         let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
-        let state = AppState(taskService: TaskService(apiClient: client))
+        let state = AppState(
+            taskService: TaskService(apiClient: client),
+            projectService: ProjectService(apiClient: client),
+            labelService: LabelService(apiClient: client)
+        )
         state.projects = [project]
         state.tasks = [task(1, position: 100), task(2, position: 200), task(3, position: 300)]
         state.projectTaskCache[7] = state.tasks
@@ -218,6 +222,63 @@ final class TaskReorderTests: XCTestCase {
         XCTAssertEqual(refetch?.url?.path, "/api/v1/projects/8/views/300/tasks", "destination list view read back")
         XCTAssertEqual(state.tasksForProject(8).map(\.id), [1, 9])
         XCTAssertEqual(state.tasksForProject(7).map(\.id), [2, 3], "the task left its old project")
+    }
+
+    /// The offline half of the same bug: a queued project move is replayed
+    /// and followed by a full refresh, which replaces the tasks but used to
+    /// leave every cached project order as it was. A full refresh now reads
+    /// each cached project's list view back, and drops orders for projects
+    /// that no longer exist.
+    func testFullRefreshReadsCachedProjectOrdersBack() async {
+        let state = await makeAppState()
+        let destination = Project(
+            id: 8,
+            title: "Home",
+            views: [ProjectView(id: 300, title: "List", projectId: 8, viewKind: "list")]
+        )
+        state.projects = [project, destination]
+        var homeTask = task(9, position: 100)
+        homeTask.projectId = 8
+        state.projectTaskCache[8] = [homeTask]
+        state.projectTaskCache[99] = [task(50, position: 1)] // a project deleted elsewhere
+
+        let json: (Any) -> Data = { (try? JSONSerialization.data(withJSONObject: $0)) ?? Data() }
+        let projectsJSON = json([
+            ["id": 7, "title": "Work", "views": [["id": 100, "title": "List", "project_id": 7, "view_kind": "list"]]],
+            ["id": 8, "title": "Home", "views": [["id": 300, "title": "List", "project_id": 8, "view_kind": "list"]]],
+        ])
+        MockURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+            let response = MockURLProtocol.makeResponse(
+                statusCode: 200, url: request.url, headers: ["x-pagination-total-pages": "1"]
+            )
+            if path.hasSuffix("/views/300/tasks") {
+                // Task 1 was moved into Home (by a replayed edit or another client) and sits first.
+                return (response, Self.viewTasksJSON(ids: [1, 9], projectId: 8))
+            }
+            if path.hasSuffix("/views/100/tasks") {
+                return (response, Self.viewTasksJSON(ids: [2, 3]))
+            }
+            if path.hasSuffix("/projects") {
+                return (response, projectsJSON)
+            }
+            if path.hasSuffix("/labels") {
+                return (response, json([]))
+            }
+            // Everything the server holds, with task 1 already in Home.
+            return (response, Self.viewTasksJSON(ids: [1, 9], projectId: 8))
+        }
+
+        await state.refreshAll()
+
+        let paths = MockURLProtocol.capturedRequests.compactMap { $0.url?.path }
+        XCTAssertTrue(paths.contains { $0.hasSuffix("/views/300/tasks") }, "cached Home order must be read back")
+        XCTAssertTrue(
+            paths.contains { $0.hasSuffix("/views/100/tasks") },
+            "Work is cached by the fixture, so it is read too"
+        )
+        XCTAssertEqual(state.tasksForProject(8).map(\.id), [1, 9])
+        XCTAssertNil(state.projectTaskCache[99], "orders for projects that no longer exist are dropped")
     }
 
     /// An ordinary edit that keeps the project must not cost a refetch.

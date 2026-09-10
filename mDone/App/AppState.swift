@@ -649,6 +649,8 @@ final class AppState {
                 await notificationService.scheduleReminders(for: tasks)
             }
 
+            await refreshCachedProjectOrders()
+
             errorMessage = nil
             activeError = nil
             isShowingCachedData = false
@@ -679,6 +681,27 @@ final class AppState {
             #endif
             markCachedIfUnreachable(error)
             handleError(error)
+        }
+    }
+
+    /// Re-reads the list view of every project whose order this session has
+    /// cached, so a full refresh brings the per-project order along with the
+    /// tasks. Without it a task moved into a project by another client, or by
+    /// a queued offline edit replayed just before this refresh, would sit at
+    /// the bottom of that project's manual order until its screen was
+    /// reopened (issue #185). Only projects opened this session are cached,
+    /// so this is a handful of requests at most. Orders for projects that no
+    /// longer exist are dropped.
+    @MainActor
+    private func refreshCachedProjectOrders() async {
+        let cachedIds = Set(projectTaskCache.keys)
+        let stillPresent = projects.filter { cachedIds.contains($0.id) }
+        let goneIds = cachedIds.subtracting(stillPresent.map(\.id))
+        for id in goneIds {
+            projectTaskCache[id] = nil
+        }
+        for project in stillPresent {
+            await fetchProjectTasks(project: project)
         }
     }
 
