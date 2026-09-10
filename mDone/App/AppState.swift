@@ -1444,12 +1444,33 @@ final class AppState {
             handleError(error)
             return
         }
+        await toggleLabel(label, on: task)
+    }
 
-        let wasCurrent = isCurrent(task)
-        setCurrentLabelLocally(taskId: task.id, label: label, present: !wasCurrent)
+    // MARK: - Label mutations
+
+    /// Whether `task` carries `label`. Reads the live copy in `tasks` when
+    /// there is one, so a stale snapshot held by an open sheet can't flip the
+    /// label the wrong way.
+    @MainActor
+    func hasLabel(_ label: VLabel, on task: VTask) -> Bool {
+        let live = tasks.first(where: { $0.id == task.id }) ?? task
+        return live.labels?.contains { $0.id == label.id } ?? false
+    }
+
+    /// Adds `label` to `task` when it is missing and removes it when present,
+    /// through the dedicated label endpoints: Vikunja ignores labels on the
+    /// task-update call. Optimistic: the local copy updates immediately and
+    /// reverts if the network call fails. Returns whether the change stuck
+    /// (issue #4).
+    @MainActor
+    @discardableResult
+    func toggleLabel(_ label: VLabel, on task: VTask) async -> Bool {
+        let wasPresent = hasLabel(label, on: task)
+        setLabelLocally(taskId: task.id, label: label, present: !wasPresent)
 
         do {
-            if wasCurrent {
+            if wasPresent {
                 try await labelService.removeLabel(taskId: task.id, labelId: label.id)
             } else {
                 try await labelService.addLabel(taskId: task.id, labelId: label.id)
@@ -1458,9 +1479,35 @@ final class AppState {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             #endif
             WidgetCenter.shared.reloadAllTimelines()
+            return true
         } catch {
-            setCurrentLabelLocally(taskId: task.id, label: label, present: wasCurrent)
+            setLabelLocally(taskId: task.id, label: label, present: wasPresent)
             handleError(error)
+            return false
+        }
+    }
+
+    /// Creates a label on the server and adds it to the loaded list. Returns
+    /// nil for a blank title, or after surfacing the error when the call
+    /// fails. The colour is sent without a leading `#`, the form Vikunja's
+    /// own web client stores.
+    @MainActor
+    func createLabel(title: String, hexColor: String? = nil) async -> VLabel? {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let color = hexColor?.trimmingCharacters(in: CharacterSet(charactersIn: "# "))
+        do {
+            let created = try await labelService.createLabel(
+                LabelCreateRequest(title: trimmed, hexColor: (color?.isEmpty ?? true) ? nil : color)
+            )
+            if !labels.contains(where: { $0.id == created.id }) {
+                labels.append(created)
+                try? syncService?.cacheLabels(labels)
+            }
+            return created
+        } catch {
+            handleError(error)
+            return nil
         }
     }
 
@@ -1468,7 +1515,7 @@ final class AppState {
     /// bumps its `updated` timestamp so the stall indicator resets. The
     /// `tasks` array is the source of truth.
     @MainActor
-    private func setCurrentLabelLocally(taskId: Int64, label: VLabel, present: Bool) {
+    private func setLabelLocally(taskId: Int64, label: VLabel, present: Bool) {
         guard let index = tasks.firstIndex(where: { $0.id == taskId }) else { return }
         var labelList = tasks[index].labels ?? []
         if present {
