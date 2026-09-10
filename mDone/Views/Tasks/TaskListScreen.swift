@@ -12,7 +12,9 @@ struct TaskListScreen: View {
     @State private var showAdvancedFilter = false
     @AppStorage("calmMode") private var calmMode = false
     #if os(iOS)
-    @State private var showBoard = false
+    /// `nil` until the board toggle is tapped: until then the screen shows
+    /// whatever `ProjectViewPreference` remembers for this project (#184).
+    @State private var boardOverride: Bool?
     /// On iPad, a task opens in a pane beside the list when there is room;
     /// see `InlineTaskSelection`. Held here so Inbox and each project screen
     /// keep their own selection.
@@ -30,11 +32,31 @@ struct TaskListScreen: View {
     /// sort controls only affect the list, so they're hidden in board mode.
     private var boardActive: Bool {
         #if os(iOS)
-        return showBoard && projectFilter != nil
+        return boardVisible
         #else
         return false
         #endif
     }
+
+    #if os(iOS)
+    /// Whether the board is on screen: this visit's choice once the toggle has
+    /// been tapped, else the view remembered for this project, else the
+    /// default from Settings. A project with no Kanban view always shows the
+    /// list, whatever is stored.
+    private var boardVisible: Bool {
+        guard boardAvailable, let projectFilter else { return false }
+        return boardOverride ?? (ProjectViewPreference.mode(for: projectFilter.id) == .board)
+    }
+
+    /// Switches view and remembers the choice for this project, so the next
+    /// visit opens the same way (#184).
+    private func setBoardVisible(_ visible: Bool) {
+        boardOverride = visible
+        if let projectFilter {
+            ProjectViewPreference.save(visible ? .board : .list, for: projectFilter.id)
+        }
+    }
+    #endif
 
     private var sortScope: TaskSortScope {
         projectFilter.map { .project($0.id) } ?? .inbox
@@ -68,6 +90,9 @@ struct TaskListScreen: View {
             .navigationTitle(projectFilter?.title ?? String(localized: "Inbox"))
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            .onChange(of: projectFilter?.id) { _, _ in
+                boardOverride = nil
+            }
             #endif
             .toolbar { toolbarContent }
             .sheet(isPresented: $showAdvancedFilter) {
@@ -130,7 +155,7 @@ struct TaskListScreen: View {
     @ViewBuilder
     private var content: some View {
         #if os(iOS)
-        if showBoard, let projectFilter {
+        if boardVisible, let projectFilter {
             ProjectBoardView(project: projectFilter)
         } else {
             listBody
@@ -222,11 +247,11 @@ struct TaskListScreen: View {
         if boardAvailable {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    showBoard.toggle()
+                    setBoardVisible(!boardVisible)
                 } label: {
-                    Image(systemName: showBoard ? "list.bullet" : "rectangle.split.3x1")
+                    Image(systemName: boardVisible ? "list.bullet" : "rectangle.split.3x1")
                 }
-                .accessibilityLabel(showBoard ? "Show list" : "Show board")
+                .accessibilityLabel(boardVisible ? "Show list" : "Show board")
             }
         }
         #endif

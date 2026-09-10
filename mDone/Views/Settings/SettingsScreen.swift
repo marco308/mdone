@@ -13,6 +13,10 @@ struct SettingsScreen: View {
     @AppStorage(AllDayEventPreference.storageKey) private var hideAllDayEvents = false
     @AppStorage("currentStallDays") private var currentStallDays = 7
     @AppStorage(TaskListDensity.storageKey) private var taskListDensity = TaskListDensity.standard.rawValue
+    #if os(iOS)
+    @AppStorage(ProjectViewPreference.defaultStorageKey) private var defaultProjectView = ProjectViewPreference
+        .fallback.rawValue
+    #endif
     @State private var showLogoutConfirm = false
     @State private var showAbout = false
 
@@ -55,6 +59,22 @@ struct SettingsScreen: View {
                     "Task row size changes how much each task takes up in your lists. Compact fits more on screen; Large makes tasks easier to read."
                 )
             }
+
+            #if os(iOS)
+            Section {
+                Picker("Projects open in", selection: defaultProjectViewBinding) {
+                    ForEach(ProjectViewMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+            } header: {
+                Text("Projects")
+            } footer: {
+                Text(
+                    "The view a project opens in. Boards are only offered for projects that have Kanban columns on the server. Switching one project with the button in its toolbar is remembered for that project and overrides this."
+                )
+            }
+            #endif
 
             Section {
                 Picker("Default due time", selection: $defaultDueTime) {
@@ -212,6 +232,19 @@ struct SettingsScreen: View {
             }
         )
     }
+
+    #if os(iOS)
+    /// Storage keeps the raw string, but the picker selects a `ProjectViewMode`,
+    /// so a stored value this build does not know (a downgrade after a future
+    /// version adds a mode) still matches one of the tags instead of leaving
+    /// the picker with no selection.
+    private var defaultProjectViewBinding: Binding<ProjectViewMode> {
+        Binding(
+            get: { ProjectViewMode(rawValue: defaultProjectView) ?? ProjectViewPreference.fallback },
+            set: { defaultProjectView = $0.rawValue }
+        )
+    }
+    #endif
 
     private static var versionString: String {
         let info = Bundle.main.infoDictionary
