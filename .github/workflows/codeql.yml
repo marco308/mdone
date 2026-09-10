@@ -35,9 +35,12 @@ on:
     - cron: "27 4 * * 1"
 
 # A new push to a PR cancels the analysis still running for its previous
-# commit, so superseded runs stop tying up the three-core macOS runner.
+# commit, so superseded runs stop tying up the three-core macOS runner. The
+# event name is part of the group because scheduled runs and push-to-main
+# runs share refs/heads/main: without it, a push landing during the weekly
+# run would cancel it.
 concurrency:
-  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  group: codeql-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
