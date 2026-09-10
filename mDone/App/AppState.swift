@@ -1291,9 +1291,24 @@ final class AppState {
             syncEmbeddedRelations(with: updated)
             syncService?.updateCachedTask(updated)
             WidgetCenter.shared.reloadAllTimelines()
+            if let existing, existing.projectId != updated.projectId {
+                await refetchProjectOrderAfterMove(of: updated)
+            }
         } catch {
             handleError(error)
         }
+    }
+
+    /// A task that changed project has a fresh position in its new project's
+    /// list view, which the old per-project order knows nothing about: in
+    /// Manual sort it would sit at the bottom until that screen was next
+    /// opened (issue #185). Reading the destination view back puts it where
+    /// the server did. The old project needs nothing: its order is filtered
+    /// by project id, so the task simply stops appearing there.
+    @MainActor
+    private func refetchProjectOrderAfterMove(of task: VTask) async {
+        guard let destination = projects.first(where: { $0.id == task.projectId }) else { return }
+        await fetchProjectTasks(project: destination)
     }
 
     // MARK: - Subtasks & Relations
