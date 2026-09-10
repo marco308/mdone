@@ -1466,7 +1466,18 @@ final class AppState {
     @MainActor
     @discardableResult
     func toggleLabel(_ label: VLabel, on task: VTask) async -> Bool {
+        // Label changes are not queued for replay (issue #146 covers task
+        // edits only), so fail fast rather than retrying a connection that
+        // isn't there and losing the change.
+        if isEffectivelyOffline {
+            rejectOffline("Changing labels")
+            return false
+        }
+
         let wasPresent = hasLabel(label, on: task)
+        // `setLabelLocally` bumps `updated`; keep the original so a rejected
+        // change does not leave the task looking freshly touched.
+        let originalUpdated = tasks.first(where: { $0.id == task.id })?.updated
         setLabelLocally(taskId: task.id, label: label, present: !wasPresent)
 
         do {
@@ -1482,6 +1493,10 @@ final class AppState {
             return true
         } catch {
             setLabelLocally(taskId: task.id, label: label, present: wasPresent)
+            if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+                tasks[index].updated = originalUpdated
+                syncService?.updateCachedTask(tasks[index])
+            }
             handleError(error)
             return false
         }
@@ -1495,6 +1510,10 @@ final class AppState {
     func createLabel(title: String, hexColor: String? = nil) async -> VLabel? {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
+        if isEffectivelyOffline {
+            rejectOffline("Creating a label")
+            return nil
+        }
         let color = hexColor?.trimmingCharacters(in: CharacterSet(charactersIn: "# "))
         do {
             let created = try await labelService.createLabel(

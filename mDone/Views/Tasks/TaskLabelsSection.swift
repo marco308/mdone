@@ -174,9 +174,18 @@ struct LabelPickerSheet: View {
         let color = newLabelColor
         Task { @MainActor in
             if let created = await appState.createLabel(title: title, hexColor: color) {
+                // The new row is on screen as soon as the label exists; keep
+                // it busy until the follow-up add lands so a quick tap can't
+                // start a removal that races it.
+                busyLabelIds.insert(created.id)
                 await appState.toggleLabel(created, on: task)
-                query = ""
-                newLabelColor = ""
+                busyLabelIds.remove(created.id)
+                // Only clear what was typed for this label: a slow request
+                // must not erase the next name the user has started on.
+                if trimmedQuery == title {
+                    query = ""
+                    newLabelColor = ""
+                }
             }
             isCreating = false
         }

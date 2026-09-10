@@ -1,3 +1,4 @@
+import SwiftData
 import XCTest
 @testable import mDone
 
@@ -25,6 +26,34 @@ final class LabelAssignmentTests: XCTestCase {
         )
     }
 
+    /// An AppState that believes the device is offline, so label changes
+    /// must be refused before any request is made.
+    private func makeOfflineAppState() async throws -> AppState {
+        let schema = Schema([
+            CachedTask.self, CachedProject.self, CachedLabel.self, PendingOperation.self, FocusRecord.self,
+        ])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let client = MockURLProtocol.mockClient()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+        let sync = SyncService(
+            taskService: TaskService(apiClient: client),
+            projectService: ProjectService(apiClient: client),
+            modelContainer: container,
+            apiClient: client
+        )
+        let appState = AppState(
+            taskService: TaskService(apiClient: client),
+            labelService: LabelService(apiClient: client)
+        )
+        appState.configureSyncService(sync, networkMonitor: NetworkMonitor(stubbedConnection: false))
+        MockURLProtocol.requestHandler = { _ in
+            XCTFail("An offline label change must not hit the network")
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: nil), Data())
+        }
+        return appState
+    }
+
     private let urgent = VLabel(id: 7, title: "Urgent", hexColor: "ff4444")
     private let home = VLabel(id: 8, title: "Home", hexColor: "4772fa")
 
@@ -47,6 +76,16 @@ final class LabelAssignmentTests: XCTestCase {
     private func jsonBody(of request: URLRequest?) throws -> [String: Any] {
         let data = try XCTUnwrap(request.flatMap { MockURLProtocol.bodyData(from: $0) })
         return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
+    private func assertNetworkUnavailable(_ appState: AppState, file: StaticString = #filePath, line: UInt = #line) {
+        guard case .networkUnavailable? = appState.activeError else {
+            return XCTFail(
+                "Expected the offline error, got \(String(describing: appState.activeError))",
+                file: file,
+                line: line
+            )
+        }
     }
 
     // MARK: - toggleLabel
@@ -202,5 +241,47 @@ final class LabelAssignmentTests: XCTestCase {
         XCTAssertNil(created)
         XCTAssertTrue(appState.labels.isEmpty)
         XCTAssertNotNil(appState.errorMessage)
+    }
+
+    func testToggleLabelFailureRestoresTheUpdatedTimestamp() async {
+        // The optimistic change bumps `updated` so the stall indicator resets.
+        // A rejected change must put the old timestamp back too, or the task
+        // looks freshly touched and re-sorts even though nothing changed.
+        let appState = await makeAppState()
+        appState.labels = [urgent]
+        var task = VTask(id: 1, title: "x", done: false, priority: 0, projectId: 1)
+        let originalUpdated = Date(timeIntervalSince1970: 1_700_000_000)
+        task.updated = originalUpdated
+        appState.tasks = [task]
+        respondBadRequest()
+
+        await appState.toggleLabel(urgent, on: task)
+
+        XCTAssertEqual(appState.tasks[0].updated, originalUpdated)
+    }
+
+    func testToggleLabelIsRefusedOfflineWithoutTouchingTheTask() async throws {
+        let appState = try await makeOfflineAppState()
+        appState.labels = [urgent]
+        let task = VTask(id: 1, title: "x", done: false, priority: 0, projectId: 1)
+        appState.tasks = [task]
+
+        let stuck = await appState.toggleLabel(urgent, on: task)
+
+        XCTAssertFalse(stuck)
+        XCTAssertFalse(appState.hasLabel(urgent, on: task), "No optimistic change is left behind")
+        assertNetworkUnavailable(appState)
+        XCTAssertTrue(MockURLProtocol.capturedRequests.isEmpty)
+    }
+
+    func testCreateLabelIsRefusedOffline() async throws {
+        let appState = try await makeOfflineAppState()
+
+        let created = await appState.createLabel(title: "Home")
+
+        XCTAssertNil(created)
+        XCTAssertTrue(appState.labels.isEmpty)
+        assertNetworkUnavailable(appState)
+        XCTAssertTrue(MockURLProtocol.capturedRequests.isEmpty)
     }
 }
