@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Projects now open in the view you left them in. Switching a project to its board used to last only until you left the screen, so anyone who works on a board had to switch again on every visit. The choice is now remembered per project, and Settings > Projects > "Projects open in" sets what a project you have never switched opens in (#184).
 - Sort a project by "Manual" to put its tasks in whatever order you like. Drag the handle on a row to move it, on iPhone, iPad and Mac. The order is the same one Vikunja's web app shows, so a list you arrange in one place looks the same in the other, and it does not touch due dates: a task due tomorrow can sit below one due next month if that is how you want it. The sort you pick is remembered per project, and the Inbox keeps its date sections (#183).
 - Drag cards up and down a Kanban column, or into another column, to reorder them. Drop a card on the top half of another card to put it above, on the bottom half to put it below, or on empty space in a column to add it at the end. "Move to" in a card's menu still reaches columns that are off screen. Boards whose columns are filled by filters cannot be rearranged, as in the web app (#183).
 

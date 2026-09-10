@@ -13,6 +13,10 @@ struct SettingsScreen: View {
     @AppStorage(AllDayEventPreference.storageKey) private var hideAllDayEvents = false
     @AppStorage("currentStallDays") private var currentStallDays = 7
     @AppStorage(TaskListDensity.storageKey) private var taskListDensity = TaskListDensity.standard.rawValue
+    #if os(iOS)
+    @AppStorage(ProjectViewPreference.defaultStorageKey) private var defaultProjectView = ProjectViewPreference
+        .fallback.rawValue
+    #endif
     @State private var showLogoutConfirm = false
     @State private var showAbout = false
 
@@ -55,6 +59,22 @@ struct SettingsScreen: View {
                     "Task row size changes how much each task takes up in your lists. Compact fits more on screen; Large makes tasks easier to read."
                 )
             }
+
+            #if os(iOS)
+            Section {
+                Picker("Projects open in", selection: $defaultProjectView) {
+                    ForEach(ProjectViewMode.allCases) { mode in
+                        Text(mode.label).tag(mode.rawValue)
+                    }
+                }
+            } header: {
+                Text("Projects")
+            } footer: {
+                Text(
+                    "The view a project opens in. Boards are only offered for projects that have Kanban columns on the server. Switching one project with the button in its toolbar is remembered for that project and overrides this."
+                )
+            }
+            #endif
 
             Section {
                 Picker("Default due time", selection: $defaultDueTime) {
