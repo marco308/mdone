@@ -62,9 +62,9 @@ struct SettingsScreen: View {
 
             #if os(iOS)
             Section {
-                Picker("Projects open in", selection: $defaultProjectView) {
+                Picker("Projects open in", selection: defaultProjectViewBinding) {
                     ForEach(ProjectViewMode.allCases) { mode in
-                        Text(mode.label).tag(mode.rawValue)
+                        Text(mode.label).tag(mode)
                     }
                 }
             } header: {
@@ -232,6 +232,19 @@ struct SettingsScreen: View {
             }
         )
     }
+
+    #if os(iOS)
+    /// Storage keeps the raw string, but the picker selects a `ProjectViewMode`,
+    /// so a stored value this build does not know (a downgrade after a future
+    /// version adds a mode) still matches one of the tags instead of leaving
+    /// the picker with no selection.
+    private var defaultProjectViewBinding: Binding<ProjectViewMode> {
+        Binding(
+            get: { ProjectViewMode(rawValue: defaultProjectView) ?? ProjectViewPreference.fallback },
+            set: { defaultProjectView = $0.rawValue }
+        )
+    }
+    #endif
 
     private static var versionString: String {
         let info = Bundle.main.infoDictionary
