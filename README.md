@@ -70,7 +70,7 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 
 ## Privacy
 
-mDone does not collect, track, or share any personal data. The app communicates exclusively with the Vikunja server you configure. See the full [Privacy Policy](docs/privacy-policy.html).
+mDone does not collect, track, or share any personal data. The app communicates exclusively with the Vikunja server you configure. See the full [Privacy Policy](https://marco308.github.io/mdone/privacy-policy.html).
 
 ## License
 
@@ -80,4 +80,3 @@ mDone does not collect, track, or share any personal data. The app communicates 
 
 - [Vikunja](https://vikunja.io) — The open-source task management platform mDone connects to
 - [Issues](https://github.com/marco308/mdone/issues) — Report bugs or request features
-- [Roadmap](docs/ISSUES.md) — Planned features and enhancements
