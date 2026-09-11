@@ -1,0 +1,68 @@
+name: GitHub Release
+
+# Publishes a GitHub Release for every App Store release. On each push to
+# main it reads MARKETING_VERSION from project.yml and, if CHANGELOG.md has
+# a stamped "## [<version>] - <date>" section and no v<version> tag exists
+# yet, tags the commit and creates a release whose notes are that section.
+# A build-number bump alone (TestFlight-only build) does not stamp the
+# changelog, so it does not produce a release; stamping is what marks a
+# version as shipped.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Tag and publish release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Read version and changelog section
+        id: version
+        run: |
+          version=$(sed -nE 's/^ *MARKETING_VERSION: *"([^"]+)".*/\1/p' project.yml | head -1)
+          if [ -z "$version" ]; then
+            echo "MARKETING_VERSION not found in project.yml" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          # Notes = the body of "## [<version>] - <date>", up to the next "## " heading.
+          awk -v v="$version" '
+            /^## \[/ { if (found) exit; found = ($0 ~ "^## \\[" v "\\]") ; next }
+            found { print }
+          ' CHANGELOG.md | sed '/./,$!d' | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > notes.md
+
+          if [ ! -s notes.md ]; then
+            echo "No stamped CHANGELOG section for $version, nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
+            echo "Tag v$version already exists, nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "release=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        if: steps.version.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          {
+            cat notes.md
+            echo
+            echo "Full changelog: [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/v${VERSION}/CHANGELOG.md)"
+          } > release-notes.md
+          gh release create "v$VERSION" \
+            --target "$GITHUB_SHA" \
+            --title "mDone $VERSION" \
+            --notes-file release-notes.md
