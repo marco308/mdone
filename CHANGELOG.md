@@ -6,12 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-09-11
+
 ### Added
 - Labels can now be added to and removed from a task. The task's Labels section has an "Add Labels" button ("Edit Labels" once it has some) that opens a picker listing every label on your server: tap one to put it on the task, tap again to take it off, and each change is saved as you make it. Type a name that does not exist yet to create it, pick a colour, and it goes straight onto the task. Works in the task sheet on iPhone, the side panel on iPad and the detail view on Mac (#4).
 - Projects now open in the view you left them in. Switching a project to its board used to last only until you left the screen, so anyone who works on a board had to switch again on every visit. The choice is now remembered per project, and Settings > Projects > "Projects open in" sets what a project you have never switched opens in (#184).
 - Sort a project by "Manual" to put its tasks in whatever order you like. Drag the handle on a row to move it, on iPhone, iPad and Mac. The order is the same one Vikunja's web app shows, so a list you arrange in one place looks the same in the other, and it does not touch due dates: a task due tomorrow can sit below one due next month if that is how you want it. The sort you pick is remembered per project, and the Inbox keeps its date sections (#183).
 - Drag cards up and down a Kanban column, or into another column, to reorder them. Drop a card on the top half of another card to put it above, on the bottom half to put it below, or on empty space in a column to add it at the end. "Move to" in a card's menu still reaches columns that are off screen. Boards whose columns are filled by filters cannot be rearranged, as in the web app (#183).
-
 - You can now sign in with a username and password on an account that has two-factor authentication turned on. If your server supports two-factor, the login screen shows a "Two-factor code" field beside the password; leave it empty if your account does not use one. If a sign-in is refused because a code is needed, the field appears and tells you so, and a wrong or expired code says that rather than a generic error. Previously such accounts could only use an API token or single sign-on (#179).
 
 ### Changed
