@@ -50,17 +50,24 @@ jobs:
           repo="$GITHUB_REPOSITORY"
           owner="${repo%%/*}"
           default_branch=$(gh api "repos/$repo" --jq .default_branch)
+
+          # The days input is free text: refuse anything but a non-negative integer,
+          # otherwise a typo like "-1" would put the cutoff in the future and mark
+          # every branch stale.
+          if ! [[ "$DAYS" =~ ^[0-9]+$ ]]; then
+            echo "days must be a non-negative integer, got '$DAYS'" >&2
+            exit 1
+          fi
           cutoff=$(( $(date +%s) - DAYS * 86400 ))
 
-          # Branch names that currently have an open PR, and ones whose PR was merged.
-          # Only PRs whose head lives in this repo count: a fork's branch name is not ours.
-          gh pr list --repo "$repo" --state open --limit 1000 \
-            --json headRefName,headRepositoryOwner \
-            --jq ".[] | select(.headRepositoryOwner.login == \"$owner\") | .headRefName" \
+          # Branches with an open PR, and "branch sha" pairs for every merged PR head.
+          # Paginated, so the lists are complete however many PRs the repo has. Only
+          # PRs whose head lives in this repo count: a fork's branch name is not ours.
+          gh api --paginate "repos/$repo/pulls?state=open&per_page=100" \
+            --jq ".[] | select(.head.repo.owner.login == \"$owner\") | .head.ref" \
             | sort -u > open.txt
-          gh pr list --repo "$repo" --state merged --limit 1000 \
-            --json headRefName,headRepositoryOwner \
-            --jq ".[] | select(.headRepositoryOwner.login == \"$owner\") | .headRefName" \
+          gh api --paginate "repos/$repo/pulls?state=closed&per_page=100" \
+            --jq ".[] | select(.merged_at != null and .head.repo.owner.login == \"$owner\") | \"\(.head.ref) \(.head.sha)\"" \
             | sort -u > merged.txt
           gh api --paginate "repos/$repo/branches?per_page=100" \
             --jq '.[] | select(.protected) | .name' | sort -u > protected.txt
@@ -73,9 +80,9 @@ jobs:
             echo "|---|---|---|---|"
           } >> "$GITHUB_STEP_SUMMARY"
 
-          git for-each-ref --format='%(refname) %(committerdate:unix) %(committerdate:short)' refs/remotes/origin \
+          git for-each-ref --format='%(refname) %(objectname) %(committerdate:unix) %(committerdate:short)' refs/remotes/origin \
           | sed 's|^refs/remotes/origin/||' \
-          | while read -r branch ts date; do
+          | while read -r branch sha ts date; do
               case "$branch" in HEAD|"$default_branch") continue ;; esac
 
               action=keep; reason=
@@ -87,7 +94,9 @@ jobs:
                 reason="asset branch"
               elif ! git merge-base "origin/$default_branch" "origin/$branch" >/dev/null 2>&1; then
                 reason="orphan branch (assets)"
-              elif grep -qxF "$branch" merged.txt; then
+              elif grep -qxF "$branch $sha" merged.txt; then
+                # Only when the tip is exactly the merged PR's head. A branch reused or
+                # pushed to after its PR merged falls through to the checks below.
                 action=delete; reason="pull request merged"
               elif git merge-base --is-ancestor "origin/$branch" "origin/$default_branch"; then
                 action=delete; reason="fully merged into $default_branch"
@@ -97,13 +106,19 @@ jobs:
                 reason="active, no PR"
               fi
 
-              if [ "$action" = delete ]; then
-                if [ "$DRY_RUN" = true ]; then
-                  echo "would delete $branch ($reason)"
-                else
-                  echo "deleting $branch ($reason)"
-                  git push origin --delete "$branch"
+              if [ "$action" = delete ] && [ "$DRY_RUN" != true ]; then
+                # The snapshot above may be minutes old. Re-check for a PR opened since,
+                # and delete with a lease so a push since the snapshot makes the delete
+                # fail rather than discard the new commits.
+                if [ "$(gh api "repos/$repo/pulls?state=open&head=$owner:$branch&per_page=1" --jq length)" != 0 ]; then
+                  action=keep; reason="open pull request (opened during run)"
+                elif ! git push --force-with-lease="refs/heads/$branch:$sha" origin ":refs/heads/$branch"; then
+                  action=keep; reason="changed during run, left alone"
                 fi
+              fi
+
+              if [ "$action" = delete ]; then
+                if [ "$DRY_RUN" = true ]; then echo "would delete $branch ($reason)"; else echo "deleted $branch ($reason)"; fi
                 echo "| \`$branch\` | $date | delete | $reason |" >> "$GITHUB_STEP_SUMMARY"
               else
                 echo "| \`$branch\` | $date | keep | $reason |" >> "$GITHUB_STEP_SUMMARY"
