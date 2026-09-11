@@ -13,7 +13,8 @@ ignore:
   - "mDoneIntegrationTests/**"
   - "mDoneWidgetRenderTests/**"
 
-# xccov reports absolute paths from the runner; map them back to the repo.
+# The lcov from scripts/xcresult-to-lcov.py carries the runner's absolute
+# paths; map them back to the repo.
 fixes:
   - "/Users/runner/work/mdone/mdone/::"
 

@@ -63,20 +63,26 @@ jobs:
           fi
 
       # The scheme already gathers coverage (gatherCoverageData in project.yml);
-      # this turns the result bundle into the xccov JSON report Codecov reads.
+      # this converts the result bundle's line data to lcov, the one format
+      # here that Codecov parses (it cannot read xccov's JSON report, and
+      # llvm-cov needs binaries and a profdata the bundle does not carry).
       # codecov.yml drops SwiftUI views and the test targets from the number,
       # so the badge tracks the layers that have coverage targets in CLAUDE.md.
       - name: Export coverage report
         run: |
           bundle=$(ls -dt test-run-*.xcresult | head -n 1)
-          xcrun xccov view --report --json "$bundle" > coverage.json
+          ./scripts/xcresult-to-lcov.py "$bundle" coverage.lcov
           echo "Exported coverage from $bundle"
 
+      # plugins: noop stops the uploader's own Xcode plugin, which trawls
+      # DerivedData with llvm-cov, fails on the fat XCTest frameworks, and
+      # finds no coverage data in the app binary anyway.
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.json
+          files: coverage.lcov
           disable_search: true
+          plugins: noop
           flags: ios-unit
           fail_ci_if_error: false
