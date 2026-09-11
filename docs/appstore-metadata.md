@@ -79,10 +79,28 @@ Steps to test:
    - Open a task to edit its details, set a due date, or configure repeating.
    - Long-press a task (or open it) and choose "Mark as Current" to pin it to the new Current section at the top of the list, then update its progress from the task's detail view.
    - Try the focus timer from a task's detail view.
+   - In a task's Labels section, tap "Add Labels" to put labels on it or take them off.
+   - Sort a project by "Manual" (sort menu) and drag the handles to reorder tasks.
    - Add a widget from the home screen (long press > Edit Home Screen > tap +).
    - Say "Hey Siri, add a task in mDone" (the app can be closed). Siri asks for the task, adds it to the first project, and reads back where it went and when it is due. On a Mac, use the Shortcuts app's "Add Task" action for mDone.
 
 This is a private test server maintained by the developer for App Store review purposes.
+
+## What's New (v1.16.0)
+
+Labels, manual ordering, two-factor login and an iPad detail pane.
+
+- Add labels to a task and take them off again from the task's Labels section. Pick from every label on your server, or type a new name to create one and put it straight on the task.
+- Sort a project by "Manual" and drag tasks into whatever order you like, on iPhone, iPad and Mac. It is the same order Vikunja's web app shows, and it leaves due dates alone.
+- Drag Kanban cards up and down a column or into another column. Drop on the top half of a card to go above it, the bottom half to go below.
+- Each project opens in the view you left it in, list or board, and a new setting picks the default for projects you have not switched.
+- Sign in with a username and password on an account that uses two-factor authentication. A code field appears beside the password when your server supports it.
+- On iPad, tasks open in a panel beside the list instead of a sheet. Escape cancels and Cmd-S saves from a hardware keyboard.
+- Fixed single sign-on crashing the Mac app the moment your identity provider handed back to it.
+- Fixed API tokens created without every permission being logged out on launch. The app now keeps you signed in and says which action the token cannot do.
+- Fixed a wrong username or password showing a generic error instead of saying so.
+- Fixed a task moved to another project sitting at the bottom of its new list until you came back.
+- Available on both iPhone and Mac.
 
 ## What's New (v1.15.0)
 
