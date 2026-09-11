@@ -1,0 +1,33 @@
+# Codecov settings. The README badge and PR comments come from here.
+#
+# The number is meant to track the layers that have coverage targets in
+# CLAUDE.md (services, models, AppState, shared widget code). SwiftUI views
+# are deliberately at 0% line coverage (they get snapshot tests instead), so
+# they are excluded rather than dragging the figure down. Test targets are
+# excluded because their own lines are always executed.
+ignore:
+  - "mDone/Views/**"
+  - "mDoneTests/**"
+  - "mDoneUITests/**"
+  - "mDoneMacUITests/**"
+  - "mDoneIntegrationTests/**"
+  - "mDoneWidgetRenderTests/**"
+
+# xccov reports absolute paths from the runner; map them back to the repo.
+fixes:
+  - "/Users/runner/work/mdone/mdone/::"
+
+# Informational only: coverage is tiered by layer, not a single gate, so a
+# dip must never block a merge. The PR comment still shows the diff coverage.
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+comment:
+  layout: "condensed_header, diff, files"
+  require_changes: true

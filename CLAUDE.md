@@ -84,7 +84,7 @@ Log in with `devuser` / `devpassword`. `./scripts/reset-dev-vikunja.sh` nukes an
 
 ### CI
 
-- `.github/workflows/ios-tests.yml` runs `mDoneTests` on the iOS Simulator for every PR to `main`, pinned to `-destination 'platform=iOS Simulator,name=iPhone 17'`. UI and snapshot targets are excluded: they need a booted app and are flaky on CI.
+- `.github/workflows/ios-tests.yml` runs `mDoneTests` on the iOS Simulator for every PR to `main` and every push to `main`, pinned to `-destination 'platform=iOS Simulator,name=iPhone 17'`. UI and snapshot targets are excluded: they need a booted app and are flaky on CI. It exports the result bundle with `xccov` and uploads it to Codecov (`CODECOV_TOKEN` secret), which feeds the README badge and the coverage comment on PRs. `codecov.yml` excludes `mDone/Views/` and the test targets from that number and keeps the checks informational, so Codecov never blocks a merge.
 - `.github/workflows/macos-tests.yml` runs `mDoneMacTests` on `-destination 'platform=macOS'` for every PR to `main`. It signs ad-hoc (`CODE_SIGN_IDENTITY=-`, `CODE_SIGNING_REQUIRED=NO`, `CODE_SIGN_STYLE=Manual`, empty `DEVELOPMENT_TEAM`) because runners have no Apple Development identity and, unlike the simulator, a real macOS bundle has to be signed to launch. Ad-hoc still applies the sandbox entitlements, so the Keychain-backed tests pass. `mDoneMacUITests` is excluded: it is the App Store screenshot run and needs a live server plus credentials.
 - `.github/workflows/vikunja-integration.yml` runs `mDoneIntegrationTests` nightly (and on demand) against a real Vikunja server: the latest release plus the pinned version the API inventory was verified against. It runs the native macOS release binary straight on the runner, never Docker, because the hosted arm64 macOS runners cannot boot a Linux VM. It never runs on a PR and cannot block a merge.
 - `.github/workflows/codeql.yml` runs CodeQL (build-only, so it uses `generic/platform=iOS Simulator`); `.github/workflows/deploy-pages.yml` publishes `website/`.
@@ -132,7 +132,7 @@ No em-dashes anywhere: user-facing copy, changelog entries, code comments, docs,
 
 ## Test Coverage
 
-Code coverage is gathered by default: `gatherCoverageData: true` is set on both schemes in `project.yml`. Read coverage from any test run with `xcrun xccov view --report <path-to-.xcresult>`.
+Code coverage is gathered by default: `gatherCoverageData: true` is set on both schemes in `project.yml`. Read coverage from any test run with `xcrun xccov view --report <path-to-.xcresult>`. CI uploads the iOS run to Codecov (see CI above); the badge number excludes views and test targets, per `codecov.yml`.
 
 Apply tiered coverage targets by layer rather than chasing a single overall percentage:
 
