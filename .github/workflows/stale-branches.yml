@@ -1,0 +1,111 @@
+name: Stale Branches
+
+# Prunes remote branches nobody needs any more. Runs every Monday and on
+# demand. A branch is deleted when it is not main, not protected, has no
+# open pull request, and either:
+#   * its pull request was merged (the work is on main, so the branch is
+#     only clutter; GitHub keeps the "Restore branch" button on the PR), or
+#   * it is already fully contained in main, or
+#   * its last commit is older than `days` (GitHub's own "stale" cut-off is
+#     90 days), whatever its PR state.
+# Asset branches are always kept: the repo uses `screenshots/*` and `*-assets`
+# branches (and orphan branches with no merge base with main) to hold review
+# screenshots that issues and PRs link to, and deleting them would break
+# those images. A manual run can be a dry run, which only reports.
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Report what would be deleted without deleting anything
+        type: boolean
+        default: false
+      days:
+        description: Delete unmerged branches whose last commit is older than this many days
+        type: string
+        default: '90'
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  prune:
+    name: Delete merged and abandoned branches
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Prune branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run == true && 'true' || 'false' }}
+          DAYS: ${{ inputs.days || '90' }}
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          owner="${repo%%/*}"
+          default_branch=$(gh api "repos/$repo" --jq .default_branch)
+          cutoff=$(( $(date +%s) - DAYS * 86400 ))
+
+          # Branch names that currently have an open PR, and ones whose PR was merged.
+          # Only PRs whose head lives in this repo count: a fork's branch name is not ours.
+          gh pr list --repo "$repo" --state open --limit 1000 \
+            --json headRefName,headRepositoryOwner \
+            --jq ".[] | select(.headRepositoryOwner.login == \"$owner\") | .headRefName" \
+            | sort -u > open.txt
+          gh pr list --repo "$repo" --state merged --limit 1000 \
+            --json headRefName,headRepositoryOwner \
+            --jq ".[] | select(.headRepositoryOwner.login == \"$owner\") | .headRefName" \
+            | sort -u > merged.txt
+          gh api --paginate "repos/$repo/branches?per_page=100" \
+            --jq '.[] | select(.protected) | .name' | sort -u > protected.txt
+
+          {
+            echo "## Stale branch prune"
+            echo
+            [ "$DRY_RUN" = true ] && echo "**Dry run:** nothing was deleted." && echo
+            echo "| Branch | Last commit | Action | Reason |"
+            echo "|---|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          git for-each-ref --format='%(refname) %(committerdate:unix) %(committerdate:short)' refs/remotes/origin \
+          | sed 's|^refs/remotes/origin/||' \
+          | while read -r branch ts date; do
+              case "$branch" in HEAD|"$default_branch") continue ;; esac
+
+              action=keep; reason=
+              if grep -qxF "$branch" protected.txt; then
+                reason="protected"
+              elif grep -qxF "$branch" open.txt; then
+                reason="open pull request"
+              elif [[ "$branch" == screenshots/* || "$branch" == *-assets ]]; then
+                reason="asset branch"
+              elif ! git merge-base "origin/$default_branch" "origin/$branch" >/dev/null 2>&1; then
+                reason="orphan branch (assets)"
+              elif grep -qxF "$branch" merged.txt; then
+                action=delete; reason="pull request merged"
+              elif git merge-base --is-ancestor "origin/$branch" "origin/$default_branch"; then
+                action=delete; reason="fully merged into $default_branch"
+              elif [ "$ts" -lt "$cutoff" ]; then
+                action=delete; reason="no commits in $DAYS days"
+              else
+                reason="active, no PR"
+              fi
+
+              if [ "$action" = delete ]; then
+                if [ "$DRY_RUN" = true ]; then
+                  echo "would delete $branch ($reason)"
+                else
+                  echo "deleting $branch ($reason)"
+                  git push origin --delete "$branch"
+                fi
+                echo "| \`$branch\` | $date | delete | $reason |" >> "$GITHUB_STEP_SUMMARY"
+              else
+                echo "| \`$branch\` | $date | keep | $reason |" >> "$GITHUB_STEP_SUMMARY"
+              fi
+            done

@@ -89,6 +89,7 @@ Log in with `devuser` / `devpassword`. `./scripts/reset-dev-vikunja.sh` nukes an
 - `.github/workflows/vikunja-integration.yml` runs `mDoneIntegrationTests` nightly (and on demand) against a real Vikunja server: the latest release plus the pinned version the API inventory was verified against. It runs the native macOS release binary straight on the runner, never Docker, because the hosted arm64 macOS runners cannot boot a Linux VM. It never runs on a PR and cannot block a merge.
 - `.github/workflows/codeql.yml` runs CodeQL (build-only, so it uses `generic/platform=iOS Simulator`); `.github/workflows/deploy-pages.yml` publishes `website/`.
 - `.github/workflows/github-release.yml` runs on every push to `main`. It reads `MARKETING_VERSION` from `project.yml` and, when `CHANGELOG.md` has a stamped `## [<version>] - <date>` section and no `v<version>` tag exists, tags the commit and publishes a GitHub Release with that section as its notes. Stamping the changelog is therefore what makes a version appear under Releases; a build-number-only bump for a TestFlight build does not.
+- `.github/workflows/stale-branches.yml` runs every Monday (and on demand, with a dry-run option) and deletes remote branches that have a merged PR, are fully contained in `main`, or have had no commits in 90 days. Branches with an open PR are never touched. `screenshots/*`, `*-assets` and orphan branches are kept because issues and PRs link to the images on them; use one of those names for anything else that should survive the prune.
 
 ## Architecture
 
