@@ -22,7 +22,7 @@ Beyond plain task CRUD the app also covers: focus sessions with a Live Activity,
 | `mDoneUITests/`, `mDoneMacUITests/` | XCUITests, including the App Store screenshot runs |
 | `mDoneWidgetRenderTests/` | Unhosted logic tests that render widget views to PNGs for the marketing site |
 | `docs/` | Dev setup, App Store metadata, Vikunja API inventory, research notes |
-| `scripts/` | `seed-dev-vikunja.sh`, `reset-dev-vikunja.sh` for the local dev server; `localization.py` moves translations between `localization/<lang>.json` and the string catalogs |
+| `scripts/` | `seed-dev-vikunja.sh`, `reset-dev-vikunja.sh` for the local dev server; `localization.py` moves translations between `localization/<lang>.json` and the string catalogs; `xcresult-to-lcov.py` turns a test run's `.xcresult` into lcov for Codecov |
 | `localization/` | One flat `<lang>.json` per translated language, the file translators edit (see `docs/localization.md`) |
 | `website/` | The GitHub Pages site (deployed by `.github/workflows/deploy-pages.yml`) |
 
@@ -84,7 +84,7 @@ Log in with `devuser` / `devpassword`. `./scripts/reset-dev-vikunja.sh` nukes an
 
 ### CI
 
-- `.github/workflows/ios-tests.yml` runs `mDoneTests` on the iOS Simulator for every PR to `main` and every push to `main`, pinned to `-destination 'platform=iOS Simulator,name=iPhone 17'`. UI and snapshot targets are excluded: they need a booted app and are flaky on CI. It exports the result bundle with `xccov` and uploads it to Codecov (`CODECOV_TOKEN` secret), which feeds the README badge and the coverage comment on PRs. `codecov.yml` excludes `mDone/Views/` and the test targets from that number and keeps the checks informational, so Codecov never blocks a merge.
+- `.github/workflows/ios-tests.yml` runs `mDoneTests` on the iOS Simulator for every PR to `main` and every push to `main`, pinned to `-destination 'platform=iOS Simulator,name=iPhone 17'`. UI and snapshot targets are excluded: they need a booted app and are flaky on CI. It converts the result bundle to lcov with `scripts/xcresult-to-lcov.py` (Codecov cannot read xccov's JSON report) and uploads it to Codecov (`CODECOV_TOKEN` secret), which feeds the README badge and the coverage comment on PRs. `codecov.yml` excludes `mDone/Views/` and the test targets from that number and keeps the checks informational, so Codecov never blocks a merge.
 - `.github/workflows/macos-tests.yml` runs `mDoneMacTests` on `-destination 'platform=macOS'` for every PR to `main`. It signs ad-hoc (`CODE_SIGN_IDENTITY=-`, `CODE_SIGNING_REQUIRED=NO`, `CODE_SIGN_STYLE=Manual`, empty `DEVELOPMENT_TEAM`) because runners have no Apple Development identity and, unlike the simulator, a real macOS bundle has to be signed to launch. Ad-hoc still applies the sandbox entitlements, so the Keychain-backed tests pass. `mDoneMacUITests` is excluded: it is the App Store screenshot run and needs a live server plus credentials.
 - `.github/workflows/vikunja-integration.yml` runs `mDoneIntegrationTests` nightly (and on demand) against a real Vikunja server: the latest release plus the pinned version the API inventory was verified against. It runs the native macOS release binary straight on the runner, never Docker, because the hosted arm64 macOS runners cannot boot a Linux VM. It never runs on a PR and cannot block a merge.
 - `.github/workflows/codeql.yml` runs CodeQL (build-only, so it uses `generic/platform=iOS Simulator`); `.github/workflows/deploy-pages.yml` publishes `website/`.
