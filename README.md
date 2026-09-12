@@ -3,6 +3,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform: iOS & macOS](https://img.shields.io/badge/Platform-iOS%2018%20%7C%20macOS%2015-orange.svg)]()
 [![Swift 5.9](https://img.shields.io/badge/Swift-5.9-FA7343.svg)](https://swift.org)
+[![iOS Tests](https://github.com/marco308/mdone/actions/workflows/ios-tests.yml/badge.svg?branch=main)](https://github.com/marco308/mdone/actions/workflows/ios-tests.yml)
+[![codecov](https://codecov.io/gh/marco308/mdone/branch/main/graph/badge.svg)](https://codecov.io/gh/marco308/mdone)
 
 A native iOS and macOS task management app for your self-hosted [Vikunja](https://vikunja.io) server. A polished, focused interface for your self-hosted productivity setup.
 
