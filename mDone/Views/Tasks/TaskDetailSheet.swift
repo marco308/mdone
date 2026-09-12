@@ -166,9 +166,10 @@ struct TaskDetailSheet: View {
                                 .foregroundStyle(.secondary)
                                 .italic()
                         } else {
-                            Text(RichTextRenderer.render(description))
-                                .font(.body)
-                                .textSelection(.enabled)
+                            if let checklist = DescriptionChecklist.parse(description) {
+                                ChecklistSummaryView(checklist: checklist)
+                            }
+                            RichDescriptionView(html: description, onToggle: toggleChecklistItem)
                         }
                     } else {
                         TextEditor(text: $description)
@@ -297,6 +298,20 @@ struct TaskDetailSheet: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This action cannot be undone.")
+        }
+    }
+
+    /// Ticks or unticks one checklist item in the description and saves that
+    /// straight away, the way the web app does, so a tick survives Cancel.
+    /// The rest of the form stays unsaved until Save: the request carries
+    /// only the description, and `updateTask` fills the other fields in
+    /// from the task as the server last had it.
+    private func toggleChecklistItem(_ index: Int) {
+        guard let updated = DescriptionChecklist.toggling(itemAt: index, in: description) else { return }
+        description = updated
+        let composed = EstimateMarker.apply(estimateSeconds, to: updated) ?? ""
+        Task { @MainActor in
+            await appState.updateTask(id: task.id, request: TaskUpdateRequest(description: composed))
         }
     }
 
