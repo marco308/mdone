@@ -75,10 +75,11 @@ struct MacTaskDetailView: View {
                                 .italic()
                                 .frame(minHeight: 100, alignment: .topLeading)
                         } else {
+                            if let checklist = DescriptionChecklist.parse(descriptionText) {
+                                ChecklistSummaryView(checklist: checklist)
+                            }
                             ScrollView {
-                                Text(RichTextRenderer.render(descriptionText))
-                                    .font(.body)
-                                    .textSelection(.enabled)
+                                RichDescriptionView(html: descriptionText, onToggle: toggleChecklistItem)
                                     .frame(maxWidth: .infinity, alignment: .topLeading)
                             }
                             .frame(minHeight: 100, maxHeight: 200)
@@ -234,6 +235,18 @@ struct MacTaskDetailView: View {
             isShowingDescriptionPreview = !newDescription.isEmpty
             estimateSeconds = newTask.estimatedSeconds
             percentDone = newTask.percentDone ?? 0
+        }
+    }
+
+    /// Ticks or unticks one checklist item and saves the description straight
+    /// away, the way the web app does. Only the description is sent; the
+    /// rest of the form waits for Save.
+    private func toggleChecklistItem(_ index: Int) {
+        guard let updated = DescriptionChecklist.toggling(itemAt: index, in: descriptionText) else { return }
+        descriptionText = updated
+        let composed = EstimateMarker.apply(estimateSeconds, to: updated) ?? ""
+        Task { @MainActor in
+            await appState.updateTask(id: task.id, request: TaskUpdateRequest(description: composed))
         }
     }
 

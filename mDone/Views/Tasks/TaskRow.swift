@@ -271,6 +271,11 @@ struct TaskRow: View {
                         .foregroundStyle(counts.done == counts.total ? Color.green : Color.secondary)
                     }
 
+                    if let counts = task.checklistCounts {
+                        ChecklistCountBadge(done: counts.done, total: counts.total)
+                            .font(density.metadataFont)
+                    }
+
                     if let labels = task.labels, !labels.isEmpty {
                         HStack(spacing: 4) {
                             ForEach(labels.prefix(3)) { label in
@@ -319,6 +324,9 @@ struct TaskRow: View {
         }
         if let counts = task.subtaskCounts {
             parts.append("\(counts.done) of \(counts.total) subtasks done")
+        }
+        if let counts = task.checklistCounts {
+            parts.append("\(counts.done) of \(counts.total) checklist items done")
         }
         if task.priority > 0 {
             parts.append("priority \(task.priorityLevel.label)")
