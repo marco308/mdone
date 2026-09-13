@@ -307,14 +307,21 @@ struct TaskDetailSheet: View {
     /// only the description, and `updateTask` fills the other fields in
     /// from the task as the server last had it.
     private func toggleChecklistItem(_ index: Int) {
-        guard let updated = DescriptionChecklist.toggling(itemAt: index, in: description) else { return }
+        let previous = description
+        guard let updated = DescriptionChecklist.toggling(itemAt: index, in: previous) else { return }
         description = updated
         // The task's committed estimate, not the form's draft: the estimate
         // picker waits for Save like every other field.
         let committedEstimate = (appState.tasks.first(where: { $0.id == task.id }) ?? task).estimatedSeconds
         let composed = EstimateMarker.apply(committedEstimate, to: updated) ?? ""
         Task { @MainActor in
-            await appState.updateTask(id: task.id, request: TaskUpdateRequest(description: composed))
+            let saved = await appState.updateTask(id: task.id, request: TaskUpdateRequest(description: composed))
+            // The tick was shown before it was saved. If the server refused
+            // it, put the box back the way Vikunja still has it, unless the
+            // description has moved on since (#204).
+            if !saved, description == updated {
+                description = previous
+            }
         }
     }
 
