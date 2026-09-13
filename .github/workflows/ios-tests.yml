@@ -78,7 +78,7 @@ jobs:
       # DerivedData with llvm-cov, fails on the fat XCTest frameworks, and
       # finds no coverage data in the app binary anyway.
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.lcov
