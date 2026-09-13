@@ -254,8 +254,7 @@ struct MacTaskDetailView: View {
     /// away, the way the web app does. Only the description is sent; the
     /// rest of the form waits for Save.
     private func toggleChecklistItem(_ index: Int) {
-        let previous = descriptionText
-        guard let updated = DescriptionChecklist.toggling(itemAt: index, in: previous) else { return }
+        guard let updated = DescriptionChecklist.toggling(itemAt: index, in: descriptionText) else { return }
         descriptionText = updated
         checklistSaveInFlight = updated
         // The task's committed estimate, not the form's draft: the estimate
@@ -265,15 +264,19 @@ struct MacTaskDetailView: View {
         Task { @MainActor in
             let saved = await appState.updateTask(id: task.id, request: TaskUpdateRequest(description: composed))
             // The tick was shown before it was saved. If the server refused
-            // it, put the box back the way Vikunja still has it, unless the
-            // description has moved on since, and forget the in-flight
-            // marker so the next outside refresh reloads the form (#204).
+            // it, put the boxes back the way Vikunja still has them, unless
+            // the description has moved on since, and forget the in-flight
+            // marker so the next outside refresh reloads the form. The task
+            // in AppState is the authority, not the text this tap started
+            // from: after two quick taps that both fail, the first tap's
+            // text was never saved either (#204).
             if !saved {
                 if checklistSaveInFlight == updated {
                     checklistSaveInFlight = nil
                 }
                 if descriptionText == updated {
-                    descriptionText = previous
+                    descriptionText = (appState.tasks.first(where: { $0.id == task.id }) ?? task)
+                        .userVisibleDescription ?? ""
                 }
             }
         }

@@ -1288,10 +1288,11 @@ final class AppState {
     }
 
     /// Returns `true` when the edit reached the server or was queued for
-    /// replay while offline, `false` when nothing was saved (the request
-    /// failed, or another update for the same task was already running).
-    /// Callers that showed the change before saving use `false` to put the
-    /// old state back; every other caller can ignore the result.
+    /// replay while offline, `false` when nothing was saved: the request
+    /// failed, or the calling task was cancelled. An update that finds the
+    /// task busy waits for its turn rather than failing. Callers that showed
+    /// the change before saving use `false` to put the old state back; every
+    /// other caller can ignore the result.
     @MainActor
     @discardableResult
     func updateTask(id: Int64, request: TaskUpdateRequest) async -> Bool {

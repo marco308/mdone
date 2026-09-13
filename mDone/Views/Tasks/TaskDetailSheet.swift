@@ -307,8 +307,7 @@ struct TaskDetailSheet: View {
     /// only the description, and `updateTask` fills the other fields in
     /// from the task as the server last had it.
     private func toggleChecklistItem(_ index: Int) {
-        let previous = description
-        guard let updated = DescriptionChecklist.toggling(itemAt: index, in: previous) else { return }
+        guard let updated = DescriptionChecklist.toggling(itemAt: index, in: description) else { return }
         description = updated
         // The task's committed estimate, not the form's draft: the estimate
         // picker waits for Save like every other field.
@@ -317,10 +316,13 @@ struct TaskDetailSheet: View {
         Task { @MainActor in
             let saved = await appState.updateTask(id: task.id, request: TaskUpdateRequest(description: composed))
             // The tick was shown before it was saved. If the server refused
-            // it, put the box back the way Vikunja still has it, unless the
-            // description has moved on since (#204).
+            // it, put the boxes back the way Vikunja still has them, unless
+            // the description has moved on since. The task in AppState is
+            // the authority, not the text this tap started from: after two
+            // quick taps that both fail, the first tap's text was never saved
+            // either (#204).
             if !saved, description == updated {
-                description = previous
+                description = (appState.tasks.first(where: { $0.id == task.id }) ?? task).userVisibleDescription ?? ""
             }
         }
     }
