@@ -1,7 +1,16 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "%lld" : {},
+    "%lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
+          }
+        }
+      }
+    },
     "%lld tasks due today" : {
       "localizations" : {
         "en" : {
@@ -17,6 +26,18 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld tasks due today"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld个任务今天截止"
                 }
               }
             }
@@ -43,54 +64,471 @@
               }
             }
           }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "另有%lld项"
+                }
+              }
+            }
+          }
         }
       }
     },
-    "Add Task" : {},
-    "Add Task Button" : {},
-    "All caught up!" : {},
-    "Compact" : {},
-    "Complete %@" : {},
-    "Complete Task" : {},
-    "Customize how today's tasks appear in this widget." : {},
-    "Customize how upcoming tasks appear in this widget." : {},
-    "Font Size" : {},
-    "Large" : {},
-    "Marks a task as complete in mDone" : {},
-    "Next Task" : {},
-    "No tasks due" : {},
-    "No tasks due today" : {},
-    "No upcoming tasks" : {},
-    "Nothing overdue" : {},
-    "Open mDone to sign in" : {},
-    "Overdue" : {},
-    "Overdue Only" : {},
-    "Quick Add" : {},
-    "Quickly add a new task to mDone." : {},
-    "Show" : {},
-    "Shows tasks due today in a single line." : {},
-    "Shows the number of tasks due today." : {},
-    "Shows your next upcoming task." : {},
-    "Sign in to mDone" : {},
-    "Standard" : {},
-    "Tap to Complete Tasks" : {},
-    "Tap to return to mDone" : {},
-    "Task Count" : {},
-    "Task ID" : {},
-    "Tasks" : {},
-    "Tasks Due" : {},
-    "Tasks due today and overdue. Long-press to customise." : {},
-    "Tasks with upcoming due dates. Long-press to customise." : {},
-    "Today" : {},
-    "Today + Overdue" : {},
-    "Today Only" : {},
-    "Today's Tasks" : {},
-    "Today's Tasks Settings" : {},
-    "Tomorrow" : {},
-    "Upcoming" : {},
-    "Upcoming Deadlines" : {},
-    "Upcoming Tasks Settings" : {},
-    "mDone" : {}
+    "Add Task" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加任务"
+          }
+        }
+      }
+    },
+    "Add Task Button" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加任务按钮"
+          }
+        }
+      }
+    },
+    "All caught up!" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部处理完毕！"
+          }
+        }
+      }
+    },
+    "Compact" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "紧凑"
+          }
+        }
+      }
+    },
+    "Complete %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成%@"
+          }
+        }
+      }
+    },
+    "Complete Task" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成任务"
+          }
+        }
+      }
+    },
+    "Customize how today's tasks appear in this widget." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义今天的任务在此小组件中的显示方式。"
+          }
+        }
+      }
+    },
+    "Customize how upcoming tasks appear in this widget." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义即将到期的任务在此小组件中的显示方式。"
+          }
+        }
+      }
+    },
+    "Font Size" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字体大小"
+          }
+        }
+      }
+    },
+    "Large" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大"
+          }
+        }
+      }
+    },
+    "Marks a task as complete in mDone" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 mDone 中将任务标记为已完成"
+          }
+        }
+      }
+    },
+    "Next Task" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一个任务"
+          }
+        }
+      }
+    },
+    "No tasks due" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有到期任务"
+          }
+        }
+      }
+    },
+    "No tasks due today" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天没有到期任务"
+          }
+        }
+      }
+    },
+    "No upcoming tasks" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有即将到期的任务"
+          }
+        }
+      }
+    },
+    "Nothing overdue" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有逾期事项"
+          }
+        }
+      }
+    },
+    "Open mDone to sign in" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 mDone 以登录"
+          }
+        }
+      }
+    },
+    "Overdue" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "逾期"
+          }
+        }
+      }
+    },
+    "Overdue Only" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅逾期"
+          }
+        }
+      }
+    },
+    "Quick Add" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速添加"
+          }
+        }
+      }
+    },
+    "Quickly add a new task to mDone." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速向 mDone 添加新任务。"
+          }
+        }
+      }
+    },
+    "Show" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示"
+          }
+        }
+      }
+    },
+    "Shows tasks due today in a single line." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在一行中显示今天截止的任务。"
+          }
+        }
+      }
+    },
+    "Shows the number of tasks due today." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示今天截止的任务数量。"
+          }
+        }
+      }
+    },
+    "Shows your next upcoming task." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示下一个即将到期的任务。"
+          }
+        }
+      }
+    },
+    "Sign in to mDone" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录 mDone"
+          }
+        }
+      }
+    },
+    "Standard" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标准"
+          }
+        }
+      }
+    },
+    "Tap to Complete Tasks" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻点完成任务"
+          }
+        }
+      }
+    },
+    "Tap to return to mDone" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻点返回 mDone"
+          }
+        }
+      }
+    },
+    "Task Count" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务数量"
+          }
+        }
+      }
+    },
+    "Task ID" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务 ID"
+          }
+        }
+      }
+    },
+    "Tasks" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务"
+          }
+        }
+      }
+    },
+    "Tasks Due" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "到期任务"
+          }
+        }
+      }
+    },
+    "Tasks due today and overdue. Long-press to customise." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天截止和已逾期的任务。长按可自定义。"
+          }
+        }
+      }
+    },
+    "Tasks with upcoming due dates. Long-press to customise." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即将到期的任务。长按可自定义。"
+          }
+        }
+      }
+    },
+    "Today" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天"
+          }
+        }
+      }
+    },
+    "Today + Overdue" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天 + 逾期"
+          }
+        }
+      }
+    },
+    "Today Only" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅今天"
+          }
+        }
+      }
+    },
+    "Today's Tasks" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天的任务"
+          }
+        }
+      }
+    },
+    "Today's Tasks Settings" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天的任务设置"
+          }
+        }
+      }
+    },
+    "Tomorrow" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "明天"
+          }
+        }
+      }
+    },
+    "Upcoming" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即将到期"
+          }
+        }
+      }
+    },
+    "Upcoming Deadlines" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "临近截止日期"
+          }
+        }
+      }
+    },
+    "Upcoming Tasks Settings" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即将到期任务设置"
+          }
+        }
+      }
+    },
+    "mDone" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mDone"
+          }
+        }
+      }
+    }
   },
   "version" : "1.0"
 }
