@@ -10,6 +10,12 @@
             "state" : "translated",
             "value" : "mDone displays your calendar events alongside your tasks so you can plan your day in one place. For example, your upcoming meetings will appear in the Calendar tab and Today view next to your to-do items."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mDone 会将你的日历日程与任务一同显示，方便你在一个地方规划一天。例如，即将开始的会议会显示在“日历”标签页和“今天”视图中，与待办事项并列。"
+          }
         }
       }
     },
@@ -21,6 +27,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "mDone connects to your local Vikunja server to sync tasks and projects."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mDone 会连接到本地网络中的 Vikunja 服务器，以同步任务和项目。"
           }
         }
       }
