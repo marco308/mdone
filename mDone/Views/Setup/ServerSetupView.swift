@@ -40,7 +40,7 @@ struct ServerSetupView: View {
         case apiToken = "API Token"
 
         /// The raw value is a plain String, which `Text` does not localize.
-        var title: LocalizedStringResource {
+        var label: LocalizedStringResource {
             switch self {
             case .credentials: "Login"
             case .apiToken: "API Token"
@@ -99,7 +99,7 @@ struct ServerSetupView: View {
                         if availableModes.count > 1 {
                             Picker("Auth Method", selection: $authMode) {
                                 ForEach(availableModes, id: \.self) { mode in
-                                    Text(mode.title).tag(mode)
+                                    Text(mode.label).tag(mode)
                                 }
                             }
                             .pickerStyle(.segmented)
