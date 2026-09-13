@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Checklists written inside a task's description now work in mDone. Vikunja's web editor lets you put a list of checkboxes in a description, for the steps of a task that is not one and done. Those used to show up as plain bullets with no sign of what was ticked. The description preview now shows each item with a checkbox you can tap to tick or untick, saved straight away as in the web app, with a "2 of 3 done" line and progress bar above it. Task rows and Kanban cards carry a matching count. Works on iPhone, iPad and Mac. Checkboxes in a repeating task still reset when the task is marked done, since that is the server's doing (#200).
+
 ## [1.16.0] - 2026-09-11
 
 ### Added

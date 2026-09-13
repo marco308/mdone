@@ -349,7 +349,7 @@ private struct BoardTaskCard: View {
             }
             .fixedSize(horizontal: false, vertical: true)
 
-            if task.effectiveDueDate != nil || (task.labels?.isEmpty == false) {
+            if task.effectiveDueDate != nil || task.checklistCounts != nil || (task.labels?.isEmpty == false) {
                 HStack(spacing: 8) {
                     if let dueDate = task.effectiveDueDate {
                         HStack(spacing: 4) {
@@ -358,6 +358,11 @@ private struct BoardTaskCard: View {
                         }
                         .font(.caption2)
                         .foregroundStyle(task.isOverdue ? .red : .secondary)
+                    }
+
+                    if let counts = task.checklistCounts {
+                        ChecklistCountBadge(done: counts.done, total: counts.total)
+                            .font(.caption2)
                     }
 
                     if let labels = task.labels, !labels.isEmpty {
@@ -392,6 +397,9 @@ private struct BoardTaskCard: View {
                 parts.append(String(localized: "overdue"))
             }
             parts.append(String(localized: "due \(due.formatted(date: .abbreviated, time: .omitted))"))
+        }
+        if let counts = task.checklistCounts {
+            parts.append(String(localized: "\(counts.done) of \(counts.total) checklist items done"))
         }
         return parts.joined(separator: ", ")
     }
