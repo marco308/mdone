@@ -86,6 +86,15 @@ Steps to test:
 
 This is a private test server maintained by the developer for App Store review purposes.
 
+## What's New (v1.17.0)
+
+Checklists inside task descriptions.
+
+- A description written in Vikunja's web editor can hold a list of checkboxes, for the steps of a task that is not one and done. They used to show as plain bullets with no sign of what was ticked. Each item now has a checkbox you can tap to tick or untick, saved straight away as in the web app, with a "2 of 3 done" line and progress bar above the list.
+- Task rows and Kanban cards show the same count, so you can see how far along a task is without opening it.
+- A tick the server refuses to save goes back to unticked, with the usual error message, so a tick you can see is a tick that was saved.
+- Available on both iPhone and Mac.
+
 ## What's New (v1.16.0)
 
 Labels, manual ordering, two-factor login and an iPad detail pane.
