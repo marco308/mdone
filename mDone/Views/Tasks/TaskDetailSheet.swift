@@ -314,7 +314,16 @@ struct TaskDetailSheet: View {
         let committedEstimate = (appState.tasks.first(where: { $0.id == task.id }) ?? task).estimatedSeconds
         let composed = EstimateMarker.apply(committedEstimate, to: updated) ?? ""
         Task { @MainActor in
-            await appState.updateTask(id: task.id, request: TaskUpdateRequest(description: composed))
+            let saved = await appState.updateTask(id: task.id, request: TaskUpdateRequest(description: composed))
+            // The tick was shown before it was saved. If the server refused
+            // it, put the boxes back the way Vikunja still has them, unless
+            // the description has moved on since. The task in AppState is
+            // the authority, not the text this tap started from: after two
+            // quick taps that both fail, the first tap's text was never saved
+            // either (#204).
+            if !saved, description == updated {
+                description = (appState.tasks.first(where: { $0.id == task.id }) ?? task).userVisibleDescription ?? ""
+            }
         }
     }
 

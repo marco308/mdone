@@ -1287,15 +1287,22 @@ final class AppState {
         }
     }
 
+    /// Returns `true` when the edit reached the server or was queued for
+    /// replay while offline, `false` when nothing was saved: the request
+    /// failed, or the calling task was cancelled. An update that finds the
+    /// task busy waits for its turn rather than failing. Callers that showed
+    /// the change before saving use `false` to put the old state back; every
+    /// other caller can ignore the result.
     @MainActor
-    func updateTask(id: Int64, request: TaskUpdateRequest) async {
-        guard await acquireTaskUpdateSlot(id: id) else { return }
+    @discardableResult
+    func updateTask(id: Int64, request: TaskUpdateRequest) async -> Bool {
+        guard await acquireTaskUpdateSlot(id: id) else { return false }
         defer { releaseTaskUpdateSlot(id: id) }
 
         let existing = taskSnapshot(id: id)
 
         if let existing, queueOfflineEdit(request, for: existing) != nil {
-            return
+            return true
         }
 
         let safeRequest = existing.map { request.preservingExistingValues(from: $0) } ?? request
@@ -1317,8 +1324,10 @@ final class AppState {
             if let existing, existing.projectId != updated.projectId {
                 await refetchProjectOrderAfterMove(of: updated)
             }
+            return true
         } catch {
             handleError(error)
+            return false
         }
     }
 

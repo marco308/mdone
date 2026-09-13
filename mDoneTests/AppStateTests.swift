@@ -1063,4 +1063,46 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(SharedKeys.sharedDefaults.bool(forKey: SharedKeys.calmModeKey))
         SharedKeys.sharedDefaults.removeObject(forKey: SharedKeys.calmModeKey)
     }
+
+    // MARK: - updateTask result (#204)
+
+    /// Views that show a change before saving it (checklist ticks) rely on
+    /// the result to know whether to put the old state back.
+    func testUpdateTaskReturnsTrueWhenServerSaves() async {
+        let appState = await makeMockedAppState()
+        let task = VTask(id: 60, title: "Pack", description: "old", done: false, priority: 0, projectId: 2)
+        appState.tasks = [task]
+
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url!)
+            let json = """
+            {"id": 60, "title": "Pack", "description": "new", "done": false, "priority": 0, "project_id": 2}
+            """
+            return (response, Data(json.utf8))
+        }
+
+        let saved = await appState.updateTask(id: 60, request: TaskUpdateRequest(description: "new"))
+
+        XCTAssertTrue(saved)
+        XCTAssertEqual(appState.tasks.first?.description, "new")
+        XCTAssertNil(appState.errorMessage)
+    }
+
+    func testUpdateTaskReturnsFalseAndKeepsLocalTaskWhenServerRefuses() async {
+        let appState = await makeMockedAppState()
+        let task = VTask(id: 61, title: "Pack", description: "old", done: false, priority: 0, projectId: 2)
+        appState.tasks = [task]
+
+        // 400 (not 5xx) so APIClient fails fast instead of retrying with backoff.
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 400, url: request.url!)
+            return (response, Data("{\"message\": \"bad request\"}".utf8))
+        }
+
+        let saved = await appState.updateTask(id: 61, request: TaskUpdateRequest(description: "new"))
+
+        XCTAssertFalse(saved, "A refused update must report failure so the caller can revert")
+        XCTAssertEqual(appState.tasks.first?.description, "old", "The local task keeps what the server still has")
+        XCTAssertNotNil(appState.errorMessage, "The usual error banner still explains what went wrong")
+    }
 }

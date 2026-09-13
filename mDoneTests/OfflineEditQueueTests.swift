@@ -352,4 +352,20 @@ final class OfflineEditQueueTests: XCTestCase {
         XCTAssertFalse(MockURLProtocol.capturedRequests.isEmpty)
         XCTAssertEqual(sync.pendingOperationCount(), 0, "online edits are never queued")
     }
+
+    /// A queued edit counts as saved: the replay will land it, so a view
+    /// that showed the change first must not undo it (#204).
+    func testUpdateTaskReturnsTrueWhenQueuedOffline() async throws {
+        let container = try makeContainer()
+        let sync = await makeSyncService(container: container)
+        let state = await makeAppState(sync: sync, connected: false)
+        state.tasks = [sampleTask()]
+
+        let saved = await state.updateTask(id: 1, request: TaskUpdateRequest(description: "Queued while away"))
+
+        XCTAssertTrue(saved)
+        XCTAssertEqual(sync.pendingOperationCount(), 1)
+        XCTAssertEqual(state.tasks.first?.description, "Queued while away")
+        XCTAssertTrue(MockURLProtocol.capturedRequests.isEmpty, "nothing goes to the server while offline")
+    }
 }
