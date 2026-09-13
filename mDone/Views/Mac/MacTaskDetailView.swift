@@ -17,6 +17,9 @@ struct MacTaskDetailView: View {
     @State private var isShowingDescriptionPreview: Bool
     @State private var estimateSeconds: TimeInterval?
     @State private var percentDone: Double
+    /// The description a checklist tap just sent, so the resulting task
+    /// change is recognised as ours in `onChange(of: task)`.
+    @State private var checklistSaveInFlight: String?
 
     init(task: VTask) {
         self.task = task
@@ -222,6 +225,15 @@ struct MacTaskDetailView: View {
             Text("This action cannot be undone.")
         }
         .onChange(of: task) { _, newTask in
+            // The task coming back from a checklist tap is our own save: the
+            // draft already holds that description, and the other fields
+            // must keep whatever the user has typed. Anything else is an
+            // outside refresh and reloads the form as before.
+            if let saved = checklistSaveInFlight, newTask.userVisibleDescription == saved {
+                checklistSaveInFlight = nil
+                return
+            }
+            checklistSaveInFlight = nil
             title = newTask.title
             let newDescription = newTask.userVisibleDescription ?? ""
             descriptionText = newDescription
@@ -244,7 +256,11 @@ struct MacTaskDetailView: View {
     private func toggleChecklistItem(_ index: Int) {
         guard let updated = DescriptionChecklist.toggling(itemAt: index, in: descriptionText) else { return }
         descriptionText = updated
-        let composed = EstimateMarker.apply(estimateSeconds, to: updated) ?? ""
+        checklistSaveInFlight = updated
+        // The task's committed estimate, not the form's draft: the estimate
+        // picker waits for Save like every other field.
+        let committedEstimate = (appState.tasks.first(where: { $0.id == task.id }) ?? task).estimatedSeconds
+        let composed = EstimateMarker.apply(committedEstimate, to: updated) ?? ""
         Task { @MainActor in
             await appState.updateTask(id: task.id, request: TaskUpdateRequest(description: composed))
         }
