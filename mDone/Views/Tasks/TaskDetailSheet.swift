@@ -309,7 +309,10 @@ struct TaskDetailSheet: View {
     private func toggleChecklistItem(_ index: Int) {
         guard let updated = DescriptionChecklist.toggling(itemAt: index, in: description) else { return }
         description = updated
-        let composed = EstimateMarker.apply(estimateSeconds, to: updated) ?? ""
+        // The task's committed estimate, not the form's draft: the estimate
+        // picker waits for Save like every other field.
+        let committedEstimate = (appState.tasks.first(where: { $0.id == task.id }) ?? task).estimatedSeconds
+        let composed = EstimateMarker.apply(committedEstimate, to: updated) ?? ""
         Task { @MainActor in
             await appState.updateTask(id: task.id, request: TaskUpdateRequest(description: composed))
         }

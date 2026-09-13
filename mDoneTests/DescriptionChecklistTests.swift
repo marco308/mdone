@@ -29,6 +29,24 @@ final class DescriptionChecklistTests: XCTestCase {
         XCTAssertNil(DescriptionChecklist.parse("- [ ] markdown checkbox is not a Tiptap task item"))
     }
 
+    func testParseAcceptsAttributeSpacingAndCase() throws {
+        // The pre-check and the matcher must agree, or a valid spelling gets no badge and no rows.
+        let html = #"<UL DATA-TYPE="taskList"><LI DATA-CHECKED = "false"><p>Spaced</p></LI></UL>"#
+        let checklist = try XCTUnwrap(DescriptionChecklist.parse(html))
+        XCTAssertEqual(checklist.items.map(\.text), ["Spaced"])
+        XCTAssertFalse(checklist.items[0].isChecked)
+        XCTAssertEqual(DescriptionChecklist.segments(of: html).count, 1)
+        XCTAssertTrue(DescriptionChecklist.hasChecklist(html))
+    }
+
+    func testParseIgnoresCheckedItemsOutsideATaskList() {
+        // Only Vikunja task lists count, so the badge never reports a list the preview leaves as prose.
+        let html = #"<ul><li data-checked="true"><p>Custom markup</p></li></ul>"#
+        XCTAssertNil(DescriptionChecklist.parse(html))
+        XCTAssertEqual(DescriptionChecklist.segments(of: html), [.html(html)])
+        XCTAssertNil(DescriptionChecklist.toggling(itemAt: 0, in: html))
+    }
+
     func testParseAcceptsAnyAttributeOrder() throws {
         let html = #"<ul data-type="taskList"><li data-type="taskItem" data-checked="false"><p>Only</p></li></ul>"#
         let checklist = try XCTUnwrap(DescriptionChecklist.parse(html))

@@ -69,9 +69,9 @@ struct DescriptionChecklist: Equatable {
     }
 
     /// Cheap pre-check so lists of tasks without checklists never pay for a
-    /// regex scan.
+    /// regex scan. Case-insensitive, like the item matcher it gates.
     static func hasChecklist(_ html: String) -> Bool {
-        html.contains("data-checked=")
+        html.range(of: "data-checked", options: .caseInsensitive) != nil
     }
 
     // MARK: - Toggling
@@ -190,11 +190,18 @@ struct DescriptionChecklist: Equatable {
     )
     private static let tagRegex = try? NSRegularExpression(pattern: #"<[^>]+>"#)
 
+    /// The items, in document order, inside Vikunja task lists only. An
+    /// `<li data-checked>` outside a `<ul data-type="taskList">` is not a
+    /// checklist item: `segments` leaves such a list to the rich-text
+    /// renderer, so the count and the preview must ignore it alike.
     private static func itemMatches(in html: String) -> [ItemMatch] {
         guard let itemOpenRegex, let itemBoundaryRegex else { return [] }
         let nsHTML = html as NSString
         let full = NSRange(location: 0, length: nsHTML.length)
-        return itemOpenRegex.matches(in: html, range: full).map { match in
+        let lists = taskListRanges(in: html)
+        return itemOpenRegex.matches(in: html, range: full).filter { match in
+            lists.contains { NSLocationInRange(match.range.location, $0) }
+        }.map { match in
             let openTag = match.range
             let isChecked = nsHTML.substring(with: match.range(at: 1)).lowercased() == "true"
             let bodyStart = openTag.location + openTag.length
@@ -207,6 +214,18 @@ struct DescriptionChecklist: Equatable {
                 isChecked: isChecked,
                 text: plainText(of: nsHTML.substring(with: bodyRange))
             )
+        }
+    }
+
+    /// Every `<ul data-type="taskList">` block, outermost first; a nested
+    /// task list is inside its parent's range so its items count once.
+    private static func taskListRanges(in html: String) -> [NSRange] {
+        guard let taskListOpenRegex else { return [] }
+        let nsHTML = html as NSString
+        let full = NSRange(location: 0, length: nsHTML.length)
+        return taskListOpenRegex.matches(in: html, range: full).map { open in
+            let end = closingListEnd(in: nsHTML, openingAt: open.range)
+            return NSRange(location: open.range.location, length: end - open.range.location)
         }
     }
 
