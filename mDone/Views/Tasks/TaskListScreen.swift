@@ -67,9 +67,13 @@ struct TaskListScreen: View {
     }
 
     /// Rows can only be dragged when the list shows the server's order;
-    /// under any other sort the drop would be sorted straight back.
+    /// under any other sort the drop would be sorted straight back. A virtual
+    /// project (saved filter, negative id) is excluded: `moveTask` positions
+    /// by the task's real home project, so dragging here would write the
+    /// position into that project's list view instead of the filter's (#209).
     private var manualOrderActive: Bool {
-        projectFilter != nil && sortPreference.order == .manual
+        guard let projectFilter else { return false }
+        return projectFilter.id >= 0 && sortPreference.order == .manual
     }
 
     var body: some View {

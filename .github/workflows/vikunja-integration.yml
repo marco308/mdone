@@ -106,7 +106,30 @@ jobs:
           brew install xcodegen
           xcodegen generate
 
+      - name: Wait for the iPhone 17 simulator
+        # Now and then a runner comes up with no iOS simulator runtime at all,
+        # only the "Any iOS Simulator Device" placeholder, and xcodebuild dies
+        # with exit 70 before a single test runs (#213). Give CoreSimulator a
+        # few minutes to finish, and fail here with a clear message if it
+        # never does, so the tracking issue says "runner" rather than "API".
+        # The name must match the destination in the next step.
+        id: simulator
+        run: |
+          for attempt in $(seq 1 18); do
+            if xcrun simctl list devices available | grep -qE '^[[:space:]]+iPhone 17 \('; then
+              echo "iPhone 17 simulator available (attempt $attempt)."
+              exit 0
+            fi
+            echo "iPhone 17 simulator not available yet (attempt $attempt), waiting 10s."
+            sleep 10
+          done
+          xcrun simctl list runtimes
+          xcrun simctl list devices available
+          echo "::error::This runner has no iPhone 17 simulator, so no tests ran. This is a runner problem, not an API change; re-run the job."
+          exit 1
+
       - name: Run integration tests
+        id: tests
         # Same simulator CI pins in ios-tests.yml; keep the two in step.
         run: |
           set -o pipefail
@@ -145,17 +168,29 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TITLE: "Nightly integration failed against Vikunja ${{ matrix.vikunja }}"
+          SIMULATOR_OUTCOME: ${{ steps.simulator.outcome }}
+          TESTS_OUTCOME: ${{ steps.tests.outcome }}
         run: |
           gh label create vikunja-nightly \
             --color B60205 \
             --description "Raised by the nightly Vikunja integration run" 2>/dev/null || true
+
+          # Only a failed test step means the API contract may have moved.
+          # Anything else failed around the tests, not in them.
+          if [ "$SIMULATOR_OUTCOME" = failure ]; then
+            next_step="No tests ran: the runner never had an iPhone 17 simulator. This is a runner flake, not an API change. Re-run the job, and close this issue once a run passes."
+          elif [ "$TESTS_OUTCOME" = failure ]; then
+            next_step="Start with the failing test names: each one states the API assumption it checks, so the name says which part of the contract moved. The result bundle is attached to the run as an artifact."
+          else
+            next_step="No integration test failed: a setup step (server download or startup, seeding, project generation) or the skipped-suite check failed instead. Open the run and start from the first failed step."
+          fi
 
           body=$(cat <<EOF
           The nightly run failed against Vikunja release \`${VIKUNJA_RELEASE_TAG:-unknown}\` (matrix entry \`${{ matrix.vikunja }}\`), which reported version \`${VIKUNJA_SERVER_VERSION:-unknown}\`.
 
           Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-          Start with the failing test names: each one states the API assumption it checks, so the name says which part of the contract moved. The result bundle is attached to the run as an artifact.
+          $next_step
           EOF
           )
 
