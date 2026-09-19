@@ -1667,6 +1667,18 @@ final class AppState {
     }
 
     func tasksForProject(_ projectId: Int64) -> [VTask] {
+        // Saved filters appear as virtual projects with negative IDs; their tasks keep
+        // their real (positive) home project's ID, so a `projectId ==` filter always
+        // comes back empty. The cache from the view fetch is the only membership source
+        // of truth for those (#209); refresh each entry from `tasks` for the latest data.
+        if projectId < 0 {
+            guard let cached = projectTaskCache[projectId] else { return [] }
+            let latest = Self.uniquedById(cached.map { cachedTask in
+                tasks.first(where: { $0.id == cachedTask.id }) ?? cachedTask
+            })
+            return latest.filter { !$0.done }
+        }
+
         // Always read latest task data from the tasks array (source of truth).
         // Use the cache only for position ordering.
         let projectTasks = tasks.filter { $0.projectId == projectId && !$0.done }
