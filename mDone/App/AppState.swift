@@ -1670,11 +1670,12 @@ final class AppState {
         // Saved filters appear as virtual projects with negative IDs; their tasks keep
         // their real (positive) home project's ID, so a `projectId ==` filter always
         // comes back empty. The cache from the view fetch is the only membership source
-        // of truth for those (#209); refresh each entry from `tasks` for the latest data.
+        // of truth for those (#209). Drop any cached id no longer in `tasks` (e.g. a
+        // delete, which updates `tasks` but not this cache) instead of showing stale data.
         if projectId < 0 {
             guard let cached = projectTaskCache[projectId] else { return [] }
-            let latest = Self.uniquedById(cached.map { cachedTask in
-                tasks.first(where: { $0.id == cachedTask.id }) ?? cachedTask
+            let latest = Self.uniquedById(cached.compactMap { cachedTask in
+                tasks.first(where: { $0.id == cachedTask.id })
             })
             return latest.filter { !$0.done }
         }

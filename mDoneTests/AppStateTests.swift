@@ -416,6 +416,25 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(appState.tasksForProject(-2), [])
     }
 
+    /// `deleteTask` removes the task from `tasks` but does not touch `projectTaskCache`.
+    /// For a virtual project, falling back to the stale cached entry would keep a
+    /// deleted task visible until the next view refetch, unlike normal projects (where
+    /// removal from `tasks` alone drops it). Deleted ids must be dropped instead.
+    func testTasksForProjectVirtualProjectDropsDeletedTask() {
+        let filterId: Int64 = -3
+        let appState = AppState()
+
+        appState.tasks = [
+            VTask(id: 1, title: "Still exists", done: false, priority: 0, projectId: 10),
+        ]
+        appState.projectTaskCache[filterId] = [
+            VTask(id: 1, title: "Still exists", done: false, priority: 0, projectId: 10),
+            VTask(id: 2, title: "Deleted elsewhere", done: false, priority: 0, projectId: 20),
+        ]
+
+        XCTAssertEqual(appState.tasksForProject(filterId).map(\.id), [1])
+    }
+
     // MARK: - Session expiry vs logout (issue #80)
 
     func testExpireSessionKeepsServerURL() async {
