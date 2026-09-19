@@ -2,6 +2,9 @@ import EventKit
 import Foundation
 
 struct CalendarEvent: Identifiable, Hashable {
+    /// Used wherever a calendar's real color is unavailable (deleted calendar, no color set).
+    static let fallbackColor = CGColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1.0)
+
     let id: String // EKEvent.eventIdentifier
     let title: String
     let startDate: Date

@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - Simplified Chinese (简体中文) translation of the app, widgets and system permission prompts, contributed by somnus0917 (#163)
 
+### Fixed
+- The calendar month view now shows each event dot in its own calendar's color instead of the same green for every calendar, so days with events from different calendars are easy to tell apart at a glance (#212)
+
 ## [1.17.0] - 2026-09-13
 
 ### Added

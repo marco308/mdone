@@ -7,7 +7,7 @@ struct CalendarEventRow: View {
         HStack(spacing: 12) {
             // Calendar color accent bar
             RoundedRectangle(cornerRadius: 2)
-                .fill(Color(cgColor: event.calendarColor ?? CGColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1.0)))
+                .fill(Color(cgColor: event.calendarColor ?? CalendarEvent.fallbackColor))
                 .frame(width: 4, height: 40)
 
             VStack(alignment: .leading, spacing: 2) {

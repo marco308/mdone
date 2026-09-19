@@ -137,12 +137,18 @@ struct DayCell: View {
     let tasks: [VTask]
     var events: [CalendarEvent] = []
 
-    private var hasEvents: Bool {
-        !events.isEmpty
-    }
-
-    private var totalDots: Int {
-        min(tasks.count, 3) + (hasEvents ? 1 : 0)
+    /// One color per distinct calendar represented that day, capped so the row of dots
+    /// stays legible next to the (also capped) task dots.
+    private var eventCalendarColors: [CGColor?] {
+        var seen = Set<String>()
+        var colors: [CGColor?] = []
+        for event in events where seen.insert(event.calendarIdentifier).inserted {
+            colors.append(event.calendarColor)
+            if colors.count == 3 {
+                break
+            }
+        }
+        return colors
     }
 
     var body: some View {
@@ -168,9 +174,9 @@ struct DayCell: View {
                         .frame(width: 5, height: 5)
                 }
 
-                if hasEvents {
+                ForEach(Array(eventCalendarColors.enumerated()), id: \.offset) { _, color in
                     Circle()
-                        .fill(Color.green)
+                        .fill(Color(cgColor: color ?? CalendarEvent.fallbackColor))
                         .frame(width: 5, height: 5)
                 }
             }
