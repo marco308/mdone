@@ -1127,10 +1127,11 @@ final class AppState {
 
     // MARK: - Siri and Shortcuts
 
-    /// Where a task goes when the caller names no project: the first in the
-    /// list, which is also what the quick-add bar on the Inbox uses.
+    /// Where a task goes when the caller names no project: the one picked in
+    /// Settings, else the "Inbox" project, else the first. The quick-add bar
+    /// on the Inbox and the Mac new-task sheet use it too (#210).
     var defaultProject: Project? {
-        projects.first
+        DefaultProjectPreference.resolve(in: projects)
     }
 
     /// Creates a task on behalf of Siri or Shortcuts, where there is no UI to

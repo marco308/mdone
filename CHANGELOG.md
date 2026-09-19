@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - Simplified Chinese (简体中文) translation of the app, widgets and system permission prompts, contributed by somnus0917 (#163)
+- Settings > Tasks > "Default project" picks where a task goes when you add it from the Inbox, through Siri, or with the Mac's New Task window. "Inbox adds tasks due" sets whether a task typed into the Inbox is due today, tomorrow or not at all (#210).
+
+### Fixed
+- Tasks added from the Inbox now go to your project named Inbox, not whichever project happened to be listed first. If you have no project by that name they still go to the first one, and the new "Default project" setting overrides both (#210).
 
 ### Fixed
 - A saved filter opened from the Projects tab now shows its matching tasks in the standard list view, not just on its board. The list view was checking each task's real project instead of the filter's results, so it always came back empty (#209).

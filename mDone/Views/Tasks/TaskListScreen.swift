@@ -239,7 +239,9 @@ struct TaskListScreen: View {
             if !readOnly {
                 QuickAddBar(
                     projectId: projectFilter?.id ?? defaultProjectId,
-                    defaultDueDate: projectFilter == nil ? DefaultDueTimePreference.apply(to: Date()) : nil
+                    defaultDueDate: projectFilter == nil
+                        ? NewTaskDueDatePreference.dueDate(forKey: NewTaskDueDatePreference.inboxStorageKey)
+                        : nil
                 )
             }
         }
@@ -310,7 +312,7 @@ struct TaskListScreen: View {
     }
 
     private var defaultProjectId: Int64 {
-        appState.projects.first?.id ?? 1
+        appState.defaultProject?.id ?? 1
     }
 
     @ViewBuilder

@@ -101,7 +101,7 @@ struct MacQuickAddSheet: View {
         .padding(20)
         .frame(width: 350)
         .onAppear {
-            selectedProjectId = appState.projects.first?.id ?? 0
+            selectedProjectId = appState.defaultProject?.id ?? 0
             titleFocused = true
         }
     }
