@@ -367,6 +367,74 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(appState.tasksForProject(projectId).map(\.id), [1])
     }
 
+    // MARK: - tasksForProject with virtual projects / saved filters (issue #209)
+
+    /// Saved filters are exposed as virtual projects with negative IDs; the tasks they
+    /// match keep their real, positive home project's `projectId`. Before the fix,
+    /// `tasksForProject` filtered by `projectId == filterId`, which never matched, so
+    /// the standard list view always showed nothing for a saved filter even though the
+    /// view fetch had populated the cache correctly.
+    func testTasksForProjectUsesCacheForVirtualProject() {
+        let filterId: Int64 = -5
+        let appState = AppState()
+
+        appState.tasks = [
+            VTask(id: 1, title: "Labeled A", done: false, priority: 0, projectId: 10),
+            VTask(id: 2, title: "Labeled B", done: false, priority: 0, projectId: 20),
+            VTask(id: 3, title: "Unrelated", done: false, priority: 0, projectId: 30),
+        ]
+        appState.projectTaskCache[filterId] = [
+            VTask(id: 1, title: "Labeled A", done: false, priority: 0, projectId: 10),
+            VTask(id: 2, title: "Labeled B", done: false, priority: 0, projectId: 20),
+        ]
+
+        XCTAssertEqual(appState.tasksForProject(filterId).map(\.id), [1, 2])
+    }
+
+    func testTasksForProjectVirtualProjectExcludesDoneAndUsesLatestData() {
+        let filterId: Int64 = -1
+        let appState = AppState()
+
+        appState.tasks = [
+            VTask(id: 1, title: "Still open", done: false, priority: 0, projectId: 10),
+            VTask(id: 2, title: "Now done", done: true, priority: 0, projectId: 20),
+        ]
+        appState.projectTaskCache[filterId] = [
+            VTask(id: 1, title: "Stale title", done: false, priority: 0, projectId: 10),
+            VTask(id: 2, title: "Stale title", done: false, priority: 0, projectId: 20),
+        ]
+
+        let result = appState.tasksForProject(filterId)
+        XCTAssertEqual(result.map(\.id), [1])
+        XCTAssertEqual(result.first?.title, "Still open")
+    }
+
+    func testTasksForProjectVirtualProjectWithNoCacheReturnsEmpty() {
+        let appState = AppState()
+        appState.tasks = [VTask(id: 1, title: "A", done: false, priority: 0, projectId: 10)]
+
+        XCTAssertEqual(appState.tasksForProject(-2), [])
+    }
+
+    /// `deleteTask` removes the task from `tasks` but does not touch `projectTaskCache`.
+    /// For a virtual project, falling back to the stale cached entry would keep a
+    /// deleted task visible until the next view refetch, unlike normal projects (where
+    /// removal from `tasks` alone drops it). Deleted ids must be dropped instead.
+    func testTasksForProjectVirtualProjectDropsDeletedTask() {
+        let filterId: Int64 = -3
+        let appState = AppState()
+
+        appState.tasks = [
+            VTask(id: 1, title: "Still exists", done: false, priority: 0, projectId: 10),
+        ]
+        appState.projectTaskCache[filterId] = [
+            VTask(id: 1, title: "Still exists", done: false, priority: 0, projectId: 10),
+            VTask(id: 2, title: "Deleted elsewhere", done: false, priority: 0, projectId: 20),
+        ]
+
+        XCTAssertEqual(appState.tasksForProject(filterId).map(\.id), [1])
+    }
+
     // MARK: - Session expiry vs logout (issue #80)
 
     func testExpireSessionKeepsServerURL() async {
