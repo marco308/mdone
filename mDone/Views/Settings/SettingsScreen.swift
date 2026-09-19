@@ -8,7 +8,11 @@ struct SettingsScreen: View {
     @AppStorage(WeekStartPreference.storageKey) private var firstWeekday = WeekStartPreference.system.rawValue
     @AppStorage(DefaultDueTimePreference.storageKey) private var defaultDueTime = DefaultDueTimePreference
         .defaultRawValue
-    @AppStorage(SiriDueDatePreference.storageKey) private var siriDueDate = SiriDueDatePreference.defaultValue.rawValue
+    @AppStorage(NewTaskDueDatePreference.siriStorageKey) private var siriDueDate = NewTaskDueDatePreference
+        .defaultValue.rawValue
+    @AppStorage(NewTaskDueDatePreference.inboxStorageKey) private var inboxDueDate = NewTaskDueDatePreference
+        .defaultValue.rawValue
+    @AppStorage(DefaultProjectPreference.storageKey) private var defaultProjectId = DefaultProjectPreference.automatic
     @AppStorage("calmMode") private var calmMode = false
     @AppStorage(AllDayEventPreference.storageKey) private var hideAllDayEvents = false
     @AppStorage("currentStallDays") private var currentStallDays = 7
@@ -77,13 +81,24 @@ struct SettingsScreen: View {
             #endif
 
             Section {
+                Picker("Default project", selection: defaultProjectBinding) {
+                    Text("Automatic").tag(DefaultProjectPreference.automatic)
+                    ForEach(appState.projects) { project in
+                        Text(project.title).tag(Int(project.id))
+                    }
+                }
+                Picker("Inbox adds tasks due", selection: $inboxDueDate) {
+                    ForEach(NewTaskDueDatePreference.allCases) { preference in
+                        Text(preference.label).tag(preference.rawValue)
+                    }
+                }
                 Picker("Default due time", selection: $defaultDueTime) {
                     ForEach(DefaultDueTimePreference.allCases) { preference in
                         Text(preference.label).tag(preference.rawValue)
                     }
                 }
                 Picker("Siri adds tasks due", selection: $siriDueDate) {
-                    ForEach(SiriDueDatePreference.allCases) { preference in
+                    ForEach(NewTaskDueDatePreference.allCases) { preference in
                         Text(preference.label).tag(preference.rawValue)
                     }
                 }
@@ -91,7 +106,7 @@ struct SettingsScreen: View {
                 Text("Tasks")
             } footer: {
                 Text(
-                    "Time of day applied to tasks you add to Today without picking a time, and to tasks you add through Siri. Pick a time later in the day to avoid the task showing as overdue right away."
+                    "Tasks you add from the Inbox or through Siri go to the default project. Automatic uses your project named Inbox, or your first project if there is none. Default due time applies when those tasks get a due date: pick a time later in the day so a new task does not show as overdue right away."
                 )
             }
 
@@ -230,6 +245,19 @@ struct SettingsScreen: View {
                 hideAllDayEvents = !shown
                 Task { await appState.calendarSelectionDidChange() }
             }
+        )
+    }
+
+    /// Shows Automatic when the stored project has since been deleted or
+    /// archived, matching what `DefaultProjectPreference.resolve` falls back to.
+    private var defaultProjectBinding: Binding<Int> {
+        Binding(
+            get: {
+                appState.projects.contains(where: { Int($0.id) == defaultProjectId })
+                    ? defaultProjectId
+                    : DefaultProjectPreference.automatic
+            },
+            set: { defaultProjectId = $0 }
         )
     }
 

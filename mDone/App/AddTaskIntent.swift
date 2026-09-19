@@ -43,7 +43,7 @@ struct AddTaskIntent: AppIntent {
         let outcome = try await state.createTaskFromIntent(
             title: taskTitle,
             projectId: project?.projectId,
-            dueDate: dueDate ?? SiriDueDatePreference.dueDate()
+            dueDate: dueDate ?? NewTaskDueDatePreference.dueDate(forKey: NewTaskDueDatePreference.siriStorageKey)
         )
         return .result(dialog: IntentDialog("\(Self.dialog(for: outcome))"))
     }
