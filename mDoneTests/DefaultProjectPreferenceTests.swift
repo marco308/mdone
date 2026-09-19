@@ -57,6 +57,35 @@ final class DefaultProjectPreferenceTests: XCTestCase {
         XCTAssertEqual(picked?.id, inbox.id)
     }
 
+    /// Vikunja's saved filters and pseudo-projects ride along in
+    /// `AppState.projects` with negative ids, and there is no
+    /// `PUT /projects/-2/tasks`, so they can never be the default.
+    func testPseudoProjectsAreNeverSelectable() {
+        let savedFilter = Project(id: -2, title: "My Open Tasks")
+        let inboxFilter = Project(id: -3, title: "Inbox")
+        XCTAssertEqual(
+            DefaultProjectPreference.selectable(from: [savedFilter, inboxFilter, work]).map(\.id),
+            [work.id]
+        )
+        let picked = DefaultProjectPreference.resolve(in: [savedFilter, inboxFilter, work], defaults: defaults)
+        XCTAssertEqual(picked?.id, work.id)
+    }
+
+    func testStoredPseudoProjectIdReadsAsAutomatic() {
+        defaults.set(-2, forKey: DefaultProjectPreference.storageKey)
+        XCTAssertNil(DefaultProjectPreference.storedProjectId(defaults: defaults))
+        let picked = DefaultProjectPreference.resolve(
+            in: [Project(id: -2, title: "My Open Tasks"), inbox, work],
+            defaults: defaults
+        )
+        XCTAssertEqual(picked?.id, inbox.id)
+    }
+
+    func testOnlyPseudoProjectsGivesNil() {
+        let picked = DefaultProjectPreference.resolve(in: [Project(id: -2, title: "My Open Tasks")], defaults: defaults)
+        XCTAssertNil(picked)
+    }
+
     func testNoProjectsGivesNil() {
         XCTAssertNil(DefaultProjectPreference.resolve(in: [], defaults: defaults))
     }

@@ -83,7 +83,7 @@ struct SettingsScreen: View {
             Section {
                 Picker("Default project", selection: defaultProjectBinding) {
                     Text("Automatic").tag(DefaultProjectPreference.automatic)
-                    ForEach(appState.projects) { project in
+                    ForEach(DefaultProjectPreference.selectable(from: appState.projects)) { project in
                         Text(project.title).tag(Int(project.id))
                     }
                 }
@@ -253,7 +253,8 @@ struct SettingsScreen: View {
     private var defaultProjectBinding: Binding<Int> {
         Binding(
             get: {
-                appState.projects.contains(where: { Int($0.id) == defaultProjectId })
+                DefaultProjectPreference.selectable(from: appState.projects)
+                    .contains(where: { Int($0.id) == defaultProjectId })
                     ? defaultProjectId
                     : DefaultProjectPreference.automatic
             },
