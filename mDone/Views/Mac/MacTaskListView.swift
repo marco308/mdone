@@ -21,10 +21,14 @@ struct MacTaskListView: View {
     /// Rows can be dragged only while a project list shows the server's
     /// order, with nothing filtered out: under another sort the drop would
     /// be sorted straight back, and a filtered list's indices don't line up
-    /// with the project's order.
+    /// with the project's order. A virtual project (saved filter, negative
+    /// id) is excluded: `moveTask` positions by the task's real home
+    /// project, so dragging here would write the position into that
+    /// project's list view instead of the filter's (#209).
     private var manualOrderActive: Bool {
-        guard case .project = section else { return false }
-        return sortPreference.order == .manual
+        guard case let .project(project) = section else { return false }
+        return project.id >= 0
+            && sortPreference.order == .manual
             && appState.activeFilter == nil
             && appState.searchQuery.isEmpty
     }

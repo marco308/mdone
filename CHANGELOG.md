@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - The calendar month view now shows each event dot in its own calendar's color instead of the same green for every calendar, so days with events from different calendars are easy to tell apart at a glance (#212)
+- A saved filter opened from the Projects tab now shows its matching tasks in the standard list view, not just on its board. The list view was checking each task's real project instead of the filter's results, so it always came back empty (#209).
 
 ## [1.17.0] - 2026-09-13
 
