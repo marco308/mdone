@@ -6,10 +6,7 @@ struct ProjectRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Circle()
-                .fill(projectColor)
-                .frame(width: 12, height: 12)
-                .accessibilityHidden(true)
+            ProjectColorDot(project: project)
 
             Text(project.title)
                 .font(.body)
@@ -29,10 +26,5 @@ struct ProjectRow: View {
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(String(localized: "\(project.title), \(taskCount) tasks"))
-    }
-
-    private var projectColor: Color {
-        guard let hex = project.hexColor, !hex.isEmpty else { return Color.accentColor }
-        return Color(hex: hex)
     }
 }

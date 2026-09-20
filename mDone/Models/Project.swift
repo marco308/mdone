@@ -24,6 +24,15 @@ struct Project: Codable, Identifiable, Hashable {
         lhs.id == rhs.id
     }
 
+    /// The project's Vikunja color, or `nil` when the project has no usable one.
+    /// Vikunja leaves `hex_color` empty for projects created without a color, so
+    /// an empty or malformed value means "no color" rather than a color we should
+    /// guess at. Callers render an unset project neutrally instead of falling back
+    /// to the accent color, which is itself a color a user can assign (#211).
+    var normalizedHexColor: String? {
+        HexColor.normalized(hexColor)
+    }
+
     var listViewId: Int64? {
         views?.first(where: { $0.viewKind == "list" })?.id
     }
