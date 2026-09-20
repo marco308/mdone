@@ -163,8 +163,8 @@ final class MockURLProtocol: URLProtocol {
     /// unreachable server sits for seven real seconds, and leaves the request in
     /// flight for all of them. Retrying immediately keeps the retry paths under
     /// test without the wall clock or the straggling requests.
-    static func mockClient() -> APIClient {
-        APIClient(session: mockSession(), baseRetryDelay: 0)
+    static func mockClient(baseRetryDelay: UInt64 = 0) -> APIClient {
+        APIClient(session: mockSession(), baseRetryDelay: baseRetryDelay)
     }
 
     /// Returns a request's body. URLSession hands URLProtocol the body as a

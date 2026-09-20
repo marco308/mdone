@@ -68,7 +68,6 @@ final class MockURLProtocolIsolationTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { _ in throw URLError(.cannotConnectToHost) }
 
-        let started = Date()
         do {
             let _: VTask = try await client.fetch(Endpoint.task(id: 1))
             XCTFail("Expected the unreachable server to surface as an error")
@@ -76,8 +75,37 @@ final class MockURLProtocolIsolationTests: XCTestCase {
             // Expected.
         }
 
-        // 1 initial attempt + 3 retries, and none of the 1s/2s/4s backoff.
+        // 1 initial attempt + 3 retries.
         XCTAssertEqual(MockURLProtocol.capturedRequests.count, 4)
-        XCTAssertLessThan(Date().timeIntervalSince(started), 1.0)
+        // And none of the 1s/2s/4s backoff: those three retries waited for
+        // nothing at all. Asserted against the client's own tally rather than
+        // the wall clock, which on a loaded runner measures the runner and not
+        // the backoff (a 1s bound failed on CI while the backoff was collapsed
+        // exactly as intended).
+        let backoff = await client.retryBackoffApplied
+        XCTAssertEqual(backoff, 0)
+    }
+
+    /// Keeps the assertion above honest. A tally that always read zero would let
+    /// a `mockClient()` that stopped collapsing the backoff pass unnoticed, so
+    /// pin the doubling on a client whose base delay is a microsecond: still no
+    /// wall-clock cost, but a non-zero total to compare against.
+    func testRetryBackoffTallyTracksTheInjectedDelay() async throws {
+        let client = MockURLProtocol.mockClient(baseRetryDelay: 1000)
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+
+        MockURLProtocol.requestHandler = { _ in throw URLError(.cannotConnectToHost) }
+
+        do {
+            let _: VTask = try await client.fetch(Endpoint.task(id: 1))
+            XCTFail("Expected the unreachable server to surface as an error")
+        } catch {
+            // Expected.
+        }
+
+        XCTAssertEqual(MockURLProtocol.capturedRequests.count, 4)
+        // 1x, then 2x, then 4x the base delay.
+        let backoff = await client.retryBackoffApplied
+        XCTAssertEqual(backoff, 7000)
     }
 }
