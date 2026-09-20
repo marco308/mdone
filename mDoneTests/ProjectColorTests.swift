@@ -36,6 +36,15 @@ final class ProjectColorTests: XCTestCase {
         XCTAssertNil(makeProject(hexColor: "1234567").normalizedHexColor)
     }
 
+    /// Only one leading `#` is a prefix; anything else is a malformed value, not
+    /// a color with decoration.
+    func testRepeatedOrTrailingHashIsNil() {
+        XCTAssertNil(makeProject(hexColor: "##FF0000").normalizedHexColor)
+        XCTAssertNil(makeProject(hexColor: "#FF0000#").normalizedHexColor)
+        XCTAssertNil(makeProject(hexColor: "FF0000#").normalizedHexColor)
+        XCTAssertNil(makeProject(hexColor: "##").normalizedHexColor)
+    }
+
     func testNonHexCharactersAreNil() {
         XCTAssertNil(makeProject(hexColor: "GGGGGG").normalizedHexColor)
         XCTAssertNil(makeProject(hexColor: "12 34 56").normalizedHexColor)

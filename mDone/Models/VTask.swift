@@ -82,14 +82,7 @@ struct VTask: Codable, Identifiable, Hashable {
     /// default styling instead of rendering a stray gray. The leading `#`, if
     /// present, is stripped.
     var normalizedHexColor: String? {
-        guard let hexColor else { return nil }
-        let trimmed = hexColor
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        guard [3, 6, 8].contains(trimmed.count),
-              trimmed.allSatisfy(\.isHexDigit)
-        else { return nil }
-        return trimmed
+        HexColor.normalized(hexColor)
     }
 
     /// `description` with the mDone estimate marker stripped — what the user
