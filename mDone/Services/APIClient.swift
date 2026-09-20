@@ -19,6 +19,15 @@ actor APIClient {
     /// real seconds per request, which also kept requests in flight long after
     /// the test that started them had finished.
     private let baseRetryDelay: UInt64
+
+    /// Total nanoseconds this client has actually spent in retry backoff.
+    ///
+    /// Read by the backoff test so it can assert the injected delay was honoured
+    /// instead of timing the run: an absolute wall-clock bound only measures how
+    /// busy the machine is, and failed on a loaded CI runner. Cumulative and
+    /// monotonic, so it stays meaningful with several requests in flight.
+    private(set) var retryBackoffApplied: UInt64 = 0
+
     private static let refreshCookieName = "vikunja_refresh_token"
 
     /// Per-request timeout, in seconds. URLSession's 60s default is far too
@@ -225,6 +234,7 @@ actor APIClient {
                         "[mDone] Retrying request (attempt \(attempt + 1)/\(maxRetries)) after \(delay / 1_000_000_000)s — HTTP \(httpResponse.statusCode)"
                     )
                     #endif
+                    retryBackoffApplied += delay
                     try await Task.sleep(nanoseconds: delay)
                     continue
                 }
@@ -245,6 +255,7 @@ actor APIClient {
                         "[mDone] Retrying request (attempt \(attempt + 1)/\(maxRetries)) after \(delay / 1_000_000_000)s — \(error.localizedDescription)"
                     )
                     #endif
+                    retryBackoffApplied += delay
                     try await Task.sleep(nanoseconds: delay)
                     lastError = error
                     continue
