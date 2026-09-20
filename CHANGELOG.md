@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-09-20
+
 ### Added
 - Simplified Chinese (简体中文) translation of the app, widgets and system permission prompts, contributed by somnus0917 (#163)
 - Settings > Tasks > "Default project" picks where a task goes when you add it from the Inbox, through Siri, or with the Mac's New Task window. "Inbox adds tasks due" sets whether a task typed into the Inbox is due today, tomorrow or not at all (#210).

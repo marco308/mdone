@@ -82,9 +82,22 @@ Steps to test:
    - In a task's Labels section, tap "Add Labels" to put labels on it or take them off.
    - Sort a project by "Manual" (sort menu) and drag the handles to reorder tasks.
    - Add a widget from the home screen (long press > Edit Home Screen > tap +).
+   - Open Settings > Tasks and set "Default project", then add a task from the Inbox to see it land there.
    - Say "Hey Siri, add a task in mDone" (the app can be closed). Siri asks for the task, adds it to the first project, and reads back where it went and when it is due. On a Mac, use the Shortcuts app's "Add Task" action for mDone.
 
 This is a private test server maintained by the developer for App Store review purposes.
+
+## What's New (v1.18.0)
+
+Simplified Chinese, and a say in where new tasks land.
+
+- mDone is now available in Simplified Chinese (简体中文), including the widgets and the system permission prompts. It follows your device language, so there is nothing to switch on.
+- A new "Default project" setting picks where a task goes when you add it from the Inbox, ask Siri, or use the Mac's New Task window, instead of whichever project happened to be listed first.
+- "Inbox adds tasks due" sets whether a task typed into the Inbox is due today, tomorrow, or not at all.
+- Projects you have not given a colour now show a hollow marker in the Projects tab and the Mac sidebar, so they no longer look like projects you deliberately coloured blue.
+- Each event dot on the calendar's month view now uses its own calendar's colour, so days with events from different calendars are easy to tell apart.
+- Fixed a saved filter opened from the Projects tab coming back empty in the list view. Its matching tasks now show there as well as on the board.
+- Available on both iPhone and Mac.
 
 ## What's New (v1.17.0)
 
