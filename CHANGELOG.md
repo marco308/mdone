@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Smart parsing in the quick-add bar, off by default: turn it on in Settings > Tasks. Type "Buy milk tomorrow at 5pm +Home !2 *shopping" and mDone adds "Buy milk" to Home, due tomorrow at 5:00 PM, priority 2, labelled shopping. Each part shows as a chip under the field before you add the task; tap its X to keep those words in the title instead (#215).
+
 ## [1.18.0] - 2026-09-20
 
 ### Added

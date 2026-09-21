@@ -1098,7 +1098,8 @@ final class AppState {
         projectId: Int64,
         description: String? = nil,
         dueDate: Date? = nil,
-        priority: Int64 = 0
+        priority: Int64 = 0,
+        labelIds: [Int64] = []
     ) async -> VTask? {
         // Creating offline isn't queueable yet: a queued create has no server id,
         // so any later edit or completion of that task would have nothing to
@@ -1111,9 +1112,24 @@ final class AppState {
 
         let request = TaskCreateRequest(title: title, description: description, dueDate: dueDate, priority: priority)
         do {
-            let newTask = try await taskService.createTask(projectId: projectId, request: request)
+            var newTask = try await taskService.createTask(projectId: projectId, request: request)
             tasks.append(newTask)
             syncService?.updateCachedTask(newTask)
+            // Vikunja ignores labels in the create body, so smart quick add's
+            // `*label` goes through the label endpoints once the task exists.
+            // A failure here leaves the task created without that label.
+            for labelId in labelIds {
+                guard let label = labels.first(where: { $0.id == labelId }) else { continue }
+                do {
+                    try await labelService.addLabel(taskId: newTask.id, labelId: labelId)
+                    setLabelLocally(taskId: newTask.id, label: label, present: true)
+                } catch {
+                    handleError(error)
+                }
+            }
+            if let updated = tasks.first(where: { $0.id == newTask.id }) {
+                newTask = updated
+            }
             #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             #endif

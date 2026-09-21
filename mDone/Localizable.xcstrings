@@ -332,6 +332,8 @@
         }
       }
     },
+    "%lld of %lld checklist items done" : {},
+    "%lld of %lld done" : {},
     "%lld percent" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1014,6 +1016,7 @@
         }
       }
     },
+    "Automatic" : {},
     "Bearer token" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1154,6 +1157,7 @@
         }
       }
     },
+    "Checklist" : {},
     "Choose a section from the sidebar" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1504,6 +1508,7 @@
         }
       }
     },
+    "Default project" : {},
     "Delete" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1634,6 +1639,7 @@
         }
       }
     },
+    "Double tap to toggle" : {},
     "Due Date" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2280,6 +2286,7 @@
         }
       }
     },
+    "Inbox adds tasks due" : {},
     "Invalid date range. Start date must not be after end date." : {
       "localizations" : {
         "zh-Hans" : {
@@ -2950,6 +2957,7 @@
         }
       }
     },
+    "Not done" : {},
     "Not synced" : {
       "localizations" : {
         "zh-Hans" : {
@@ -3274,6 +3282,7 @@
         }
       }
     },
+    "Priority %lld" : {},
     "Priority: %@" : {
       "localizations" : {
         "zh-Hans" : {
@@ -3454,6 +3463,7 @@
         }
       }
     },
+    "Remove %@" : {},
     "Remove %@ relation to %@" : {
       "localizations" : {
         "zh-Hans" : {
@@ -3784,6 +3794,7 @@
         }
       }
     },
+    "Smart parsing in quick add" : {},
     "Some changes could not be synced" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4084,6 +4095,7 @@
         }
       }
     },
+    "Tasks you add from the Inbox or through Siri go to the default project. Automatic uses your project named Inbox, or your first project if there is none. Default due time applies when those tasks get a due date: pick a time later in the day so a new task does not show as overdue right away. Smart parsing reads dates, +project, !priority and *label from what you type in the quick-add bar and shows each one as a chip you can remove before adding." : {},
     "Tasks you mark as Current sit at the top of your list with a progress bar. An idle badge appears when one hasn't been touched for this many days." : {
       "localizations" : {
         "zh-Hans" : {
@@ -4326,7 +4338,8 @@
             "value" : "用于添加到“今天”但未指定时间的任务，以及通过 Siri 添加的任务。建议选择当天较晚的时间，以免任务立即显示为逾期。"
           }
         }
-      }
+      },
+      "extractionState" : "stale"
     },
     "Time of day applied to tasks you add to Today without picking a time. Pick a time later in the day to avoid the task showing as overdue right away." : {
       "extractionState" : "stale"
