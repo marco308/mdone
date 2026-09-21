@@ -371,9 +371,11 @@ final class SmartTaskParserTests: XCTestCase {
 
     /// Tolerant of OS drift: whatever the detector makes of the date, it must
     /// strip it cleanly and land on a date-only default time.
-    func testDetectorFallbackStripsWhatItParses() {
+    func testDetectorFallbackStripsWhatItParses() throws {
         let parse = parser(dataDetector: true).parse("Pay bill 12.10.2027")
-        guard let due = parse.dueDate else { return }
+        guard let due = parse.dueDate else {
+            throw XCTSkip("NSDataDetector on this OS did not read 12.10.2027 as a date")
+        }
         XCTAssertEqual(parse.title, "Pay bill")
         XCTAssertFalse(parse.dueDateHasTime)
         XCTAssertEqual(calendar.component(.hour, from: due), 18)

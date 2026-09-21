@@ -91,7 +91,7 @@ struct SmartTaskParse: Equatable {
 ///    time-only matches are rejected.
 ///
 /// Everything works on string ranges rather than whitespace-split words, and
-/// each keyword says whether it needs word boundaries, so a column of Chinese
+/// each fixed keyword says whether it needs word boundaries, so a column of Chinese
 /// keywords (no spaces between words) can be added without a rewrite.
 struct SmartTaskParser {
     /// A project or label the text can refer to by name.
@@ -587,8 +587,15 @@ struct SmartTaskParser {
             return date
         }
 
-        func fixed(_ pattern: String, _ date: @escaping () -> Date?, time: (Int, Int)? = nil) -> DayRule {
-            DayRule(regex: Self.regex(Self.bounded(pattern))) { _, _, range in
+        /// `wordBoundaries: false` is for scripts written without spaces,
+        /// such as the zh-Hans column in phase 3 ("买牛奶明天").
+        func fixed(
+            _ pattern: String,
+            _ date: @escaping () -> Date?,
+            time: (Int, Int)? = nil,
+            wordBoundaries: Bool = true
+        ) -> DayRule {
+            DayRule(regex: Self.regex(wordBoundaries ? Self.bounded(pattern) : pattern)) { _, _, range in
                 date().map { DayHit(range: range, day: $0, impliedTime: time.map { (hour: $0.0, minute: $0.1) }) }
             }
         }
