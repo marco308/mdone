@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - Smart parsing in the quick-add bar, off by default: turn it on in Settings > Tasks. Type "Buy milk tomorrow at 5pm +Home !2 *shopping" and mDone adds "Buy milk" to Home, due tomorrow at 5:00 PM, priority 2, labelled shopping. Each part shows as a chip under the field before you add the task; tap its X to keep those words in the title instead (#215).
+- Smart parsing now also works in the Mac's New Task window, where it fills the project, due date and priority controls as you type, and in Siri and Shortcuts, where it reads a date, project, priority and labels out of what you say. A date you set explicitly in the Shortcuts action is never overridden (#215).
+- Smart parsing understands Chinese dates: 今天, 明天, 后天, 今晚, 下周, 下个月, 周一 to 周日, and times like 明天下午3点 (#215).
 
 ## [1.18.0] - 2026-09-20
 

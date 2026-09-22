@@ -46,6 +46,13 @@ struct MacQuickAddSheet: View {
     @State private var priority: Int64 = 0
     @FocusState private var titleFocused: Bool
 
+    /// Smart parsing (#215). Off by default. When on, typing fills the
+    /// pickers below rather than adding controls of its own, so the user
+    /// sees the result before pressing Add.
+    @AppStorage(SmartParsingPreference.storageKey) private var smartParsing = SmartParsingPreference.defaultValue
+    @State private var parse: SmartTaskParse?
+    @State private var parseTask: Task<Void, Never>?
+
     var body: some View {
         VStack(spacing: 16) {
             Text("New Task")
@@ -58,6 +65,12 @@ struct MacQuickAddSheet: View {
                     if !title.isEmpty {
                         addTask()
                     }
+                }
+                .onChange(of: title) { _, newValue in
+                    scheduleParse(for: newValue)
+                }
+                .onChange(of: smartParsing) { _, _ in
+                    scheduleParse(for: title)
                 }
 
             if !appState.projects.isEmpty {
@@ -106,15 +119,55 @@ struct MacQuickAddSheet: View {
         }
     }
 
+    /// Debounced like the iOS bar, then applied to the controls. The user's
+    /// own picker changes win: a later parse only writes a field the text
+    /// actually names.
+    private func scheduleParse(for rawTitle: String) {
+        parseTask?.cancel()
+        guard smartParsing, !rawTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            parse = nil
+            return
+        }
+        parseTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(250))
+            if Task.isCancelled {
+                return
+            }
+            let result = SmartTaskParser(projects: appState.projects, labels: appState.labels).parse(rawTitle)
+            parse = result
+            apply(result)
+        }
+    }
+
+    private func apply(_ parse: SmartTaskParse) {
+        if let due = parse.dueDate {
+            hasDueDate = true
+            dueDate = due
+        }
+        if let projectId = parse.projectId, appState.projects.contains(where: { $0.id == projectId }) {
+            selectedProjectId = projectId
+        }
+        if let parsed = parse.priority {
+            priority = Int64(parsed)
+        }
+    }
+
     private func addTask() {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        // The controls hold the values (the parse filled them, the user may
+        // have changed them); only the title and the labels come from the
+        // parse itself.
+        let currentParse = smartParsing ? parse.flatMap { $0.text == title ? $0 : nil } : nil
+        let trimmed = (currentParse?.title ?? title).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, selectedProjectId > 0 else { return }
+        parseTask?.cancel()
+        parseTask = nil
         Task {
             await appState.createTask(
                 title: trimmed,
                 projectId: selectedProjectId,
                 dueDate: hasDueDate ? dueDate : nil,
-                priority: priority
+                priority: priority,
+                labelIds: currentParse?.labelIds ?? []
             )
             dismiss()
         }

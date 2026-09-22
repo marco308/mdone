@@ -540,6 +540,12 @@ struct SmartTaskParser {
 
     private static let priorityRegex = regex("(?<!\\S)!([1-5])(?![\\p{L}\\p{N}])")
 
+    /// 一 is Monday, matching `Calendar.weekday` where 1 is Sunday. Both 日
+    /// and 天 are Sunday.
+    private static let chineseWeekdays = [
+        "一": 2, "二": 3, "三": 4, "四": 5, "五": 6, "六": 7, "日": 1, "天": 1,
+    ]
+
     private static let weekdays = [
         "sunday": 1, "monday": 2, "tuesday": 3, "wednesday": 4, "thursday": 5, "friday": 6, "saturday": 7,
     ]
@@ -674,6 +680,29 @@ struct SmartTaskParser {
                 return absolute(year: year, month: month, day: day)
                     .map { DayHit(range: range, day: $0, impliedTime: nil) }
             },
+
+            // zh-Hans. Chinese is written without spaces between words, so
+            // these keywords take no word boundaries (#226).
+            fixed("今天", { startOfToday }, wordBoundaries: false),
+            fixed("明天", { offset(1) }, wordBoundaries: false),
+            fixed("后天|後天", { offset(2) }, wordBoundaries: false),
+            fixed("今晚|今天晚上", { startOfToday }, time: (21, 0), wordBoundaries: false),
+            fixed("下周|下週|下星期", {
+                QuickSchedule.nextWeek.resolvedDate(now: now, calendar: calendar)
+            }, wordBoundaries: false),
+            fixed("下个月|下個月", {
+                QuickSchedule.nextMonth.resolvedDate(now: now, calendar: calendar)
+            }, wordBoundaries: false),
+
+            // 周一 to 周日, also 星期一 and 礼拜一. Same rule as the English
+            // weekdays: the next occurrence strictly after today.
+            DayRule(regex: Self.regex("(?:这|這|下)?(?:周|週|星期|礼拜|禮拜)([一二三四五六日天])")) { result, text, range in
+                guard let name = Self.group(result, 1, in: text),
+                      let target = Self.chineseWeekdays[name] else { return nil }
+                let today = calendar.component(.weekday, from: now)
+                let ahead = (target - today + 7) % 7
+                return offset(ahead == 0 ? 7 : ahead).map { DayHit(range: range, day: $0, impliedTime: nil) }
+            },
         ]
     }
 
@@ -694,6 +723,19 @@ struct SmartTaskParser {
             else { return nil }
             return (hour, minute)
         },
+        // zh-Hans: 3点, 下午3点, 上午9点30分, 中午. No word boundaries.
+        TimeRule(
+            regex: regex("(上午|早上|中午|下午|晚上)?\\s*(\\d{1,2})\\s*[点點](?:\\s*(\\d{1,2})\\s*分?)?")
+        ) { result, text in
+            guard let hour = group(result, 2, in: text).flatMap(Int.init), (0 ... 23).contains(hour)
+            else { return nil }
+            let minute = group(result, 3, in: text).flatMap(Int.init) ?? 0
+            guard (0 ... 59).contains(minute) else { return nil }
+            let period = group(result, 1, in: text)
+            let isAfternoon = period == "下午" || period == "晚上" || period == "中午"
+            return (isAfternoon && hour < 12 ? hour + 12 : hour, minute)
+        },
+        TimeRule(regex: regex("中午(?![\\d一二三四五六七八九十])")) { _, _ in (12, 0) },
         TimeRule(regex: regex(bounded("(?:at\\s+)?noon"))) { _, _ in (12, 0) },
         TimeRule(regex: regex(bounded("(?:at\\s+)?midnight"))) { _, _ in (0, 0) },
     ]

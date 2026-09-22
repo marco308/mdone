@@ -264,6 +264,61 @@ final class SmartTaskParserTests: XCTestCase {
         assertParse("Buy   milk   tomorrow", title: "Buy milk", due: date(2026, 9, 22, 18))
     }
 
+    // MARK: - Chinese (zh-Hans locale)
+
+    private func assertChinese(
+        _ input: String,
+        title: String,
+        due: Date? = nil,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        assertParse(input, title: title, due: due, locale: "zh_Hans_CN", file: file, line: line)
+    }
+
+    func testChineseTomorrowWithSpace() {
+        assertChinese("买牛奶 明天", title: "买牛奶", due: date(2026, 9, 22, 18))
+    }
+
+    func testChineseTomorrowWithoutSpace() {
+        assertChinese("买牛奶明天", title: "买牛奶", due: date(2026, 9, 22, 18))
+    }
+
+    func testChineseTonight() {
+        assertChinese("打电话给妈妈 今晚", title: "打电话给妈妈", due: date(2026, 9, 21, 21))
+    }
+
+    func testChineseNextWeek() {
+        assertChinese("交报告 下周", title: "交报告", due: date(2026, 9, 28, 18))
+    }
+
+    func testChineseAfternoonTime() {
+        assertChinese("开会 明天下午3点", title: "开会", due: date(2026, 9, 22, 15))
+    }
+
+    func testChineseToday() {
+        assertChinese("倒垃圾 今天", title: "倒垃圾", due: date(2026, 9, 21, 18))
+    }
+
+    func testChineseDayAfterTomorrow() {
+        assertChinese("取快递 后天", title: "取快递", due: date(2026, 9, 23, 18))
+    }
+
+    func testChineseNextMonth() {
+        assertChinese("体检 下个月", title: "体检", due: date(2026, 10, 1, 18))
+    }
+
+    func testChineseWeekday() {
+        // Today is Monday, so 周一 is a week out and 周五 is this Friday.
+        assertChinese("牙医 周五", title: "牙医", due: date(2026, 9, 25, 18))
+        assertChinese("牙医 周一", title: "牙医", due: date(2026, 9, 28, 18))
+        assertChinese("牙医 星期日", title: "牙医", due: date(2026, 9, 27, 18))
+    }
+
+    func testChineseMorningTime() {
+        assertChinese("站会 明天上午9点30分", title: "站会", due: date(2026, 9, 22, 9, 30))
+    }
+
     // MARK: - Any locale
 
     func testProjectPrefixWorksInChineseText() {

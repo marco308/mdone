@@ -1157,8 +1157,19 @@ final class AppState {
     /// than refusing it. The UI refuses because a queued task has no id for a
     /// later edit to address (issue #146); a driver talking to Siri cannot
     /// edit anything anyway, and losing the thought is the worse outcome.
+    /// - Parameters:
+    ///   - dueDate: a date the caller named explicitly. Smart parsing never
+    ///     overrides it.
+    ///   - fallbackDueDate: the "Siri adds tasks due" default, used only when
+    ///     neither the caller nor the parsed text gives a date.
     @MainActor
-    func createTaskFromIntent(title: String, projectId: Int64?, dueDate: Date?) async throws -> IntentTaskOutcome {
+    func createTaskFromIntent(
+        title: String,
+        projectId: Int64?,
+        dueDate: Date?,
+        fallbackDueDate: Date? = nil,
+        smartParsingEnabled: Bool = SmartParsingPreference.isEnabled()
+    ) async throws -> IntentTaskOutcome {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else { throw IntentTaskError.emptyTitle }
 
@@ -1174,9 +1185,18 @@ final class AppState {
             projects = await (try? projectService.fetchProjects()) ?? []
         }
 
-        let project: Project? = if let projectId {
-            projects.first(where: { $0.id == projectId }) ?? Project(
-                id: projectId,
+        // Smart parsing fills only what the caller left out (#215). There is
+        // no chip row here, so the spoken confirmation is the safety net.
+        let parse = smartParsingEnabled
+            ? SmartTaskParser(projects: projects, labels: labels).parse(trimmedTitle)
+            : nil
+        let taskTitle = parse?.title ?? trimmedTitle
+        let resolvedDueDate = dueDate ?? parse?.dueDate ?? fallbackDueDate
+        let resolvedProjectId = projectId ?? parse?.projectId
+
+        let project: Project? = if let resolvedProjectId {
+            projects.first(where: { $0.id == resolvedProjectId }) ?? Project(
+                id: resolvedProjectId,
                 title: String(localized: "your project")
             )
         } else {
@@ -1184,8 +1204,14 @@ final class AppState {
         }
         guard let project else { throw IntentTaskError.noProject }
 
-        let request = TaskCreateRequest(title: trimmedTitle, dueDate: dueDate)
+        let request = TaskCreateRequest(
+            title: taskTitle,
+            dueDate: resolvedDueDate,
+            priority: parse?.priority.map(Int64.init)
+        )
         if isOffline {
+            // A queued create has no id yet, so parsed labels cannot be
+            // attached; the rest of the parse still applies.
             return try queueIntentCreate(request, in: project)
         }
 
@@ -1193,8 +1219,14 @@ final class AppState {
             let newTask = try await taskService.createTask(projectId: project.id, request: request)
             tasks.append(newTask)
             syncService?.updateCachedTask(newTask)
+            for labelId in parse?.labelIds ?? [] {
+                guard let label = labels.first(where: { $0.id == labelId }) else { continue }
+                if await (try? labelService.addLabel(taskId: newTask.id, labelId: labelId)) != nil {
+                    setLabelLocally(taskId: newTask.id, label: label, present: true)
+                }
+            }
             WidgetCenter.shared.reloadAllTimelines()
-            return .created(taskTitle: trimmedTitle, projectTitle: project.title, dueDate: dueDate)
+            return .created(taskTitle: taskTitle, projectTitle: project.title, dueDate: resolvedDueDate)
         } catch let error as NetworkError where error.isConnectivityFailure {
             // The monitor said we were online but the server was not there:
             // a tunnel, a car park, a dead mobile link. Same answer as offline.

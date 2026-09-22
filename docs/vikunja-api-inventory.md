@@ -438,6 +438,10 @@ Saved filters appear as virtual projects with negative IDs (calculated as `-(fil
 
 **User settings include:** `email_reminders_enabled`, `discoverable_by_name`, `discoverable_by_email`, `overdue_tasks_reminders_enabled`, `overdue_tasks_reminders_time`, `default_project_id`, `week_start`, `timezone`, `language`, `frontend_settings` (JSON blob for UI preferences)
 
+`frontend_settings` is where the web client keeps its own preferences, including `quickAddMagicMode` (which
+prefix its quick add magic uses). It is `null` for a user who has never used the web UI, and mDone's smart
+parsing accepts `+` and `#` either way, so mDone deliberately does not read it (#226).
+
 **Avatar providers:** `gravatar`, `upload`, `initials`, `marble`
 
 ### 6.2 Authentication
