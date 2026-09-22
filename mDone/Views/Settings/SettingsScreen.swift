@@ -13,6 +13,7 @@ struct SettingsScreen: View {
     @AppStorage(NewTaskDueDatePreference.inboxStorageKey) private var inboxDueDate = NewTaskDueDatePreference
         .defaultValue.rawValue
     @AppStorage(DefaultProjectPreference.storageKey) private var defaultProjectId = DefaultProjectPreference.automatic
+    @AppStorage(SmartParsingPreference.storageKey) private var smartParsing = SmartParsingPreference.defaultValue
     @AppStorage("calmMode") private var calmMode = false
     @AppStorage(AllDayEventPreference.storageKey) private var hideAllDayEvents = false
     @AppStorage("currentStallDays") private var currentStallDays = 7
@@ -102,11 +103,12 @@ struct SettingsScreen: View {
                         Text(preference.label).tag(preference.rawValue)
                     }
                 }
+                Toggle("Smart parsing in quick add", isOn: $smartParsing)
             } header: {
                 Text("Tasks")
             } footer: {
                 Text(
-                    "Tasks you add from the Inbox or through Siri go to the default project. Automatic uses your project named Inbox, or your first project if there is none. Default due time applies when those tasks get a due date: pick a time later in the day so a new task does not show as overdue right away."
+                    "Tasks you add from the Inbox or through Siri go to the default project. Automatic uses your project named Inbox, or your first project if there is none. Default due time applies when those tasks get a due date: pick a time later in the day so a new task does not show as overdue right away. Smart parsing reads dates, +project, !priority and *label from what you type in the quick-add bar and shows each one as a chip you can remove before adding."
                 )
             }
 
