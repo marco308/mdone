@@ -44,10 +44,6 @@ struct QuickAddBar: View {
                 suggestionHint(suggestion)
             }
 
-            if smartParsing, let visibleParse, !visibleParse.matches.isEmpty {
-                parseChips(visibleParse)
-            }
-
             if estimateSeconds != nil {
                 EstimatePicker(estimateSeconds: $estimateSeconds)
                     .padding(.horizontal, 4)
@@ -95,6 +91,12 @@ struct QuickAddBar: View {
                     .accessibilityLabel("Add task")
                 }
             }
+
+            // Under the field, where #225 puts them: they read as a
+            // description of what was just typed.
+            if smartParsing, let visibleParse, !visibleParse.matches.isEmpty {
+                parseChips(visibleParse)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -106,6 +108,11 @@ struct QuickAddBar: View {
         .animation(.snappy(duration: 0.2), value: suggestion)
         .animation(.snappy(duration: 0.2), value: visibleParse?.matches.count ?? 0)
         .animation(.snappy(duration: 0.2), value: estimateSeconds == nil)
+        .onChange(of: smartParsing) { _, _ in
+            // Flipping the setting with text already in the field: show chips
+            // for it straight away, or drop a pending parse when turned off.
+            scheduleParse(for: title)
+        }
         .task(id: appState.quickAddTrigger) {
             // Consume the trigger so a later-mounted QuickAddBar (e.g. switching
             // to a project's task list) doesn't see a stale value and steal focus.
@@ -239,6 +246,7 @@ struct QuickAddBar: View {
         parseTask?.cancel()
         guard smartParsing else {
             parse = nil
+            rejectedFields = []
             return
         }
         if rawTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

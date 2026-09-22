@@ -174,4 +174,35 @@ final class SmartQuickAddTests: XCTestCase {
         XCTAssertEqual(created?.labels?.map(\.id), [Self.shopping])
         XCTAssertEqual(state.tasks.first { $0.id == 99 }?.labels?.map(\.id), [Self.shopping])
     }
+
+    /// A label that fails to attach leaves the task created without it and
+    /// surfaces the error; the create is not rolled back.
+    func testLabelFailureKeepsTheCreatedTask() async {
+        let client = MockURLProtocol.mockClient()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+        let state = AppState(
+            taskService: TaskService(apiClient: client),
+            labelService: LabelService(apiClient: client)
+        )
+        state.labels = [VLabel(id: Self.shopping, title: "shopping")]
+
+        MockURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+            if path.hasSuffix("/labels") {
+                // 400 fails fast, no retry.
+                return (
+                    MockURLProtocol.makeResponse(statusCode: 400, url: request.url),
+                    Data(#"{"message": "bad"}"#.utf8)
+                )
+            }
+            let body = #"{"id": 99, "title": "Buy gift", "done": false, "project_id": 1, "priority": 0}"#
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), Data(body.utf8))
+        }
+
+        let created = await state.createTask(title: "Buy gift", projectId: 1, labelIds: [Self.shopping])
+
+        XCTAssertEqual(created?.id, 99)
+        XCTAssertTrue(created?.labels?.isEmpty ?? true)
+        XCTAssertNotNil(state.activeError)
+    }
 }
