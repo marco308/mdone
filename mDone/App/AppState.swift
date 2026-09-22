@@ -1187,6 +1187,17 @@ final class AppState {
 
         // Smart parsing fills only what the caller left out (#215). There is
         // no chip row here, so the spoken confirmation is the safety net.
+        // `*label` needs the label list, which a cold background launch has
+        // not loaded: the cache first, the server only if it is still empty.
+        // Only when the text actually names a label, so the common Siri add
+        // does not wait on a request it has no use for.
+        if smartParsingEnabled, labels.isEmpty, trimmedTitle.contains("*") {
+            if let cached = try? syncService?.loadCachedLabels(), !cached.isEmpty {
+                labels = cached
+            } else if !isOffline {
+                labels = await (try? labelService.fetchLabels()) ?? []
+            }
+        }
         let parse = smartParsingEnabled
             ? SmartTaskParser(projects: projects, labels: labels).parse(trimmedTitle)
             : nil
@@ -1219,10 +1230,15 @@ final class AppState {
             let newTask = try await taskService.createTask(projectId: project.id, request: request)
             tasks.append(newTask)
             syncService?.updateCachedTask(newTask)
+            // Same as `createTask`: the task exists by now, so a failed
+            // association is surfaced rather than rolled back or thrown.
             for labelId in parse?.labelIds ?? [] {
                 guard let label = labels.first(where: { $0.id == labelId }) else { continue }
-                if await (try? labelService.addLabel(taskId: newTask.id, labelId: labelId)) != nil {
+                do {
+                    try await labelService.addLabel(taskId: newTask.id, labelId: labelId)
                     setLabelLocally(taskId: newTask.id, label: label, present: true)
+                } catch {
+                    handleError(error)
                 }
             }
             WidgetCenter.shared.reloadAllTimelines()

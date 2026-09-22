@@ -129,7 +129,9 @@ struct SmartTaskParser {
     }
 
     /// Convenience for call sites holding the app's models. Archived projects
-    /// are not offered: a task should not quietly land in one.
+    /// are not offered (a task should not quietly land in one), and neither
+    /// are the pseudo-projects and saved filters Vikunja returns with ids at
+    /// or below zero: "+My Open Tasks" must not resolve to `/projects/-2`.
     init(
         projects: [Project],
         labels: [VLabel],
@@ -140,7 +142,7 @@ struct SmartTaskParser {
     ) {
         self.init(
             projects: projects
-                .filter { $0.isArchived != true }
+                .filter { $0.id > 0 && $0.isArchived != true }
                 .map { Candidate(id: $0.id, name: $0.title) },
             labels: labels.map { Candidate(id: $0.id, name: $0.title) },
             now: now,
@@ -356,7 +358,13 @@ struct SmartTaskParser {
                 break
             }
         }
-        return hits.min { $0.range.lowerBound < $1.range.lowerBound }
+        // Earliest wins; at the same start the longest does, so 下周一 is read
+        // as a weekday rather than as 下周 with 一 left in the title.
+        return hits.min { lhs, rhs in
+            lhs.range.lowerBound == rhs.range.lowerBound
+                ? lhs.range.upperBound > rhs.range.upperBound
+                : lhs.range.lowerBound < rhs.range.lowerBound
+        }
     }
 
     private func firstTimeHit(in text: String, excluding consumed: [Range<String.Index>]) -> TimeHit? {
@@ -371,7 +379,11 @@ struct SmartTaskParser {
                 break
             }
         }
-        return hits.min { $0.range.lowerBound < $1.range.lowerBound }
+        return hits.min { lhs, rhs in
+            lhs.range.lowerBound == rhs.range.lowerBound
+                ? lhs.range.upperBound > rhs.range.upperBound
+                : lhs.range.lowerBound < rhs.range.lowerBound
+        }
     }
 
     /// "morning", "afternoon" and "evening" only count next to a day

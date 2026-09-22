@@ -315,6 +315,12 @@ final class SmartTaskParserTests: XCTestCase {
         assertChinese("牙医 星期日", title: "牙医", due: date(2026, 9, 27, 18))
     }
 
+    func testChineseNextWeekdayBeatsNextWeek() {
+        // 下周一 is the weekday, not 下周 with 一 left behind (#226 review).
+        assertChinese("开会 下周一", title: "开会", due: date(2026, 9, 28, 18))
+        assertChinese("开会 下星期日", title: "开会", due: date(2026, 9, 27, 18))
+    }
+
     func testChineseMorningTime() {
         assertChinese("站会 明天上午9点30分", title: "站会", due: date(2026, 9, 22, 9, 30))
     }
@@ -377,6 +383,22 @@ final class SmartTaskParserTests: XCTestCase {
         assertParse("Sand door +Improv", title: "Sand door +Improv")
         assertParse("Sand door +Home Imp", title: "Sand door Imp", project: Self.home)
         assertParse("Deck +Wor", title: "Deck", project: Self.work)
+    }
+
+    /// Vikunja returns saved filters and pseudo-projects such as "My Open
+    /// Tasks" with ids at or below zero. Matching one would create the task
+    /// against an endpoint that does not exist.
+    func testPseudoProjectsAreNotCandidates() {
+        let real = Project(id: 5, title: "Garden")
+        let pseudo = Project(id: -2, title: "My Open Tasks")
+        let parser = SmartTaskParser(
+            projects: [real, pseudo], labels: [],
+            now: date(2026, 9, 21, 10), calendar: calendar,
+            locale: Locale(identifier: "en_GB"), defaultDueTime: .sixPM
+        )
+        XCTAssertNil(parser.parse("Check +My Open Tasks").projectId)
+        XCTAssertEqual(parser.parse("Check +My Open Tasks").title, "Check +My Open Tasks")
+        XCTAssertEqual(parser.parse("Weed +Garden").projectId, 5)
     }
 
     func testArchivedProjectsAreNotCandidates() {

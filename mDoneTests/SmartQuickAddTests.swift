@@ -343,6 +343,64 @@ final class SmartQuickAddTests: XCTestCase {
         XCTAssertNil(due)
     }
 
+    /// A cold Siri launch has projects but no labels loaded yet; the parser
+    /// cannot see `*shopping` unless they are fetched first (#226 review).
+    func testIntentLoadsLabelsBeforeParsing() async throws {
+        let state = await makeIntentState()
+        state.labels = []
+        let sent = Sent()
+        MockURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+            if path.hasSuffix("/labels"), request.httpMethod == "GET" {
+                return (
+                    MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
+                    Data(#"[{"id": 10, "title": "shopping"}]"#.utf8)
+                )
+            }
+            if let data = MockURLProtocol.bodyData(from: request),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            {
+                sent.record(json)
+            }
+            let body = path.hasSuffix("/labels")
+                ? #"{"label_id": 10}"#
+                : #"{"id": 42, "title": "Buy milk", "done": false, "project_id": 2, "priority": 0}"#
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), Data(body.utf8))
+        }
+
+        _ = try await state.createTaskFromIntent(
+            title: "Buy milk *shopping",
+            projectId: Self.home,
+            dueDate: nil,
+            smartParsingEnabled: true
+        )
+
+        XCTAssertEqual(state.labels.map(\.id), [Self.shopping], "labels are fetched when empty")
+        XCTAssertEqual(sent.bodies.first?["title"] as? String, "Buy milk")
+        XCTAssertEqual(sent.bodies.last?["label_id"] as? Int, Int(Self.shopping))
+    }
+
+    /// A saved filter or pseudo-project must never become the task's project.
+    func testIntentIgnoresPseudoProjectsInTheTitle() async throws {
+        let state = await makeIntentState()
+        state.projects.append(Project(id: -2, title: "My Open Tasks"))
+        let sent = Sent()
+        respondCreating { sent.record($0) }
+
+        let outcome = try await state.createTaskFromIntent(
+            title: "Buy milk +My Open Tasks",
+            projectId: nil,
+            dueDate: nil,
+            smartParsingEnabled: true
+        )
+
+        guard case let .created(taskTitle, projectTitle, _) = outcome else {
+            return XCTFail("Expected a created outcome, got \(outcome)")
+        }
+        XCTAssertEqual(taskTitle, "Buy milk +My Open Tasks")
+        XCTAssertEqual(projectTitle, "Inbox", "falls back to the default project")
+    }
+
     func testIntentSendsParsedPriorityAndLabel() async throws {
         let state = await makeIntentState()
         let sent = Sent()

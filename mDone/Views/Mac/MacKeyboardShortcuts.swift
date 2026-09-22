@@ -52,6 +52,12 @@ struct MacQuickAddSheet: View {
     @AppStorage(SmartParsingPreference.storageKey) private var smartParsing = SmartParsingPreference.defaultValue
     @State private var parse: SmartTaskParse?
     @State private var parseTask: Task<Void, Never>?
+    /// The values the last parse wrote. A control that no longer holds what
+    /// the parser put there was changed by the user, and later parses leave
+    /// it alone.
+    @State private var appliedProjectId: Int64?
+    @State private var appliedDueDate: Date?
+    @State private var appliedPriority: Int64?
 
     var body: some View {
         VStack(spacing: 16) {
@@ -119,9 +125,7 @@ struct MacQuickAddSheet: View {
         }
     }
 
-    /// Debounced like the iOS bar, then applied to the controls. The user's
-    /// own picker changes win: a later parse only writes a field the text
-    /// actually names.
+    /// Debounced like the iOS bar, then applied to the controls.
     private func scheduleParse(for rawTitle: String) {
         parseTask?.cancel()
         guard smartParsing, !rawTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -133,40 +137,63 @@ struct MacQuickAddSheet: View {
             if Task.isCancelled {
                 return
             }
-            let result = SmartTaskParser(projects: appState.projects, labels: appState.labels).parse(rawTitle)
+            let result = makeParser().parse(rawTitle)
             parse = result
             apply(result)
         }
     }
 
-    private func apply(_ parse: SmartTaskParse) {
-        if let due = parse.dueDate {
+    private func makeParser() -> SmartTaskParser {
+        SmartTaskParser(projects: appState.projects, labels: appState.labels)
+    }
+
+    /// Writes the parse into the controls and answers what the task would be
+    /// created with. A field the user has changed by hand is left as they set
+    /// it: their choice beats every later parse.
+    @discardableResult
+    private func apply(_ parse: SmartTaskParse) -> (projectId: Int64, dueDate: Date?, priority: Int64) {
+        if let due = parse.dueDate, appliedDueDate == nil || (hasDueDate && dueDate == appliedDueDate) {
             hasDueDate = true
             dueDate = due
+            appliedDueDate = due
         }
-        if let projectId = parse.projectId, appState.projects.contains(where: { $0.id == projectId }) {
+        if let projectId = parse.projectId,
+           appState.projects.contains(where: { $0.id == projectId && $0.id > 0 }),
+           appliedProjectId == nil || selectedProjectId == appliedProjectId
+        {
             selectedProjectId = projectId
+            appliedProjectId = projectId
         }
-        if let parsed = parse.priority {
-            priority = Int64(parsed)
+        if let parsed = parse.priority.map(Int64.init), appliedPriority == nil || priority == appliedPriority {
+            priority = parsed
+            appliedPriority = parsed
         }
+        return (selectedProjectId, hasDueDate ? dueDate : nil, priority)
     }
 
     private func addTask() {
-        // The controls hold the values (the parse filled them, the user may
-        // have changed them); only the title and the labels come from the
-        // parse itself.
-        let currentParse = smartParsing ? parse.flatMap { $0.text == title ? $0 : nil } : nil
+        // Parse what is in the field right now rather than trusting the
+        // debounce, so pressing Add mid-keystroke still strips the magic text
+        // and keeps the labels, as the iOS bar does.
+        var currentParse: SmartTaskParse?
+        var values = (projectId: selectedProjectId, dueDate: hasDueDate ? dueDate : nil, priority: priority)
+        if smartParsing, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let fresh = parse?.text == title ? parse : makeParser().parse(title)
+            currentParse = fresh
+            if let fresh {
+                values = apply(fresh)
+            }
+        }
         let trimmed = (currentParse?.title ?? title).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, selectedProjectId > 0 else { return }
+        guard !trimmed.isEmpty, values.projectId > 0 else { return }
         parseTask?.cancel()
         parseTask = nil
         Task {
             await appState.createTask(
                 title: trimmed,
-                projectId: selectedProjectId,
-                dueDate: hasDueDate ? dueDate : nil,
-                priority: priority,
+                projectId: values.projectId,
+                dueDate: values.dueDate,
+                priority: values.priority,
                 labelIds: currentParse?.labelIds ?? []
             )
             dismiss()
