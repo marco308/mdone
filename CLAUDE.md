@@ -8,63 +8,13 @@ mDone is a native iOS/macOS task management app that connects to a self-hosted *
 
 Beyond plain task CRUD the app also covers: focus sessions with a Live Activity, Kanban boards, subtasks and task relations, calendar (EventKit) overlay, home/lock screen widgets, Shortcuts and Siri actions, and offline caching with a pending-operation queue.
 
-## Repository Layout
-
-| Path | What lives there |
-|---|---|
-| `mDone/App/` | `AppState`, `AppDependencies` (SwiftData container + network monitor), App Intents, preference types |
-| `mDone/Models/` | API models: `VTask`, `Project`, `Label`, `Bucket`, `TaskRelation`, `CalendarEvent`, `VNotification`, `ProjectHierarchy` |
-| `mDone/Services/` | Actors and managers: API, auth, sync, cache, labels, notifications, calendar, focus |
-| `mDone/Views/` | SwiftUI views, split by feature (`Tasks`, `Projects`, `Calendar`, `Focus`, `Settings`, `Notifications`, `Setup`, `Components`) plus `Mac/` for the macOS-only UI |
-| `mDoneShared/` | Sources compiled into **both** the app and the widget extension: `WidgetDataProvider`, `WidgetModels`, `FocusSession`, `SharedTokenStore`, `SharedConstants` |
-| `mDoneWidgets/` | WidgetKit extension: Today/Upcoming/QuickAdd/lock screen widgets and the focus Live Activity |
-| `mDoneTests/` | Unit tests (iOS, hosted by the app) |
-| `mDoneUITests/`, `mDoneMacUITests/` | XCUITests, including the App Store screenshot runs |
-| `mDoneWidgetRenderTests/` | Unhosted logic tests that render widget views to PNGs for the marketing site |
-| `docs/` | Dev setup, localization, App Store metadata, Vikunja API inventory, the OIDC callback decision, and the estimated-duration marker contract for external agents |
-| `scripts/` | `seed-dev-vikunja.sh`, `reset-dev-vikunja.sh` for the local dev server; `localization.py` moves translations between `localization/<lang>.json` and the string catalogs; `xcresult-to-lcov.py` turns a test run's `.xcresult` into lcov for Codecov |
-| `localization/` | One flat `<lang>.json` per translated language, the file translators edit (see `docs/localization.md`) |
-| `website/` | The GitHub Pages site (deployed by `.github/workflows/deploy-pages.yml`) |
-
 ## Build & Development
 
 The project uses **XcodeGen** to generate the Xcode project from `project.yml`. The `.xcodeproj` is not committed, so generate it after any clone or target/settings change.
 
-```bash
-# Regenerate Xcode project after changing targets/settings
-xcodegen generate
-
-# Build iOS app
-xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build
-
-# Build macOS app
-xcodebuild -project mDone.xcodeproj -scheme mDone-macOS build
-
-# Run unit tests only (what CI runs)
-xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:mDoneTests test
-
-# Run the same unit tests against the macOS app
-xcodebuild -project mDone.xcodeproj -scheme mDone-macOS -destination 'platform=macOS' -only-testing:mDoneMacTests test
-
-# Run a single test class
-xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:mDoneTests/TaskServiceTests test
-
-# Lint
-swiftlint lint --quiet
-
-# Format
-swiftformat .
-```
-
 **Simulator destinations:** build-only invocations use `generic/platform=iOS Simulator`, which needs no simulator by that name to exist. Test runs have to name a concrete device, so they use the same one CI pins in `.github/workflows/ios-tests.yml` (`iPhone 17`). If you change one, change the other, and check `xcrun simctl list devices available` when a destination stops resolving after an Xcode update.
 
-**Deployment targets:** iOS 18.0+, macOS 15.0+. Swift 5.9. Version and build number live in `project.yml` (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION`), not in an Info.plist.
-
 ### Targets and schemes
-
-- `mDone` (iOS app, embeds `mDoneWidgets`); its scheme runs `mDoneTests`, `mDoneUITests`, `mDoneWidgetRenderTests`.
-- `mDone-macOS` (macOS app); its scheme runs `mDoneMacTests` and `mDoneMacUITests`.
-- `mDoneWidgets` (app extension), `mDoneTests`, `mDoneUITests`, `mDoneMacTests`, `mDoneMacUITests`, `mDoneWidgetRenderTests`.
 
 `mDoneTests` and `mDoneMacTests` compile the **same** `mDoneTests/` sources against the iOS and macOS app respectively, so a shared service or model is covered on both platforms from one set of files. Cases that only make sense on iOS (Live Activity, focus outbox) guard themselves with `#if os(iOS)`. `mDone-macOS` pins `PRODUCT_MODULE_NAME: mDone` so the shared `@testable import mDone` resolves there too; without it the module would be `mDone_macOS` and every test file would fail to compile.
 
@@ -82,22 +32,9 @@ docker compose -f docker-compose.dev.yml up -d && ./scripts/seed-dev-vikunja.sh
 
 Log in with `devuser` / `devpassword`. `./scripts/reset-dev-vikunja.sh` nukes and reseeds it. Full walkthrough, including the environments table (dev vs Apple Review test server vs prod), in [docs/dev-setup.md](docs/dev-setup.md).
 
-### CI
-
-- `.github/workflows/ios-tests.yml` runs `mDoneTests` on the iOS Simulator for every PR to `main` and every push to `main`, pinned to `-destination 'platform=iOS Simulator,name=iPhone 17'`. UI and snapshot targets are excluded: they need a booted app and are flaky on CI. It converts the result bundle to lcov with `scripts/xcresult-to-lcov.py` (Codecov cannot read xccov's JSON report) and uploads it to Codecov (`CODECOV_TOKEN` secret), which feeds the README badge and the coverage comment on PRs. `codecov.yml` excludes `mDone/Views/` and the test targets from that number and keeps the checks informational, so Codecov never blocks a merge.
-- `.github/workflows/macos-tests.yml` runs `mDoneMacTests` on `-destination 'platform=macOS'` for every PR to `main`. It signs ad-hoc (`CODE_SIGN_IDENTITY=-`, `CODE_SIGNING_REQUIRED=NO`, `CODE_SIGN_STYLE=Manual`, empty `DEVELOPMENT_TEAM`) because runners have no Apple Development identity and, unlike the simulator, a real macOS bundle has to be signed to launch. Ad-hoc still applies the sandbox entitlements, so the Keychain-backed tests pass. `mDoneMacUITests` is excluded: it is the App Store screenshot run and needs a live server plus credentials.
-- `.github/workflows/vikunja-integration.yml` runs `mDoneIntegrationTests` nightly (and on demand) against a real Vikunja server: the latest release plus the pinned version the API inventory was verified against. It runs the native macOS release binary straight on the runner, never Docker, because the hosted arm64 macOS runners cannot boot a Linux VM. It never runs on a PR and cannot block a merge.
-- `.github/workflows/codeql.yml` runs CodeQL (build-only, so it uses `generic/platform=iOS Simulator`); `.github/workflows/deploy-pages.yml` publishes `website/`.
-- `.github/workflows/github-release.yml` runs on every push to `main`. It reads `MARKETING_VERSION` from `project.yml` and, when `CHANGELOG.md` has a stamped `## [<version>] - <date>` section and no `v<version>` tag exists, tags the commit and publishes a GitHub Release with that section as its notes. Stamping the changelog is therefore what makes a version appear under Releases; a build-number-only bump for a TestFlight build does not.
-- `.github/workflows/stale-branches.yml` runs every Monday (and on demand, with a dry-run option) and deletes remote branches that have a merged PR, are fully contained in `main`, or have had no commits in 90 days. Branches with an open PR are never touched. `screenshots/*`, `*-assets` and orphan branches are kept because issues and PRs link to the images on them; use one of those names for anything else that should survive the prune.
+- CI workflows and release tagging: see the `ci-release` skill.
 
 ## Architecture
-
-### Data Flow
-```
-View → AppState (method call) → Service (TaskService/ProjectService)
-→ APIClient (singleton actor) → Vikunja REST API → decode response → update AppState → SwiftUI re-renders
-```
 
 ### Key Patterns
 - **AppState** (`App/AppState.swift`): Single `@Observable` class holding all app state: tasks, projects, labels, notifications, auth status, filters. All mutating async methods are `@MainActor`. A weak `AppState.shared` exists purely so App Intents can reach the live instance.
@@ -131,28 +68,4 @@ Update `CHANGELOG.md` whenever making user-facing changes (features, fixes, UI c
 
 No em-dashes anywhere: user-facing copy, changelog entries, code comments, docs, or PR descriptions. Use a comma, colon, or a separate sentence instead. Everything else follows the surrounding prose.
 
-## Test Coverage
-
-Code coverage is gathered by default: `gatherCoverageData: true` is set on both schemes in `project.yml`. Read coverage from any test run with `xcrun xccov view --report <path-to-.xcresult>`. CI uploads the iOS run to Codecov (see CI above); the badge number excludes views and test targets, per `codecov.yml`.
-
-Apply tiered coverage targets by layer rather than chasing a single overall percentage:
-
-| Layer | Target |
-|---|---|
-| Services (`mDone/Services/`) | 85%+ (never drop a service below 70% without a reason) |
-| Models with logic (e.g. `VTask`) | 90%+ |
-| `AppState` | 75%+ |
-| Widgets (`mDoneShared/`, `mDoneWidgets/`) | 70%+ |
-| SwiftUI views | no line-coverage target, use snapshot tests |
-
-Rules of practice:
-- New code in services, models, or `AppState` ships with tests in the same PR. Coverage-of-the-diff matters more than overall %.
-- Verify a test file actually exercises its target with `xccov`: a file's existence isn't proof of coverage. `SyncServiceTests` once had 12 tests but only hit 3.78% of `SyncService` because it mocked the wrong layer.
-- Don't pad the overall % with shallow view tests. SwiftUI view files at 0% line coverage are normal.
-- If a service in a diff is below 70%, flag it as a good moment to add tests.
-
-## Linting & Formatting
-
-SwiftLint runs as a post-build script (configured in `project.yml`). Config in `.swiftlint.yml`, which notably disables `line_length`, `trailing_whitespace`, `type_body_length`, `file_length`, `function_body_length`, and `cyclomatic_complexity`.
-
-SwiftFormat config in `.swiftformat`: 4-space indent, 120 max width, semicolons never.
+- Coverage targets and the xccov verification workflow: see the `test-coverage` skill.

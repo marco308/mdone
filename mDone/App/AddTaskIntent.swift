@@ -40,10 +40,14 @@ struct AddTaskIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         guard let state = AppState.shared else { throw IntentTaskError.notSignedIn }
+        // `dueDate` is passed as the caller's explicit choice and the
+        // preference as the fallback, so smart parsing can fill a date the
+        // user spoke in the title without overriding one they set (#215).
         let outcome = try await state.createTaskFromIntent(
             title: taskTitle,
             projectId: project?.projectId,
-            dueDate: dueDate ?? NewTaskDueDatePreference.dueDate(forKey: NewTaskDueDatePreference.siriStorageKey)
+            dueDate: dueDate,
+            fallbackDueDate: NewTaskDueDatePreference.dueDate(forKey: NewTaskDueDatePreference.siriStorageKey)
         )
         return .result(dialog: IntentDialog("\(Self.dialog(for: outcome))"))
     }

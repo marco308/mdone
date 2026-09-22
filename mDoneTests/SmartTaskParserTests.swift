@@ -264,6 +264,67 @@ final class SmartTaskParserTests: XCTestCase {
         assertParse("Buy   milk   tomorrow", title: "Buy milk", due: date(2026, 9, 22, 18))
     }
 
+    // MARK: - Chinese (zh-Hans locale)
+
+    private func assertChinese(
+        _ input: String,
+        title: String,
+        due: Date? = nil,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        assertParse(input, title: title, due: due, locale: "zh_Hans_CN", file: file, line: line)
+    }
+
+    func testChineseTomorrowWithSpace() {
+        assertChinese("买牛奶 明天", title: "买牛奶", due: date(2026, 9, 22, 18))
+    }
+
+    func testChineseTomorrowWithoutSpace() {
+        assertChinese("买牛奶明天", title: "买牛奶", due: date(2026, 9, 22, 18))
+    }
+
+    func testChineseTonight() {
+        assertChinese("打电话给妈妈 今晚", title: "打电话给妈妈", due: date(2026, 9, 21, 21))
+    }
+
+    func testChineseNextWeek() {
+        assertChinese("交报告 下周", title: "交报告", due: date(2026, 9, 28, 18))
+    }
+
+    func testChineseAfternoonTime() {
+        assertChinese("开会 明天下午3点", title: "开会", due: date(2026, 9, 22, 15))
+    }
+
+    func testChineseToday() {
+        assertChinese("倒垃圾 今天", title: "倒垃圾", due: date(2026, 9, 21, 18))
+    }
+
+    func testChineseDayAfterTomorrow() {
+        assertChinese("取快递 后天", title: "取快递", due: date(2026, 9, 23, 18))
+    }
+
+    func testChineseNextMonth() {
+        assertChinese("体检 下个月", title: "体检", due: date(2026, 10, 1, 18))
+    }
+
+    func testChineseWeekday() {
+        // Today is Monday, so 周一 is a week out and 周五 is this Friday.
+        assertChinese("牙医 周五", title: "牙医", due: date(2026, 9, 25, 18))
+        assertChinese("牙医 周一", title: "牙医", due: date(2026, 9, 28, 18))
+        assertChinese("牙医 星期日", title: "牙医", due: date(2026, 9, 27, 18))
+    }
+
+    func testChineseNextWeekdayBeatsNextWeek() {
+        // 下周一 is the weekday, not 下周 with 一 left behind (#226 review).
+        assertChinese("开会 下周一", title: "开会", due: date(2026, 9, 28, 18))
+        assertChinese("开会 下星期日", title: "开会", due: date(2026, 9, 27, 18))
+    }
+
+    func testChineseMorningTime() {
+        assertChinese("站会 明天上午9点30分", title: "站会", due: date(2026, 9, 22, 9, 30))
+    }
+
     // MARK: - Any locale
 
     func testProjectPrefixWorksInChineseText() {
@@ -322,6 +383,22 @@ final class SmartTaskParserTests: XCTestCase {
         assertParse("Sand door +Improv", title: "Sand door +Improv")
         assertParse("Sand door +Home Imp", title: "Sand door Imp", project: Self.home)
         assertParse("Deck +Wor", title: "Deck", project: Self.work)
+    }
+
+    /// Vikunja returns saved filters and pseudo-projects such as "My Open
+    /// Tasks" with ids at or below zero. Matching one would create the task
+    /// against an endpoint that does not exist.
+    func testPseudoProjectsAreNotCandidates() {
+        let real = Project(id: 5, title: "Garden")
+        let pseudo = Project(id: -2, title: "My Open Tasks")
+        let parser = SmartTaskParser(
+            projects: [real, pseudo], labels: [],
+            now: date(2026, 9, 21, 10), calendar: calendar,
+            locale: Locale(identifier: "en_GB"), defaultDueTime: .sixPM
+        )
+        XCTAssertNil(parser.parse("Check +My Open Tasks").projectId)
+        XCTAssertEqual(parser.parse("Check +My Open Tasks").title, "Check +My Open Tasks")
+        XCTAssertEqual(parser.parse("Weed +Garden").projectId, 5)
     }
 
     func testArchivedProjectsAreNotCandidates() {
