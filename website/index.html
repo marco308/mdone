@@ -6,7 +6,7 @@
 <!-- Mark JS as available so scroll-reveal only hides content when it can also reveal it (no-JS / crawlers see everything). -->
 <script>document.documentElement.classList.add('js');</script>
 <title>mDone: A native task manager for your self-hosted Vikunja</title>
-<meta name="description" content="mDone is a polished, native iOS and macOS app for your self-hosted Vikunja server. Smart lists, widgets, a focus timer, Siri hands-free, repeating tasks, and offline sync, with zero tracking." />
+<meta name="description" content="mDone is a polished, native iPhone, iPad and Mac app for your self-hosted Vikunja server. Smart quick add, Kanban boards, subtasks, widgets, a focus timer, Siri hands-free and offline sync, with zero tracking." />
 <meta name="theme-color" content="#527AFA" />
 
 <!-- Social / link previews -->
@@ -227,6 +227,7 @@ section{ padding:96px 0; }
 .card:hover{ transform:translateY(-4px); box-shadow:var(--shadow-md); border-color:var(--brand-tint-2); }
 .card.col-3{ grid-column:span 3; }
 .card.col-2{ grid-column:span 2; }
+.new-tag{ display:inline-block; vertical-align:middle; margin-left:6px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:#fff; background:#1a8cff; }
 .card .ic{
   width:46px; height:46px; border-radius:13px; display:grid; place-items:center; margin-bottom:18px;
   background:var(--brand-tint); color:var(--brand-ink); border:1px solid var(--brand-tint-2);
@@ -398,9 +399,9 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
   <div class="glow" aria-hidden="true"></div>
   <div class="wrap hero-grid">
     <div class="hero-copy">
-      <span class="pill load d1"><span class="dot"></span> Native iOS &amp; macOS · Privacy-first</span>
+      <span class="pill load d1"><span class="dot"></span> Native iPhone, iPad &amp; Mac · Privacy-first</span>
       <h1 class="hero-title load d2">Your tasks. Your server.<br><em>Beautifully done.</em></h1>
-      <p class="hero-sub load d3">mDone is a polished, native app for your self-hosted <strong>Vikunja</strong> server: smart lists, widgets, a focus timer, Siri hands-free and offline sync, with absolutely zero tracking.</p>
+      <p class="hero-sub load d3">mDone is a polished, native app for your self-hosted <strong>Vikunja</strong> server: a quick add that understands you, smart lists, Kanban boards, widgets, a focus timer, Siri hands-free and offline sync, with absolutely zero tracking.</p>
       <div class="hero-actions load d4">
         <a class="badge-apple" href="https://apps.apple.com/us/app/mdone/id6760613430" aria-label="Download mDone on the App Store">
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.36 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.02-1.5-2.62-1.71-3.19-1.73-1.36-.14-2.65.8-3.34.8-.68 0-1.75-.78-2.87-.76-1.48.02-2.84.86-3.6 2.18-1.53 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.25 2.74 2.21 1.1-.04 1.51-.71 2.85-.71 1.33 0 1.71.71 2.87.69 1.18-.02 1.94-1.08 2.66-2.14.84-1.23 1.19-2.42 1.21-2.48-.03-.01-2.32-.89-2.34-3.53zM14.2 5.83c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.55 1.31-.56.64-1.05 1.67-.92 2.66.97.07 1.96-.49 2.57-1.21z"/></svg>
@@ -436,9 +437,10 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
   <div class="wrap">
     <span class="item"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg> Talks only to your server</span>
     <span class="item"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="2"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> iOS 18 &amp; macOS 15</span>
-    <span class="item"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Smart lists &amp; widgets</span>
+    <span class="item"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Smart quick add &amp; widgets</span>
     <span class="item"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Focus timer + Live Activities</span>
     <span class="item"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0114-5m2 5a8 8 0 01-14 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 3v4h-4M6 21v-4h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Offline sync</span>
+    <span class="item"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9s1-6.5 3.5-9z" stroke="currentColor" stroke-width="2"/></svg> English &amp; 简体中文</span>
   </div>
 </div>
 
@@ -453,19 +455,34 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
 
     <div class="bento">
       <div class="card col-3 reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h10M4 12h16M4 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 5l1.4 1.4L22 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <h3>Smart Lists</h3>
-        <p>Today, Upcoming, and Overdue views organise everything automatically, so you always know what to focus on next.</p>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8L12 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z" fill="currentColor"/></svg></div>
+        <h3>Quick Add That Understands You <span class="new-tag">New</span></h3>
+        <p>Type "Buy milk tomorrow at 5pm +Home !2" and mDone files it in Home, due tomorrow at five, priority 2. Each part shows as a chip before you add it, so nothing happens by surprise. Works in Siri and on the Mac too.</p>
       </div>
       <div class="card col-3 reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 11l1.2 2.4 2.6.3-1.9 1.8.5 2.6L12 17l-2.4 1.1.5-2.6-1.9-1.8 2.6-.3L12 11z" fill="currentColor"/></svg></div>
-        <h3>Projects &amp; Favorites</h3>
-        <p>Organise tasks into projects and pin the ones you live in to the sidebar for one-tap access.</p>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h10M4 12h16M4 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 5l1.4 1.4L22 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3>Smart Lists</h3>
+        <p>Today, Upcoming, and Overdue views organise everything automatically, repeating tasks included, so you always know what to focus on next.</p>
       </div>
       <div class="card col-2 reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M9 3h6l-1 5 3 3v2H7v-2l3-3-1-5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 15v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
         <h3>Current</h3>
         <p>Pin long-running tasks to a section above Today, each with a progress bar and an idle nudge when one stalls, so slow-burn projects actually get finished.</p>
+      </div>
+      <div class="card col-2 reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 11l1.2 2.4 2.6.3-1.9 1.8.5 2.6L12 17l-2.4 1.1.5-2.6-1.9-1.8 2.6-.3L12 11z" fill="currentColor"/></svg></div>
+        <h3>Projects &amp; Favorites</h3>
+        <p>Nest projects inside projects, sort by date, priority or your own drag-and-drop order, and keep favourites one tap away.</p>
+      </div>
+      <div class="card col-2 reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="5" height="16" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="10" y="4" width="5" height="11" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="17" y="4" width="4" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/></svg></div>
+        <h3>Kanban Boards</h3>
+        <p>Open any project as a board. Drag cards between columns and up and down them, in the same order Vikunja's web app shows.</p>
+      </div>
+      <div class="card col-2 reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6l2 2 3-3M4 13l2 2 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 7h8M12 14h8M8 20h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <h3>Subtasks, Checklists &amp; Labels</h3>
+        <p>Break big tasks into subtasks, tick off checklists written in a description, and add or create labels without leaving the task.</p>
       </div>
       <div class="card col-2 reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/></svg></div>
@@ -481,11 +498,6 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
         <div class="ic"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="13" r="7" stroke="currentColor" stroke-width="2"/><path d="M12 10v3l2 1.5M9 3h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
         <h3>Focus Timer</h3>
         <p>Work through tasks with purpose. Live Activities keep the timer on your lock screen and Dynamic Island.</p>
-      </div>
-      <div class="card col-2 reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0114-5m2 5a8 8 0 01-14 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 3v4h-4M6 21v-4h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <h3>Repeating Tasks</h3>
-        <p>Daily, weekly, monthly or custom intervals. Completed repeats generate their next occurrence automatically.</p>
       </div>
       <div class="card col-2 reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="16" rx="2.5" stroke="currentColor" stroke-width="2"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
@@ -507,6 +519,22 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
 
     <div class="show">
       <div class="show-art reveal">
+        <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-smartadd.png" alt="mDone quick add turning a typed sentence into date, project and priority chips" loading="lazy" /></div></div>
+      </div>
+      <div class="show-copy reveal">
+        <span class="eyebrow">New in 1.19</span>
+        <h2 class="serif">Type it the way you'd say it.</h2>
+        <p>Write "Call Mum tomorrow 6pm +Home !3" and mDone pulls out the date, the project and the priority as you type, leaving just "Call Mum" as the title.</p>
+        <ul class="show-list">
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Every part shows as a chip: tap its X to keep the words</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Dates and times, +projects, !priorities and *labels</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Understands 明天下午3点 as well as "next Friday"</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="show flip">
+      <div class="show-art reveal">
         <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-inbox.png" alt="mDone inbox with smart lists" loading="lazy" /></div></div>
       </div>
       <div class="show-copy reveal">
@@ -517,6 +545,22 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
           <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Quick-add a task without leaving the list</li>
           <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Swipe to complete, postpone, or reschedule</li>
           <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Shake to undo an accidental completion</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="show">
+      <div class="show-art reveal">
+        <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-board.png" alt="mDone Kanban board with To-Do and Doing columns" loading="lazy" /></div></div>
+      </div>
+      <div class="show-copy reveal">
+        <span class="eyebrow">Boards</span>
+        <h2 class="serif">When a list isn't enough.</h2>
+        <p>Flip any project to its Kanban board and drag work from column to column. It is the same board you see in Vikunja's web app, and mDone remembers which view each project opens in.</p>
+        <ul class="show-list">
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Drag cards between columns, or reorder within one</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Due dates, labels and priorities on every card</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Filter-driven boards stay read-only, as on the web</li>
         </ul>
       </div>
     </div>
@@ -544,11 +588,11 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
       <div class="show-copy reveal">
         <span class="eyebrow">Every detail</span>
         <h2 class="serif">Rich tasks, one tap away.</h2>
-        <p>Set due dates, priorities, repeats, estimates, and Markdown notes in a detail view that feels native on every screen.</p>
+        <p>Set due dates, priorities, repeats and labels, tick off a checklist in the description, and break the task into subtasks, in a detail view that feels native on every screen.</p>
         <ul class="show-list">
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Markdown descriptions render beautifully</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Checklists you can tick, with a "2 of 4 done" bar</li>
           <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Add a focus session right from a task</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Estimate how long it'll take</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Subtasks and linked tasks, nested in your lists</li>
         </ul>
       </div>
     </div>
@@ -556,7 +600,7 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
     <div class="macwrap reveal" style="text-align:center;">
       <span class="eyebrow">Right at home on the Mac</span>
       <h2 class="serif" style="margin-top:14px;">A real macOS app, not a port.</h2>
-      <p class="muted" style="max-width:46ch;margin:16px auto 0;">A proper sidebar layout, keyboard-friendly navigation, and the same data, synced through your own server.</p>
+      <p class="muted" style="max-width:46ch;margin:16px auto 0;">A proper sidebar layout, keyboard-friendly navigation, and the same data, synced through your own server. On iPad, tasks open right beside the list.</p>
       <div class="macframe">
         <div class="macbar"><i class="r"></i><i class="y"></i><i class="g"></i></div>
         <img src="assets/shot-mac.png" alt="mDone running on macOS with a sidebar and today's tasks" loading="lazy" />

@@ -10,44 +10,62 @@ Task manager for Vikunja
 
 ## Description
 
-Take control of your tasks with mDone — a beautifully designed task manager built for your self-hosted Vikunja server.
+Take control of your tasks with mDone, a native task manager for iPhone, iPad and Mac, built for your self-hosted Vikunja server.
 
-If you run your own Vikunja instance and want a polished, native iOS experience to manage your tasks, mDone is made for you. A thoughtful, focused interface for your self-hosted productivity setup.
+If you run your own Vikunja instance and want a polished, native way to manage your tasks, mDone is made for you: a thoughtful, focused interface for your self-hosted productivity setup.
 
 KEY FEATURES
 
+Quick Add That Understands You
+Type "Buy milk tomorrow at 5pm +Home !2 *shopping" and mDone files it in the right project, with the due date, priority and label already set. Everything it picks up shows as a chip before you add the task, so nothing happens by surprise. Switch it on in Settings.
+
 Smart Lists
-Stay on top of what matters. mDone organizes your tasks into smart views — Today, Upcoming, and Overdue — so you always know what to focus on next.
+Stay on top of what matters. Today, Upcoming and Overdue views organise your tasks, so you always know what to focus on next.
 
 Current Tasks
-Keep long-running work top of mind. Mark a task as Current and it stays pinned to its own section at the top of your list, above Today, with a progress bar you can update and a gentle idle nudge when it has sat untouched for too long. Perfect for slow-burn projects that would otherwise slip out of sight.
+Keep long-running work top of mind. Mark a task as Current and it stays pinned above Today, with a progress bar you can update and a gentle nudge when it has sat untouched for too long.
 
-Projects & Favorites
-Organize tasks into projects and mark the ones you use most as favorites for quick access from the sidebar.
+Kanban Boards
+Open any project as a board. Drag cards between columns and reorder them, exactly as they appear in Vikunja's web app.
 
-Home Screen & Lock Screen Widgets
-See your tasks at a glance without opening the app. Widgets show your upcoming tasks, today's agenda, and overdue items right on your home screen or lock screen.
+Subtasks, Checklists and Labels
+Break big tasks into subtasks, link related tasks, tick off checklists written in a task's description, and add or create labels without leaving the app.
+
+Projects and Favorites
+Organise tasks into projects and sub-projects, sort them by date, priority or your own manual order, and keep the ones you use most one tap away.
+
+Siri, Hands-Free
+Say "Add a task in mDone" and Siri adds it without opening the app. Works over CarPlay, on AirPods and on Apple Watch.
+
+Home Screen and Lock Screen Widgets
+See your tasks at a glance: today's agenda, what is coming up, and anything overdue.
 
 Focus Timer with Live Activities
-Use the built-in focus timer to work through your tasks with purpose. Live Activities keep your current timer visible on your lock screen and Dynamic Island.
+Work through a task with purpose. Live Activities keep the timer on your Lock Screen and in the Dynamic Island.
 
 Repeating Tasks
-Set tasks to repeat on your schedule — daily, weekly, monthly, or custom intervals. Completed repeating tasks automatically generate their next occurrence.
+Daily, weekly, monthly or custom intervals. Completing a repeating task schedules its next occurrence.
 
 Calendar View
-Visualize your tasks across days and weeks with an integrated calendar view. Spot gaps, plan ahead, and stay balanced.
+See your tasks across days and weeks alongside your calendar events. Spot the gaps and plan ahead.
 
 Offline Support
-mDone caches your tasks locally so you can view and work with them even when you are offline. Changes sync back to your Vikunja server when connectivity is restored.
+mDone caches your tasks so you can keep working without a connection. Changes sync back to your server when you are online again.
 
 Privacy First
-mDone contains zero analytics, zero tracking, and zero third-party SDKs. The app talks only to your Vikunja server — nothing else. Your data stays entirely under your control.
+Zero analytics, zero tracking, zero third-party SDKs. mDone talks only to your Vikunja server, and your data stays entirely under your control.
+
+Available in English and Simplified Chinese.
 
 REQUIREMENTS
 - A self-hosted Vikunja server (vikunja.io)
 - An account on that server
 
 mDone is open source. Visit the GitHub repository to report issues, request features, or contribute.
+
+## Promotional Text
+
+New: type a task the way you would say it. "Call Mum tomorrow at 6pm +Home !2" lands in the right project with the date and priority already set.
 
 ## Keywords
 
@@ -83,9 +101,22 @@ Steps to test:
    - Sort a project by "Manual" (sort menu) and drag the handles to reorder tasks.
    - Add a widget from the home screen (long press > Edit Home Screen > tap +).
    - Open Settings > Tasks and set "Default project", then add a task from the Inbox to see it land there.
+   - Turn on Settings > Tasks > "Smart parsing in quick add", then type "Call the dentist tomorrow at 3pm !3" in the Inbox's add-task field. Chips for the date and priority appear under the field before you add it.
    - Say "Hey Siri, add a task in mDone" (the app can be closed). Siri asks for the task, adds it to the first project, and reads back where it went and when it is due. On a Mac, use the Shortcuts app's "Add Task" action for mDone.
 
 This is a private test server maintained by the developer for App Store review purposes.
+
+## What's New (v1.19.0)
+
+Type a task the way you would say it.
+
+- New smart parsing for quick add. Type "Buy milk tomorrow at 5pm +Home !2 *shopping" and mDone files "Buy milk" in Home, due tomorrow at 5:00 PM, priority 2, labelled shopping.
+- Each part mDone picks up shows as a chip under the field before you add the task. Tap a chip's X to keep those words in the title instead.
+- Off by default: switch it on in Settings > Tasks > "Smart parsing in quick add".
+- On the Mac, the New Task window fills in the project, due date and priority as you type.
+- Siri and Shortcuts understand it too: say a date, a project or a priority and the task lands where you meant.
+- Understands Chinese dates as well, such as 明天下午3点 or 下周.
+- Available on both iPhone and Mac.
 
 ## What's New (v1.18.0)
 
