@@ -644,10 +644,7 @@ final class AppState {
             print("[mDone] refreshAll: got \(labels.count) labels")
             #endif
 
-            let notificationsEnabled = UserDefaults.standard.bool(forKey: "notificationsEnabled")
-            if notificationsEnabled {
-                await notificationService.scheduleReminders(for: tasks)
-            }
+            await rescheduleReminders()
 
             await refreshCachedProjectOrders()
 
@@ -682,6 +679,26 @@ final class AppState {
             markCachedIfUnreachable(error)
             handleError(error)
         }
+    }
+
+    /// Rebuilds the pending local reminders from the current `tasks` array.
+    ///
+    /// Called after a successful refresh *and* after any mutation that can
+    /// change what should fire (completion, create, edit, postpone,
+    /// reschedule, delete), plus when the app leaves the foreground. Previously
+    /// reminders were only ever (re)built at the end of a fully successful
+    /// `refreshAll`, so a task created/edited locally — or a refresh that
+    /// failed after the network call — could leave the schedule stale until the
+    /// next successful refresh (reminders "not always triggered").
+    ///
+    /// Gated on both the user's in-app preference and the live OS
+    /// authorization: a permission revoked in Settings means iOS would silently
+    /// drop anything we scheduled, so there's no point wiping and rebuilding.
+    @MainActor
+    func rescheduleReminders() async {
+        guard UserDefaults.standard.bool(forKey: "notificationsEnabled") else { return }
+        guard await notificationService.isAuthorized() else { return }
+        await notificationService.scheduleReminders(for: tasks)
     }
 
     /// Re-reads the list view of every project whose order this session has
@@ -968,6 +985,9 @@ final class AppState {
     func toggleTaskDone(_ task: VTask) async {
         guard await acquireTaskUpdateSlot(id: task.id) else { return }
         defer { releaseTaskUpdateSlot(id: task.id) }
+        // Reminder set changes when a task is completed/reopened; rebuild the
+        // pending notifications on every exit path (success or offline queue).
+        defer { Task { await rescheduleReminders() } }
 
         // One request drives both the network call and the response merge, so
         // the merge can never disagree with what was actually sent.
@@ -1118,6 +1138,9 @@ final class AppState {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             #endif
             WidgetCenter.shared.reloadAllTimelines()
+            // A new task with a due date needs its reminder scheduled now, not
+            // only at the next full refresh.
+            await rescheduleReminders()
             return newTask
         } catch {
             handleError(error)
@@ -1202,6 +1225,8 @@ final class AppState {
     func postponeTask(_ task: VTask, byHours hours: Int) async {
         guard await acquireTaskUpdateSlot(id: task.id) else { return }
         defer { releaseTaskUpdateSlot(id: task.id) }
+        // Due-date change moves when reminders fire; rebuild on every exit path.
+        defer { Task { await rescheduleReminders() } }
 
         let current = taskSnapshot(id: task.id) ?? task
         let baseDate = current.effectiveDueDate ?? Date()
@@ -1249,6 +1274,8 @@ final class AppState {
     func rescheduleTask(_ task: VTask, to newDate: Date) async {
         guard await acquireTaskUpdateSlot(id: task.id) else { return }
         defer { releaseTaskUpdateSlot(id: task.id) }
+        // Due-date change moves when reminders fire; rebuild on every exit path.
+        defer { Task { await rescheduleReminders() } }
 
         let current = taskSnapshot(id: task.id) ?? task
         let intent = TaskUpdateRequest(dueDate: newDate)
@@ -1298,6 +1325,8 @@ final class AppState {
     func updateTask(id: Int64, request: TaskUpdateRequest) async -> Bool {
         guard await acquireTaskUpdateSlot(id: id) else { return false }
         defer { releaseTaskUpdateSlot(id: id) }
+        // Edits can change due date/reminders; rebuild on every exit path.
+        defer { Task { await rescheduleReminders() } }
 
         let existing = taskSnapshot(id: id)
 
@@ -1634,6 +1663,9 @@ final class AppState {
     @MainActor
     func deleteTask(_ task: VTask) async {
         let taskId = task.id
+        // Deleting removes the task from `tasks`; rebuild reminders so its
+        // pending notification is dropped on every exit path.
+        defer { Task { await rescheduleReminders() } }
 
         // Deleting offline is safe to queue: the id is stable, and a queued
         // delete supersedes any edits of the same task still waiting.

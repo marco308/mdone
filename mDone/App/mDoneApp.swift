@@ -129,6 +129,10 @@ struct mDoneApp: App {
                 #if os(iOS)
                 Task { await focusOutbox.drain() }
                 #endif
+            } else if newPhase == .background, appState.isAuthenticated {
+                // Rebuild pending reminders before the app is suspended, so any
+                // edits made this session are reflected even if no refresh ran.
+                Task { await appState.rescheduleReminders() }
             }
         }
         #if os(iOS)
