@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- A task you add to a project sorted Manually now appears at the top of the list straight away, where the Vikunja web app shows it. It used to appear at the bottom and then jump to the top on the next refresh (#232).
+
 ## [1.19.0] - 2026-09-24
 
 ### Added

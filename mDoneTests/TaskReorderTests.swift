@@ -296,6 +296,49 @@ final class TaskReorderTests: XCTestCase {
         XCTAssertEqual(state.tasks.first { $0.id == 1 }?.title, "Renamed")
     }
 
+    // MARK: - Creating a task (issue #232)
+
+    /// Vikunja gives a new task the lowest position, so it belongs at the top
+    /// of a manually sorted list, as on the web. Without reading the order
+    /// back it sat at the bottom until the next refresh, then jumped.
+    func testCreatingATaskReadsTheProjectOrderBack() async {
+        let state = await makeAppState()
+        let createdJSON = #"{"id": 4, "title": "New", "done": false, "priority": 0, "project_id": 7}"#
+            .data(using: .utf8)!
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(
+                statusCode: 200, url: request.url, headers: ["x-pagination-total-pages": "1"]
+            )
+            if request.httpMethod == "PUT" {
+                return (response, createdJSON)
+            }
+            return (response, Self.viewTasksJSON(ids: [4, 1, 2, 3]))
+        }
+
+        let created = await state.createTask(title: "New", projectId: 7)
+
+        XCTAssertEqual(created?.id, 4)
+        let refetch = MockURLProtocol.capturedRequests.first { $0.httpMethod == "GET" }
+        XCTAssertEqual(refetch?.url?.path, "/api/v1/projects/7/views/100/tasks", "list view read back")
+        XCTAssertEqual(state.tasksForProject(7).map(\.id), [4, 1, 2, 3], "new task at the top, as on the web")
+    }
+
+    /// A project whose order was never read has nothing to correct: its
+    /// screen reads the order when it opens, so a create costs no refetch.
+    func testCreatingATaskInAnUncachedProjectDoesNotRefetch() async {
+        let state = await makeAppState()
+        state.projectTaskCache[7] = nil
+        let createdJSON = #"{"id": 4, "title": "New", "done": false, "priority": 0, "project_id": 7}"#
+            .data(using: .utf8)!
+        MockURLProtocol.requestHandler = { request in
+            (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), createdJSON)
+        }
+
+        await state.createTask(title: "New", projectId: 7)
+
+        XCTAssertEqual(MockURLProtocol.capturedRequests.map(\.httpMethod), ["PUT"])
+    }
+
     // MARK: - Board placement
 
     func testPlaceTaskInSameBucketOnlySendsThePosition() async throws {
