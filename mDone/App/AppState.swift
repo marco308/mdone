@@ -1127,6 +1127,7 @@ final class AppState {
                     handleError(error)
                 }
             }
+            await refetchProjectOrder(of: newTask)
             if let updated = tasks.first(where: { $0.id == newTask.id }) {
                 newTask = updated
             }
@@ -1241,6 +1242,7 @@ final class AppState {
                     handleError(error)
                 }
             }
+            await refetchProjectOrder(of: newTask)
             WidgetCenter.shared.reloadAllTimelines()
             return .created(taskTitle: taskTitle, projectTitle: project.title, dueDate: resolvedDueDate)
         } catch let error as NetworkError where error.isConnectivityFailure {
@@ -1387,7 +1389,7 @@ final class AppState {
             syncService?.updateCachedTask(updated)
             WidgetCenter.shared.reloadAllTimelines()
             if let existing, existing.projectId != updated.projectId {
-                await refetchProjectOrderAfterMove(of: updated)
+                await refetchProjectOrder(of: updated)
             }
             return true
         } catch {
@@ -1396,16 +1398,22 @@ final class AppState {
         }
     }
 
-    /// A task that changed project has a fresh position in its new project's
-    /// list view, which the old per-project order knows nothing about: in
-    /// Manual sort it would sit at the bottom until that screen was next
-    /// opened (issue #185). Reading the destination view back puts it where
-    /// the server did. The old project needs nothing: its order is filtered
-    /// by project id, so the task simply stops appearing there.
+    /// A task that is new to a project, because it was just created there or
+    /// moved in from another one, has a fresh position in that project's list
+    /// view which the cached order knows nothing about: in Manual sort it
+    /// would sit at the bottom until that screen was next opened, then jump.
+    /// Vikunja puts new tasks at the top, so this looked like the order was
+    /// reversed from the web app (issues #185, #232). Reading the view back
+    /// puts the task where the server did. A project whose order was never
+    /// cached is skipped: its screen reads the order when it opens. When a
+    /// task moves, the old project needs nothing: its order is filtered by
+    /// project id, so the task simply stops appearing there.
     @MainActor
-    private func refetchProjectOrderAfterMove(of task: VTask) async {
-        guard let destination = projects.first(where: { $0.id == task.projectId }) else { return }
-        await fetchProjectTasks(project: destination)
+    private func refetchProjectOrder(of task: VTask) async {
+        guard projectTaskCache[task.projectId] != nil,
+              let project = projects.first(where: { $0.id == task.projectId })
+        else { return }
+        await fetchProjectTasks(project: project)
     }
 
     // MARK: - Subtasks & Relations
