@@ -74,12 +74,10 @@ final class NotificationServiceTests: XCTestCase {
         XCTAssertEqual(Set(planned.map(\.identifier)), ["task-7-0", "task-7-1"])
     }
 
-    func testPlannedRemindersPrefersServerComputedAbsoluteReminder() {
+    func testPlannedRemindersUsesAbsoluteWhenReferencedDateIsUnknown() {
         let now = Date()
-        // Vikunja keeps the absolute `reminder` current for relative reminders
-        // (accounting for relative_to). When both fields are present the
-        // absolute value is authoritative and must win over a local
-        // relative_period computation against the due date.
+        // The reminder is relative to a start date this task doesn't have
+        // locally, so the server-computed absolute value is the only answer.
         let authoritative = now.addingTimeInterval(90 * 60)
         var t = VTask(id: 8, title: "Both", done: false, priority: 0, projectId: 1)
         t.dueDate = now.addingTimeInterval(240 * 60)
@@ -91,9 +89,62 @@ final class NotificationServiceTests: XCTestCase {
         XCTAssertEqual(
             planned.first?.fireDate.timeIntervalSince1970 ?? 0,
             authoritative.timeIntervalSince1970,
-            accuracy: 1,
-            "absolute server-computed reminder must win over relative_period"
+            accuracy: 1
         )
+    }
+
+    func testRelativeReminderFollowsLocallyMovedDueDate() {
+        let now = Date()
+        // An offline postpone moves the due date but leaves the server's old
+        // absolute value in place until the edit syncs. The reminder has to
+        // follow the new due date, not fire at the stale time.
+        let staleAbsolute = now.addingTimeInterval(30 * 60)
+        var t = VTask(id: 10, title: "Postponed", done: false, priority: 0, projectId: 1)
+        t.dueDate = now.addingTimeInterval(25 * 3600)
+        t.reminders = [
+            TaskReminder(reminder: staleAbsolute, relativePeriod: -1800, relativeTo: "due_date"),
+        ]
+        let planned = NotificationService.plannedReminders(for: t, offset: .thirtyMinutes, now: now)
+        XCTAssertEqual(planned.count, 1)
+        XCTAssertEqual(
+            planned.first?.fireDate.timeIntervalSince1970 ?? 0,
+            now.addingTimeInterval(25 * 3600 - 1800).timeIntervalSince1970,
+            accuracy: 1
+        )
+    }
+
+    func testRelativeReminderUsesTheDateItPointsAt() {
+        let now = Date()
+        var t = VTask(id: 11, title: "Ranges", done: false, priority: 0, projectId: 1)
+        t.dueDate = now.addingTimeInterval(10 * 3600)
+        t.startDate = now.addingTimeInterval(2 * 3600)
+        t.endDate = now.addingTimeInterval(6 * 3600)
+        t.reminders = [
+            TaskReminder(reminder: nil, relativePeriod: -600, relativeTo: "start_date"),
+            TaskReminder(reminder: nil, relativePeriod: -600, relativeTo: "end_date"),
+        ]
+        let planned = NotificationService.plannedReminders(for: t, offset: .thirtyMinutes, now: now)
+        XCTAssertEqual(planned.map(\.identifier), ["task-11-0", "task-11-1"])
+        XCTAssertEqual(
+            planned[0].fireDate.timeIntervalSince1970,
+            now.addingTimeInterval(2 * 3600 - 600).timeIntervalSince1970,
+            accuracy: 1
+        )
+        XCTAssertEqual(
+            planned[1].fireDate.timeIntervalSince1970,
+            now.addingTimeInterval(6 * 3600 - 600).timeIntervalSince1970,
+            accuracy: 1
+        )
+    }
+
+    func testAbsoluteOnlyReminderIsUsedAsIs() {
+        let now = Date()
+        let at = now.addingTimeInterval(3 * 3600)
+        var t = VTask(id: 12, title: "Absolute", done: false, priority: 0, projectId: 1)
+        t.dueDate = now.addingTimeInterval(10 * 3600)
+        t.reminders = [TaskReminder(reminder: at, relativePeriod: nil, relativeTo: nil)]
+        let planned = NotificationService.plannedReminders(for: t, offset: .thirtyMinutes, now: now)
+        XCTAssertEqual(planned.first?.fireDate.timeIntervalSince1970 ?? 0, at.timeIntervalSince1970, accuracy: 1)
     }
 
     func testPlannedRemindersFallBackToRelativePeriodWhenNoAbsolute() {
@@ -183,5 +234,19 @@ final class NotificationServiceTests: XCTestCase {
         let result = NotificationService.prioritized(reminders)
         XCTAssertEqual(result.count, NotificationService.maxPendingReminders)
         XCTAssertLessThan(result.count, 64)
+    }
+
+    // MARK: - staleIdentifiers (reconcile instead of remove-all)
+
+    func testStaleIdentifiersRemovesOnlyUnwantedTaskReminders() {
+        let wanted = [
+            NotificationService.PlannedReminder(identifier: "task-1", taskId: 1, title: "1", fireDate: Date()),
+            NotificationService.PlannedReminder(identifier: "task-2-0", taskId: 2, title: "2", fireDate: Date()),
+        ]
+        let stale = NotificationService.staleIdentifiers(
+            pending: ["task-1", "task-2-0", "task-3", "task-2-1", "focus-end"],
+            wanted: wanted
+        )
+        XCTAssertEqual(stale, ["task-3", "task-2-1"], "keeps wanted ones and anything that isn't a task reminder")
     }
 }
