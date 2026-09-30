@@ -14,6 +14,8 @@ func formatElapsed(_ interval: TimeInterval) -> String {
 
 struct FocusBanner: View {
     let session: FocusSession
+    /// Tasks left after this one when the session is part of a Focus Run.
+    var runRemaining: Int?
     var onTap: () -> Void
 
     var body: some View {
@@ -25,9 +27,15 @@ struct FocusBanner: View {
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading) {
-                    Text("Focusing")
-                        .font(.caption.bold())
-                        .foregroundStyle(.orange)
+                    if let runRemaining {
+                        Text("Focus Run · \(runRemaining) left")
+                            .font(.caption.bold())
+                            .foregroundStyle(.orange)
+                    } else {
+                        Text("Focusing")
+                            .font(.caption.bold())
+                            .foregroundStyle(.orange)
+                    }
                     Text(session.taskTitle)
                         .font(.subheadline)
                         .lineLimit(1)
@@ -53,6 +61,46 @@ struct FocusBanner: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Focusing on \(session.taskTitle). Tap to open focus session.")
+        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+    }
+}
+
+/// Shown in the list when a Focus Run ended while the focus screen was
+/// closed, e.g. the last task was ticked off from the list itself.
+struct FocusRunFinishedBanner: View {
+    let summary: FocusRunSummary
+    var onDismiss: () -> Void
+
+    var body: some View {
+        HStack {
+            Image(systemName: "flag.checkered")
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading) {
+                Text("Focus Run Complete")
+                    .font(.caption.bold())
+                    .foregroundStyle(.orange)
+                Text("You finished \(summary.completedCount) tasks.")
+                    .font(.subheadline)
+            }
+
+            Spacer()
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color.orange.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)

@@ -7,6 +7,7 @@ struct TaskRow: View {
     /// Present only while the hosting screen shows an inline detail pane
     /// (iPad, regular width). Absent, a tap opens the sheet as on iPhone.
     @Environment(InlineTaskSelection.self) private var inlineSelection: InlineTaskSelection?
+    @Environment(\.focusRunOrder) private var focusRunOrder
     #endif
     let task: VTask
     /// When true, the row is display-only: no completion toggle, swipe actions,
@@ -141,6 +142,17 @@ struct TaskRow: View {
                         focusManager.switchFocus(task: task, projectName: projectName)
                     } label: {
                         Label("Start Focus", systemImage: "scope")
+                    }
+                }
+                if !task.done, FocusRun.canStart(at: task.id, in: focusRunOrder) {
+                    Button {
+                        focusManager.startFocusRun(
+                            task: task,
+                            projectName: appState.focusProjectName(for: task),
+                            order: focusRunOrder
+                        )
+                    } label: {
+                        Label("Start Focus Run", systemImage: "forward.end.circle")
                     }
                 }
                 #endif

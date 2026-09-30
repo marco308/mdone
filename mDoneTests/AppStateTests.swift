@@ -763,6 +763,36 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(updated.repeatMode, 1)
     }
 
+    /// Vikunja answers "done" on a repeating task with the task undone and
+    /// its next date. The completion hook must still fire, or a Focus Run
+    /// would sit on that task instead of moving to the next one.
+    func testCompletingARepeatingTaskStillReportsCompletion() async throws {
+        let appState = await makeMockedAppState()
+        let task = VTask(
+            id: 85,
+            title: "Water plants",
+            done: false,
+            dueDate: Date(timeIntervalSince1970: 1_800_000_000),
+            priority: 0,
+            projectId: 1,
+            repeatAfter: 86400,
+            repeatMode: 0
+        )
+        appState.tasks = [task]
+        var completed: [Int64] = []
+        appState.onTaskCompleted = { completed.append($0) }
+        MockURLProtocol.requestHandler = { request in
+            let json = #"{"id":85,"title":"Water plants","done":false,"priority":0,"project_id":1}"#
+                .data(using: .utf8)!
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), json)
+        }
+
+        await appState.toggleTaskDone(task)
+
+        XCTAssertEqual(completed, [85])
+        XCTAssertEqual(appState.tasks.first?.done, false)
+    }
+
     func testUpdateTaskPreservesRequestedScheduleWithoutTopLevelTask() async throws {
         let appState = await makeMockedAppState()
         let start = Date(timeIntervalSince1970: 1_799_900_000)

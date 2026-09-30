@@ -140,6 +140,7 @@ struct TaskListScreen: View {
             }
             .animation(.snappy, value: showsPane && inlineTask != nil)
         }
+        .environment(\.focusRunOrder, readOnly ? [] : focusRunOrder)
         #else
         content
         #endif
@@ -178,8 +179,15 @@ struct TaskListScreen: View {
                 List {
                     #if os(iOS)
                     if let session = focusManager.currentSession {
-                        FocusBanner(session: session) {
+                        FocusBanner(
+                            session: session,
+                            runRemaining: focusManager.isRunActive ? focusManager.runRemainingCount : nil
+                        ) {
                             focusManager.showFocusView = true
+                        }
+                    } else if let summary = focusManager.finishedRun, !focusManager.showFocusView {
+                        FocusRunFinishedBanner(summary: summary) {
+                            focusManager.dismissRunSummary()
                         }
                     }
                     #endif
@@ -285,15 +293,36 @@ struct TaskListScreen: View {
         !appState.searchQuery.isEmpty || appState.activeFilter != nil
     }
 
-    @ViewBuilder
-    private var filteredTaskSection: some View {
+    /// Search or filter results in display order.
+    private var filteredTasks: [VTask] {
         let allFiltered = appState.filteredTasks
         let filtered = if let projectFilter {
             allFiltered.filter { $0.projectId == projectFilter.id }
         } else {
             allFiltered
         }
-        let tasks = sorted(filtered)
+        return sorted(filtered)
+    }
+
+    #if os(iOS)
+    /// The ids of the tasks on screen, top to bottom, which a Focus Run works
+    /// through. Mirrors the list body's branches; the board has no single
+    /// order, so it offers no run.
+    private var focusRunOrder: [Int64] {
+        if boardVisible { return [] }
+        if isFiltering { return filteredTasks.map(\.id) }
+        if let projectFilter {
+            return TaskNesting.rows(for: sorted(appState.tasksForProject(projectFilter.id))).map(\.task.id)
+        }
+        let sections = inboxSections
+        return (sections.beforeEvents + sections.afterEvents)
+            .flatMap { TaskNesting.rows(for: $0.tasks).map(\.task.id) }
+    }
+    #endif
+
+    @ViewBuilder
+    private var filteredTaskSection: some View {
+        let tasks = filteredTasks
         if tasks.isEmpty {
             Section {
                 EmptyStateView(
@@ -315,48 +344,95 @@ struct TaskListScreen: View {
         appState.defaultProject?.id ?? 1
     }
 
-    @ViewBuilder
-    private var smartListSections: some View {
+    /// One dated block of the Inbox. Built once as data so the rendered
+    /// sections and a Focus Run's order cannot drift apart.
+    private struct InboxSection: Identifiable {
+        let id: String
+        let title: String
+        let tasks: [VTask]
+        let accentColor: Color
+        var showsProgress: Bool = false
+    }
+
+    /// The Inbox's sections, split where Today's calendar events sit between
+    /// them. Empty sections are left out.
+    private var inboxSections: (beforeEvents: [InboxSection], afterEvents: [InboxSection]) {
         let currentTasks = appState.currentTasks
         let currentIds = Set(currentTasks.map(\.id))
-
-        if !currentTasks.isEmpty {
-            SmartListSection(
+        var before: [InboxSection] = [
+            InboxSection(
+                id: "current",
                 title: String(localized: "Current"),
                 tasks: currentTasks,
                 accentColor: Color.accentColor,
                 showsProgress: true
-            )
-        }
+            ),
+        ]
 
         if calmMode {
             // Calm Mode: overdue tasks aren't singled out, they fold into Today.
-            let todayAndOverdue = excludingCurrent(appState.calmModeTodayTasks, currentIds: currentIds)
-            if !todayAndOverdue.isEmpty {
-                SmartListSection(
-                    title: String(localized: "Today"),
-                    tasks: sorted(todayAndOverdue),
-                    accentColor: Color.accentColor
-                )
-            }
+            before.append(InboxSection(
+                id: "today",
+                title: String(localized: "Today"),
+                tasks: sorted(excludingCurrent(appState.calmModeTodayTasks, currentIds: currentIds)),
+                accentColor: Color.accentColor
+            ))
         } else {
-            let overdue = excludingCurrent(appState.overdueTasks, currentIds: currentIds)
-            if !overdue.isEmpty {
-                SmartListSection(
-                    title: String(localized: "Overdue"),
-                    tasks: sorted(overdue),
-                    accentColor: .red
-                )
-            }
+            before.append(InboxSection(
+                id: "overdue",
+                title: String(localized: "Overdue"),
+                tasks: sorted(excludingCurrent(appState.overdueTasks, currentIds: currentIds)),
+                accentColor: .red
+            ))
+            before.append(InboxSection(
+                id: "today",
+                title: String(localized: "Today"),
+                tasks: sorted(excludingCurrent(appState.todayTasks, currentIds: currentIds)),
+                accentColor: Color.accentColor
+            ))
+        }
 
-            let today = excludingCurrent(appState.todayTasks, currentIds: currentIds)
-            if !today.isEmpty {
-                SmartListSection(
-                    title: String(localized: "Today"),
-                    tasks: sorted(today),
-                    accentColor: Color.accentColor
-                )
-            }
+        let after: [InboxSection] = [
+            InboxSection(
+                id: "tomorrow",
+                title: String(localized: "Tomorrow"),
+                tasks: sorted(excludingCurrent(appState.tomorrowTasks, currentIds: currentIds)),
+                accentColor: .orange
+            ),
+            InboxSection(
+                id: "thisWeek",
+                title: String(localized: "This Week"),
+                tasks: sorted(excludingCurrent(appState.thisWeekTasks, currentIds: currentIds)),
+                accentColor: .blue
+            ),
+            InboxSection(
+                id: "upcoming",
+                title: String(localized: "Upcoming"),
+                tasks: sorted(excludingCurrent(appState.upcomingTasks, currentIds: currentIds)),
+                accentColor: .purple
+            ),
+            InboxSection(
+                id: "noDate",
+                title: String(localized: "No Date"),
+                tasks: sorted(excludingCurrent(appState.noDateTasks, currentIds: currentIds)),
+                accentColor: .secondary
+            ),
+        ]
+
+        return (before.filter { !$0.tasks.isEmpty }, after.filter { !$0.tasks.isEmpty })
+    }
+
+    @ViewBuilder
+    private var smartListSections: some View {
+        let sections = inboxSections
+
+        ForEach(sections.beforeEvents) { section in
+            SmartListSection(
+                title: section.title,
+                tasks: section.tasks,
+                accentColor: section.accentColor,
+                showsProgress: section.showsProgress
+            )
         }
 
         if appState.calendarAccessGranted, !appState.todayCalendarEvents.isEmpty {
@@ -382,39 +458,12 @@ struct TaskListScreen: View {
             }
         }
 
-        let tomorrow = excludingCurrent(appState.tomorrowTasks, currentIds: currentIds)
-        if !tomorrow.isEmpty {
+        ForEach(sections.afterEvents) { section in
             SmartListSection(
-                title: String(localized: "Tomorrow"),
-                tasks: sorted(tomorrow),
-                accentColor: .orange
-            )
-        }
-
-        let thisWeek = excludingCurrent(appState.thisWeekTasks, currentIds: currentIds)
-        if !thisWeek.isEmpty {
-            SmartListSection(
-                title: String(localized: "This Week"),
-                tasks: sorted(thisWeek),
-                accentColor: .blue
-            )
-        }
-
-        let upcoming = excludingCurrent(appState.upcomingTasks, currentIds: currentIds)
-        if !upcoming.isEmpty {
-            SmartListSection(
-                title: String(localized: "Upcoming"),
-                tasks: sorted(upcoming),
-                accentColor: .purple
-            )
-        }
-
-        let noDate = excludingCurrent(appState.noDateTasks, currentIds: currentIds)
-        if !noDate.isEmpty {
-            SmartListSection(
-                title: String(localized: "No Date"),
-                tasks: sorted(noDate),
-                accentColor: .secondary
+                title: section.title,
+                tasks: section.tasks,
+                accentColor: section.accentColor,
+                showsProgress: section.showsProgress
             )
         }
 
