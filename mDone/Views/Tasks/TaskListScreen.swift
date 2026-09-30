@@ -88,9 +88,6 @@ struct TaskListScreen: View {
                 await appState.requestCalendarAccess()
             }
             .searchable(text: $bindableAppState.searchQuery, prompt: "Search tasks")
-            .onSubmit(of: .search) {
-                Task { await appState.searchTasks(query: appState.searchQuery) }
-            }
             .navigationTitle(projectFilter?.title ?? String(localized: "Inbox"))
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -100,8 +97,8 @@ struct TaskListScreen: View {
             #endif
             .toolbar { toolbarContent }
             .sheet(isPresented: $showAdvancedFilter) {
-                TaskFilterSheet { filterString in
-                    Task { await appState.applyAdvancedFilter(filterString) }
+                TaskFilterSheet(filter: appState.advancedFilter) { filter in
+                    appState.advancedFilter = filter
                 }
             }
             .overlay {
@@ -275,12 +272,11 @@ struct TaskListScreen: View {
                 Button {
                     showAdvancedFilter = true
                 } label: {
-                    Image(systemName: appState
-                        .advancedFilterString != nil ? "line.3.horizontal.decrease.circle.fill" :
-                        "line.3.horizontal.decrease.circle")
+                    Image(systemName: appState.advancedFilter.isActive
+                        ? "line.3.horizontal.decrease.circle.fill"
+                        : "line.3.horizontal.decrease.circle")
                 }
-                .accessibilityLabel(appState
-                    .advancedFilterString != nil ? "Advanced filter active" : "Advanced filter")
+                .accessibilityLabel(appState.advancedFilter.isActive ? "Advanced filter active" : "Advanced filter")
             }
 
             ToolbarItem(placement: .primaryAction) {
@@ -290,7 +286,7 @@ struct TaskListScreen: View {
     }
 
     private var isFiltering: Bool {
-        !appState.searchQuery.isEmpty || appState.activeFilter != nil
+        appState.isFiltering
     }
 
     /// Search or filter results in display order.

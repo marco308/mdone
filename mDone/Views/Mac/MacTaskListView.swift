@@ -29,8 +29,7 @@ struct MacTaskListView: View {
         guard case let .project(project) = section else { return false }
         return project.id >= 0
             && sortPreference.order == .manual
-            && appState.activeFilter == nil
-            && appState.searchQuery.isEmpty
+            && !appState.isFiltering
     }
 
     var body: some View {
@@ -62,7 +61,7 @@ struct MacTaskListView: View {
         VStack(spacing: 0) {
             FilterBar(activeFilter: $appState.activeFilter)
 
-            if tasks.isEmpty, appState.searchQuery.isEmpty {
+            if tasks.isEmpty, !appState.isFiltering {
                 EmptyStateView(
                     icon: emptyStateIcon,
                     title: emptyStateTitle,
@@ -72,7 +71,10 @@ struct MacTaskListView: View {
             } else if tasks.isEmpty {
                 ContentUnavailableView.search(text: appState.searchQuery)
                     .frame(maxHeight: .infinity)
-            } else if section == .inbox {
+            } else if section == .inbox, !appState.isFiltering {
+                // The sections read AppState directly, so while a filter or
+                // search is on the Inbox falls through to the flat list of
+                // `tasks` below; otherwise filtering would change nothing.
                 let currentTasks = appState.currentTasks
                 let currentIds = Set(currentTasks.map(\.id))
                 List(selection: $selectedTask) {
@@ -145,23 +147,20 @@ struct MacTaskListView: View {
             }
         }
         .searchable(text: $appState.searchQuery, prompt: "Filter tasks")
-        .onSubmit(of: .search) {
-            Task { await appState.searchTasks(query: appState.searchQuery) }
-        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     showAdvancedFilter.toggle()
                 } label: {
-                    Image(systemName: appState
-                        .advancedFilterString != nil ? "line.3.horizontal.decrease.circle.fill" :
-                        "line.3.horizontal.decrease.circle")
+                    Image(systemName: appState.advancedFilter.isActive
+                        ? "line.3.horizontal.decrease.circle.fill"
+                        : "line.3.horizontal.decrease.circle")
                 }
                 .help("Advanced Filter")
-                .accessibilityLabel(appState.advancedFilterString != nil ? "Advanced filter active" : "Advanced filter")
+                .accessibilityLabel(appState.advancedFilter.isActive ? "Advanced filter active" : "Advanced filter")
                 .popover(isPresented: $showAdvancedFilter) {
-                    TaskFilterSheet { filterString in
-                        Task { await appState.applyAdvancedFilter(filterString) }
+                    TaskFilterSheet(filter: appState.advancedFilter) { filter in
+                        appState.advancedFilter = filter
                     }
                     .frame(width: 350, height: 450)
                 }
@@ -230,18 +229,11 @@ struct MacTaskListView: View {
     }
 
     private var filteredAndSortedTasks: [VTask] {
-        var tasks = tasksForSection
-
-        if let activeFilter = appState.activeFilter {
-            tasks = activeFilter.apply(to: tasks)
-        }
-
-        if !appState.searchQuery.isEmpty {
-            let query = appState.searchQuery.lowercased()
-            tasks = tasks.filter { $0.title.lowercased().contains(query) }
-        }
-
-        return sortPreference.apply(to: tasks)
+        // The Inbox normally lists open tasks only. Once a filter is on it
+        // searches every task, as on iOS, so "Completed" or Status: Done can
+        // actually find something.
+        let base = section == .inbox && appState.isFiltering ? appState.tasks : tasksForSection
+        return sortPreference.apply(to: appState.applyingFilters(to: base))
     }
 
     private var emptyStateIcon: String {
