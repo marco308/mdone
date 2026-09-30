@@ -192,6 +192,23 @@ final class AdvancedTaskFilterTests: XCTestCase {
         XCTAssertEqual(ids(filter, [task(1, due: date(2026, 10, 7))]), [1])
     }
 
+    func testAnyRangeKeepsTasksWithAndWithoutDueDates() {
+        var filter = AdvancedTaskFilter()
+        filter.status = .any
+        XCTAssertEqual(ids(filter, [task(1), task(2, due: date(2026, 12, 25))]), [1, 2])
+    }
+
+    // MARK: - Labels
+
+    func testEveryOptionHasALabel() {
+        let labels = AdvancedTaskFilter.DateRange.allCases.map(\.label)
+            + AdvancedTaskFilter.Status.allCases.map(\.label)
+        XCTAssertEqual(labels.count, 9)
+        XCTAssertFalse(labels.contains(where: \.isEmpty))
+        XCTAssertEqual(Set(AdvancedTaskFilter.DateRange.allCases.map(\.label)).count, 6, "labels are distinct")
+        XCTAssertEqual(Set(AdvancedTaskFilter.Status.allCases.map(\.label)).count, 3, "labels are distinct")
+    }
+
     // MARK: - Filter chips
 
     func testChipFilters() {

@@ -88,10 +88,8 @@ struct AdvancedTaskFilter: Equatable {
     }
 
     private func matchesDateRange(_ task: VTask, now: Date, calendar: Calendar) -> Bool {
-        if dateRange == .any {
-            return true
-        }
-        guard let due = task.effectiveDueDate else { return false }
+        // A task with no due date only passes when no range is chosen.
+        guard let due = task.effectiveDueDate else { return dateRange == .any }
 
         let startOfToday = calendar.startOfDay(for: now)
         switch dateRange {
