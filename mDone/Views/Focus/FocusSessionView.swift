@@ -46,6 +46,12 @@ struct FocusSessionView: View {
 
                 Spacer()
 
+                if focusManager.isRunActive {
+                    upNext
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 24)
+                }
+
                 controls(session: session)
                     .padding(.bottom, 48)
             }
@@ -56,6 +62,8 @@ struct FocusSessionView: View {
                     endPoint: .bottom
                 )
             )
+        } else if let summary = focusManager.finishedRun {
+            runSummary(summary)
         } else {
             // Session was ended (e.g. task completed externally) — auto-dismiss
             Color(.systemBackground)
@@ -68,7 +76,7 @@ struct FocusSessionView: View {
     private var header: some View {
         HStack {
             Spacer()
-            Text("Focus Mode")
+            Text(focusManager.isRunActive ? "Focus Run" : "Focus Mode")
                 .font(.headline)
                 .accessibilityAddTraits(.isHeader)
             Spacer()
@@ -86,14 +94,83 @@ struct FocusSessionView: View {
         .padding()
     }
 
-    private func controls(session: FocusSession) -> some View {
-        HStack(spacing: 40) {
+    /// What the run brings up after this task, and how much is left.
+    private var upNext: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "forward.end.circle")
+                .font(.title3)
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                if let next = focusManager.runUpNext {
+                    Text("Up next")
+                        .font(.caption.bold())
+                        .foregroundStyle(.secondary)
+                    Text(next.title)
+                        .font(.subheadline)
+                        .lineLimit(1)
+                } else {
+                    Text("Last task in this run")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            Text("\(focusManager.runRemainingCount) left")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func runSummary(_ summary: FocusRunSummary) -> some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "flag.checkered")
+                .font(.system(size: largeControlSize))
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+            Text("Focus Run Complete")
+                .font(.title.bold())
+                .accessibilityAddTraits(.isHeader)
+            Text("You finished \(summary.completedCount) tasks.")
+                .font(.body)
+            if summary.skippedCount > 0 {
+                Text("\(summary.skippedCount) skipped")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
             Button {
+                focusManager.dismissRunSummary()
+                dismiss()
+            } label: {
+                Text("Close")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.orange)
+            .padding(.horizontal, 32)
+            .padding(.bottom, 48)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func controls(session: FocusSession) -> some View {
+        HStack(spacing: focusManager.isRunActive ? 28 : 40) {
+            Button {
+                // In a run, completing the task brings up the next one (or the
+                // summary) on this same screen, so it stays open.
+                let inRun = focusManager.isRunActive
                 Task {
                     if let task = appState.tasks.first(where: { $0.id == session.taskId }) {
                         await appState.toggleTaskDone(task)
                     }
-                    dismiss()
+                    if !inRun {
+                        dismiss()
+                    }
                 }
             } label: {
                 VStack(spacing: 8) {
@@ -122,6 +199,21 @@ struct FocusSessionView: View {
                 .foregroundStyle(.orange)
             }
             .accessibilityLabel(session.isPaused ? "Resume focus timer" : "Pause focus timer")
+
+            if focusManager.isRunActive {
+                Button {
+                    focusManager.skipToNextInRun()
+                } label: {
+                    VStack(spacing: 8) {
+                        Image(systemName: "forward.end.circle.fill")
+                            .font(.system(size: smallControlSize))
+                        Text("Skip")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(Color.secondary)
+                }
+                .accessibilityLabel("Skip to next task")
+            }
 
             Button {
                 focusManager.endFocus()

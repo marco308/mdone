@@ -76,6 +76,8 @@ final class AppState {
     /// the grid and day list immediately, not just the Today view.
     private(set) var calendarFilterToken = UUID()
 
+    /// Called when the user marks a task done, including a repeating task
+    /// the server hands back undone with its next date.
     var onTaskCompleted: ((Int64) -> Void)?
     var onTaskDeleted: ((Int64) -> Void)?
 
@@ -977,9 +979,11 @@ final class AppState {
         if let updated = queueOfflineEdit(intent, for: current) {
             if updated.done {
                 recordCompletionForUndo(current)
-                onTaskCompleted?(updated.id)
             } else {
                 clearUndoIfMatches(id: updated.id)
+            }
+            if intent.done == true {
+                onTaskCompleted?(updated.id)
             }
             #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -1008,9 +1012,13 @@ final class AppState {
             syncService?.updateCachedTask(updated)
             if updated.done {
                 recordCompletionForUndo(current)
-                onTaskCompleted?(updated.id)
             } else {
                 clearUndoIfMatches(id: updated.id)
+            }
+            // A repeating task comes back undone with its next date, but the
+            // user still finished this occurrence: focus should move on.
+            if intent.done == true {
+                onTaskCompleted?(updated.id)
             }
             #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()

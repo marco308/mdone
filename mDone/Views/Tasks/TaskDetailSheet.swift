@@ -16,6 +16,7 @@ struct TaskDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     #if os(iOS)
     @Environment(FocusManager.self) private var focusManager
+    @Environment(\.focusRunOrder) private var focusRunOrder
     #endif
     let task: VTask
     var presentation: TaskDetailPresentation = .sheet
@@ -196,6 +197,17 @@ struct TaskDetailSheet: View {
                         focusManager.startFocus(task: task, projectName: projectName)
                     } label: {
                         Label("Focus on This Task", systemImage: "scope")
+                    }
+                    if !task.done, FocusRun.canStart(at: task.id, in: focusRunOrder) {
+                        Button {
+                            focusManager.startFocusRun(
+                                task: task,
+                                projectName: appState.focusProjectName(for: task),
+                                order: focusRunOrder
+                            )
+                        } label: {
+                            Label("Focus Run from Here", systemImage: "forward.end.circle")
+                        }
                     }
                 }
                 FocusHistoryRow(taskId: task.id)

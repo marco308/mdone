@@ -288,6 +288,16 @@
         }
       }
     },
+    "%lld left" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剩余%lld个"
+          }
+        }
+      }
+    },
     "%lld m" : {
       "localizations" : {
         "zh-Hans" : {
@@ -340,6 +350,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "百分之%lld"
+          }
+        }
+      }
+    },
+    "%lld skipped" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过%lld个"
           }
         }
       }
@@ -1619,6 +1639,16 @@
         }
       }
     },
+    "Dismiss" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭"
+          }
+        }
+      }
+    },
     "Dismiss estimate suggestion" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2018,6 +2048,46 @@
         }
       }
     },
+    "Focus Run" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连续专注"
+          }
+        }
+      }
+    },
+    "Focus Run Complete" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连续专注已完成"
+          }
+        }
+      }
+    },
+    "Focus Run from Here" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从此处开始连续专注"
+          }
+        }
+      }
+    },
+    "Focus Run · %lld left" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连续专注 · 剩余%lld个"
+          }
+        }
+      }
+    },
     "Focus on This Task" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2313,6 +2383,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "大"
+          }
+        }
+      }
+    },
+    "Last task in this run" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这是本轮最后一个任务"
           }
         }
       }
@@ -3802,6 +3882,26 @@
         }
       }
     },
+    "Skip" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过"
+          }
+        }
+      }
+    },
+    "Skip to next task" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳到下一个任务"
+          }
+        }
+      }
+    },
     "Smart Lists" : {
       "localizations" : {
         "zh-Hans" : {
@@ -3938,6 +4038,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "开始专注"
+          }
+        }
+      }
+    },
+    "Start Focus Run" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始连续专注"
           }
         }
       }
@@ -4600,6 +4710,16 @@
         }
       }
     },
+    "Up next" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一个"
+          }
+        }
+      }
+    },
     "Upcoming" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4706,6 +4826,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每年"
+          }
+        }
+      }
+    },
+    "You finished %lld tasks." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You finished %lld task."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You finished %lld tasks."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "你完成了%lld个任务。"
+                }
+              }
+            }
           }
         }
       }

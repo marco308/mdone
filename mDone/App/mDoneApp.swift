@@ -82,6 +82,12 @@ struct mDoneApp: App {
             appState.onTaskDeleted = { taskId in
                 focusManager.handleTaskDeleted(taskId: taskId)
             }
+            focusManager.taskLookup = { [weak appState] taskId in
+                guard let appState,
+                      let task = appState.tasks.first(where: { $0.id == taskId })
+                else { return nil }
+                return (task, appState.focusProjectName(for: task))
+            }
             #endif
 
             #if DEBUG
