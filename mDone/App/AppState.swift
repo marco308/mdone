@@ -57,7 +57,9 @@ final class AppState {
 
     var searchQuery: String = ""
     var activeFilter: TaskFilter?
-    var advancedFilterString: String?
+    /// The advanced filter sheet's choices, applied on top of `tasks` by
+    /// `applyingFilters(to:)`. Never used to replace `tasks` itself.
+    var advancedFilter = AdvancedTaskFilter()
     var pendingOperationsCount: Int = 0
     var isRetrying: Bool = false
 
@@ -266,19 +268,43 @@ final class AppState {
         tasks.filter { !$0.done }
     }
 
+    /// Whether a search, a filter chip or the advanced filter is narrowing
+    /// the list, in which case the task screens show flat results instead of
+    /// their usual sections.
+    var isFiltering: Bool {
+        !searchQuery.isEmpty || activeFilter != nil || advancedFilter.isActive
+    }
+
     var filteredTasks: [VTask] {
-        var result = tasks
+        applyingFilters(to: tasks)
+    }
+
+    /// Applies the advanced filter, the active chip and the search text to
+    /// `tasks`, in that order. Everything here is local: `tasks` already holds
+    /// every page, so nothing is fetched and nothing is overwritten, which is
+    /// what keeps a refresh from silently dropping a filter.
+    func applyingFilters(to tasks: [VTask]) -> [VTask] {
+        var result = advancedFilter.apply(to: tasks)
 
         if let activeFilter {
             result = activeFilter.apply(to: result)
         }
 
-        if !searchQuery.isEmpty {
-            let query = searchQuery.lowercased()
-            result = result.filter { $0.title.lowercased().contains(query) }
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !query.isEmpty {
+            result = result.filter { Self.task($0, matchesSearch: query) }
         }
 
         return result
+    }
+
+    /// Case- and diacritic-insensitive match on the title or description.
+    static func task(_ task: VTask, matchesSearch query: String) -> Bool {
+        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
+        if task.title.range(of: query, options: options) != nil {
+            return true
+        }
+        return task.description?.range(of: query, options: options) != nil
     }
 
     // MARK: - Current (long-running) tasks
@@ -719,51 +745,6 @@ final class AppState {
             isShowingCachedData = true
         default:
             break
-        }
-    }
-
-    @MainActor
-    func searchTasks(query: String) async {
-        guard !query.isEmpty else {
-            await refreshAll()
-            return
-        }
-
-        do {
-            let results: [VTask] = try await APIClient.shared.fetch(
-                Endpoint.allTasks(perPage: 200, search: query)
-            )
-            tasks = results
-            errorMessage = nil
-            activeError = nil
-        } catch let error as NetworkError {
-            if case .unauthorized = error {
-                await expireSession()
-            }
-            handleError(error)
-        } catch {
-            handleError(error)
-        }
-    }
-
-    @MainActor
-    func applyAdvancedFilter(_ filterString: String?) async {
-        advancedFilterString = filterString
-
-        do {
-            let results: [VTask] = try await APIClient.shared.fetch(
-                Endpoint.allTasks(perPage: 200, filter: filterString)
-            )
-            tasks = results
-            errorMessage = nil
-            activeError = nil
-        } catch let error as NetworkError {
-            if case .unauthorized = error {
-                await expireSession()
-            }
-            handleError(error)
-        } catch {
-            handleError(error)
         }
     }
 
