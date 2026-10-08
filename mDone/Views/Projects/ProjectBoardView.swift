@@ -86,7 +86,7 @@ struct ProjectBoardView: View {
               let targetIndex = buckets.firstIndex(where: { $0.id == bucket.id })
         else { return false }
 
-        let visible = buckets[targetIndex].activeTasks
+        let visible = buckets[targetIndex].allTasks
         let others = visible.filter { $0.id != taskId }
         var insertAt = min(index ?? others.count, others.count)
         if let current = visible.firstIndex(where: { $0.id == taskId }) {
@@ -106,15 +106,8 @@ struct ProjectBoardView: View {
         moved.bucketId = bucket.id
         moved.position = position
         buckets[sourceIndex].tasks?.removeAll { $0.id == taskId }
-        var targetTasks = buckets[targetIndex].tasks ?? []
-        // `tasks` also holds hidden done tasks, so map the visible slot back
-        // to a slot in the full array: just before the visible card that
-        // now follows, or at the end.
-        if insertAt < others.count, let anchor = targetTasks.firstIndex(where: { $0.id == others[insertAt].id }) {
-            targetTasks.insert(moved, at: anchor)
-        } else {
-            targetTasks.append(moved)
-        }
+        var targetTasks = others
+        targetTasks.insert(moved, at: insertAt)
         buckets[targetIndex].tasks = targetTasks
 
         Task {
@@ -161,7 +154,7 @@ private struct BoardColumn: View {
         VStack(alignment: .leading, spacing: 0) {
             header
 
-            let tasks = bucket.activeTasks
+            let tasks = bucket.allTasks
             if tasks.isEmpty {
                 Text("No tasks")
                     .font(.caption)
@@ -228,7 +221,7 @@ private struct BoardColumn: View {
     }
 
     private var countText: String {
-        let count = bucket.activeTasks.count
+        let count = bucket.allTasks.count
         if bucket.hasLimit, let limit = bucket.limit {
             return "\(count)/\(limit)"
         }
@@ -338,10 +331,20 @@ private struct BoardTaskCard: View {
                     .frame(width: 4)
                     .accessibilityHidden(true)
 
+                // Styled like a done row in the list views.
                 Text(task.title)
                     .font(.subheadline)
+                    .strikethrough(task.done)
+                    .foregroundStyle(task.done ? .secondary : .primary)
                     .lineLimit(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
+
+                if task.done {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(.green)
+                        .accessibilityHidden(true)
+                }
 
                 if task.priority > 0 {
                     PriorityBadge(priority: task.priorityLevel)
@@ -389,6 +392,9 @@ private struct BoardTaskCard: View {
         // A comma-separated list of independent facts rather than a sentence,
         // so each fragment is a key of its own.
         var parts = [task.title]
+        if task.done {
+            parts.append(String(localized: "completed"))
+        }
         if task.priority > 0 {
             parts.append(String(localized: "priority \(task.priorityLevel.label)"))
         }

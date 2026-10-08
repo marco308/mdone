@@ -21,10 +21,12 @@ struct Bucket: Codable, Identifiable, Hashable {
     var count: Int64?
     var position: Double?
 
-    /// Non-done tasks in this bucket, in their stored order. Done tasks are
-    /// hidden so a board mirrors the rest of the app (which hides completed work).
-    var activeTasks: [VTask] {
-        (tasks ?? []).filter { !$0.done }
+    /// Every task in this bucket, in its stored order, done ones included. Unlike
+    /// the list views, a board keeps finished work on show: a task's column is
+    /// what says it is finished, and hiding done tasks left a "Done" column
+    /// looking empty while the Vikunja web app showed its cards (#238).
+    var allTasks: [VTask] {
+        tasks ?? []
     }
 
     /// Whether the bucket has a meaningful WIP limit set.
@@ -32,10 +34,11 @@ struct Bucket: Codable, Identifiable, Hashable {
         (limit ?? 0) > 0
     }
 
-    /// `true` when a WIP limit is set and the active task count meets or exceeds it.
+    /// `true` when a WIP limit is set and the task count meets or exceeds it.
+    /// Done tasks count, as they do when Vikunja enforces the limit.
     var isOverLimit: Bool {
         guard let limit, limit > 0 else { return false }
-        return Int64(activeTasks.count) >= limit
+        return Int64(allTasks.count) >= limit
     }
 }
 
