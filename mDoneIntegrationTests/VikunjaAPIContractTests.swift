@@ -289,8 +289,8 @@ final class VikunjaAPIContractTests: VikunjaIntegrationCase {
 
         func cardOrder() async throws -> [VTask] {
             let buckets = try await projects.fetchBuckets(projectId: scratchProject.id, viewId: kanbanViewId)
-            let bucket = try XCTUnwrap(buckets.first { !$0.activeTasks.isEmpty }, "no bucket holds the cards")
-            return bucket.activeTasks
+            let bucket = try XCTUnwrap(buckets.first { !$0.allTasks.isEmpty }, "no bucket holds the cards")
+            return bucket.allTasks
         }
 
         let listBefore = try await tasks.fetchProjectTasks(projectId: scratchProject.id, viewId: listViewId)

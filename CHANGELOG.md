@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - On the Mac, the filter chips, search and advanced filter now narrow the Inbox too. The Inbox used to show the same sections whatever was selected.
 - Completing a repeating task you are focusing on now ends that focus session. Vikunja moves a repeating task to its next date instead of marking it done, so focus used to carry on as if nothing had happened.
 - A task you add to a project sorted Manually now appears at the top of the list straight away, where the Vikunja web app shows it. It used to appear at the bottom and then jump to the top on the next refresh (#232).
+- Kanban boards now show completed tasks, so a Done column holds the same cards as in the Vikunja web app instead of saying "No tasks". Completed cards are struck through with a green tick, and each column's count includes them (#238).
 
 ## [1.19.0] - 2026-09-24
 

@@ -4958,6 +4958,16 @@
         }
       }
     },
+    "completed" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已完成"
+          }
+        }
+      }
+    },
     "date range %@ to %@" : {
       "localizations" : {
         "zh-Hans" : {

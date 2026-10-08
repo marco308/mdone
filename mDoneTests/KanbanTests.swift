@@ -45,8 +45,8 @@ final class KanbanTests: XCTestCase {
         XCTAssertEqual(bucket.projectViewId, 9)
         XCTAssertEqual(bucket.limit, 3)
         XCTAssertEqual(bucket.tasks?.count, 2)
-        // activeTasks hides the done task.
-        XCTAssertEqual(bucket.activeTasks.map(\.id), [11])
+        // The board shows done tasks too, so a Done column is not empty (#238).
+        XCTAssertEqual(bucket.allTasks.map(\.id), [11, 12])
     }
 
     func testBucketLimitHelpers() {
@@ -61,6 +61,16 @@ final class KanbanTests: XCTestCase {
         limited.tasks = [
             VTask(id: 1, title: "x", done: false, priority: 0, projectId: 1),
             VTask(id: 2, title: "y", done: false, priority: 0, projectId: 1)
+        ]
+        XCTAssertTrue(limited.isOverLimit)
+    }
+
+    func testBucketLimitCountsDoneTasks() {
+        // Vikunja counts every task in a bucket against its limit, done or not.
+        var limited = Bucket(id: 3, title: "Done", limit: 2)
+        limited.tasks = [
+            VTask(id: 1, title: "x", done: true, priority: 0, projectId: 1),
+            VTask(id: 2, title: "y", done: true, priority: 0, projectId: 1)
         ]
         XCTAssertTrue(limited.isOverLimit)
     }
@@ -141,7 +151,7 @@ final class KanbanTests: XCTestCase {
         let buckets = try await service.fetchBuckets(projectId: 7, viewId: 3)
         XCTAssertEqual(buckets.map(\.title), ["Backlog", "Done"])
         XCTAssertNil(buckets[0].tasks)
-        XCTAssertTrue(buckets[0].activeTasks.isEmpty)
+        XCTAssertTrue(buckets[0].allTasks.isEmpty)
         XCTAssertEqual(buckets[1].tasks?.first?.id, 50)
         XCTAssertEqual(buckets[1].tasks?.first?.bucketId, 2)
     }
