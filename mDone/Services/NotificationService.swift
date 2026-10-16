@@ -41,16 +41,7 @@ actor NotificationService {
         if let taskReminders = task.reminders, !taskReminders.isEmpty {
             cancelTaskReminder(for: task.id)
             for (index, reminder) in taskReminders.enumerated() {
-                let reminderDate: Date?
-                if let period = reminder.relativePeriod, let dueDate = task.dueDate {
-                    reminderDate = dueDate.addingTimeInterval(TimeInterval(period))
-                } else if let absoluteDate = reminder.reminder {
-                    reminderDate = absoluteDate
-                } else {
-                    continue
-                }
-
-                guard let date = reminderDate, date > Date() else { continue }
+                guard let date = reminder.fireDate(for: task), date > Date() else { continue }
 
                 let content = UNMutableNotificationContent()
                 content.title = "Task Due"
