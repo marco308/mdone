@@ -151,6 +151,16 @@ struct mDoneApp: App {
                 break
             }
         }
+        #elseif os(macOS)
+        .onOpenURL { url in
+            // The widgets' Add Task links (#240). Focus has no Mac UI, so
+            // mdone://focus has nothing to open here.
+            guard url.scheme == "mdone", url.host == "create" else { return }
+            appState.quickAddTrigger = UUID()
+        }
+        // Hand the URL to the open window instead of letting WindowGroup
+        // spawn a second one for it.
+        .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
         #endif
     }
 }

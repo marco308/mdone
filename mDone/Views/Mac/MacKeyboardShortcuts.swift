@@ -9,10 +9,13 @@ struct MacKeyboardShortcuts: ViewModifier {
             .sheet(isPresented: $showingQuickAdd) {
                 MacQuickAddSheet()
             }
-            .onChange(of: appState.quickAddTrigger) { _, newValue in
+            .task(id: appState.quickAddTrigger) {
                 // Set by QuickAddIntent when the "Quick Add Task" Shortcuts
-                // action runs. Consume it so a later trigger fires again.
-                guard newValue != nil else { return }
+                // action runs, and by the widgets' mdone://create link. A
+                // task rather than onChange so a trigger set before this view
+                // appeared (a cold launch from a widget) still opens the
+                // sheet. Consume it so a later trigger fires again.
+                guard appState.quickAddTrigger != nil else { return }
                 appState.quickAddTrigger = nil
                 showingQuickAdd = true
             }

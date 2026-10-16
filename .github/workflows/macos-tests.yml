@@ -32,7 +32,11 @@ jobs:
       # Unlike the iOS job, this one runs a real (non-simulator) app bundle, so
       # it has to be signed. Runners have no Apple Development identity, so sign
       # ad-hoc: that still applies the sandbox entitlements the app launches
-      # with, without needing the team certificate.
+      # with, without needing the team certificate. The App Group the widget
+      # extension shares with the app (#240) needs a provisioning profile,
+      # which ad-hoc signing cannot have, so the test host signs with a copy of
+      # the app's entitlements minus the App Group. SharedTokenStore falls back
+      # to the app's own keychain there, as it did before the widget.
       - name: Run unit tests
         run: |
           xcodebuild \
@@ -44,4 +48,5 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM= \
+            CODE_SIGN_ENTITLEMENTS=mDone/mDone-macOS-CI.entitlements \
             test
