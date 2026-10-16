@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-10-16
+
 ### Added
 - Focus Run on iPhone and iPad: long-press a task in the Inbox (or any list) and choose Start Focus Run, or pick Focus Run from Here in the task's details. When you tick the task off, the next task in the list comes up in focus straight away, until the list runs out or you end the run. Skip moves on without completing, the focus screen shows what is up next and how many are left, and a finished run tells you how many tasks you got through. Plain Start Focus still focuses on a single task.
 
