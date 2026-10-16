@@ -1,3 +1,4 @@
+import Observation
 import XCTest
 @testable import mDone
 
@@ -80,6 +81,32 @@ final class VisibleListRefreshTests: XCTestCase {
         await state.refreshVisibleList(project: nil)
 
         XCTAssertEqual(state.tasks.map(\.title), ["Renamed elsewhere"])
+    }
+
+    /// Most ticks find nothing new. Those must not write `tasks` at all, or
+    /// every open list would re-render (and rewrite the cache) every tick.
+    func testUnchangedServerLeavesTheListsUntouched() async throws {
+        let state = await makeAppState()
+        let filter = Project(id: -2, title: "Saved filter", views: [
+            ProjectView(id: 25, title: "List", projectId: -2, viewKind: "list"),
+        ])
+        let member = task(1, "Same as before")
+        try serve(all: [member, task(2, "Other")], members: [member])
+        await state.refreshVisibleList(project: filter)
+        XCTAssertEqual(state.tasksForProject(-2).map(\.id), [1])
+
+        var tasksWritten = false
+        withObservationTracking {
+            _ = state.tasks
+            _ = state.projectTaskCache
+        } onChange: {
+            tasksWritten = true
+        }
+        let requestsBefore = MockURLProtocol.capturedRequests.count
+        await state.refreshVisibleList(project: filter)
+
+        XCTAssertGreaterThan(MockURLProtocol.capturedRequests.count, requestsBefore)
+        XCTAssertFalse(tasksWritten)
     }
 
     func testFailedReadKeepsTheRows() async {
