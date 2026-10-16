@@ -75,4 +75,51 @@ final class SharedTokenStoreTests: XCTestCase {
         XCTAssertNil(SharedKeys.sharedDefaults.string(forKey: SharedKeys.apiTokenKey))
         XCTAssertNil(SharedTokenStore.get())
     }
+
+    #if os(macOS)
+    // MARK: - Mac widget migration (#240)
+
+    func testSaveMovesPreWidgetMacItemIntoSharedKeychain() throws {
+        var seed = SharedTokenStore.legacyMacQuery
+        seed[kSecValueData as String] = Data("tk_old_mac".utf8)
+        XCTAssertEqual(SecItemAdd(seed as CFDictionary, nil), errSecSuccess)
+
+        XCTAssertTrue(SharedTokenStore.save("tk_new_mac"))
+        XCTAssertEqual(SharedTokenStore.get(), "tk_new_mac")
+
+        // Ad-hoc signed hosts (CI) have no data protection keychain, so there
+        // the old item is the store itself rather than a leftover.
+        try XCTSkipUnless(Self.sharedKeychainAvailable, "Needs a team-signed test host")
+        XCTAssertEqual(
+            legacyMacItemStatus(),
+            errSecItemNotFound,
+            "Once the shared item is written the pre-#240 copy should be gone"
+        )
+    }
+
+    func testDeleteRemovesPreWidgetMacItem() {
+        var seed = SharedTokenStore.legacyMacQuery
+        seed[kSecValueData as String] = Data("tk_old_mac".utf8)
+        SecItemAdd(seed as CFDictionary, nil)
+
+        SharedTokenStore.delete()
+
+        XCTAssertEqual(legacyMacItemStatus(), errSecItemNotFound)
+        XCTAssertNil(SharedTokenStore.get())
+    }
+
+    private func legacyMacItemStatus() -> OSStatus {
+        SecItemCopyMatching(SharedTokenStore.legacyMacQuery as CFDictionary, nil)
+    }
+
+    private static var sharedKeychainAvailable: Bool {
+        let probe: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: "com.mdone.tests.keychainProbe",
+            kSecAttrAccessGroup as String: SharedKeys.appGroupID,
+            kSecUseDataProtectionKeychain as String: true,
+        ]
+        return SecItemCopyMatching(probe as CFDictionary, nil) != errSecMissingEntitlement
+    }
+    #endif
 }

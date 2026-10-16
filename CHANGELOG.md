@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Widgets on the Mac. Add Today's Tasks, Upcoming and Quick Add to your desktop or Notification Centre, in the same sizes as on iPhone and iPad. Tick tasks off right from the widget, and Add Task opens the new task sheet in mDone (#240).
+
 ## [1.20.0] - 2026-10-16
 
 ### Added

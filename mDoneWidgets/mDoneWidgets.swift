@@ -7,9 +7,11 @@ struct mDoneWidgets: WidgetBundle {
         TodayTasksWidget()
         UpcomingWidget()
         QuickAddWidget()
+        #if os(iOS)
         LockScreenCircularWidget()
         LockScreenRectangularWidget()
         LockScreenInlineWidget()
         FocusTaskLiveActivity()
+        #endif
     }
 }

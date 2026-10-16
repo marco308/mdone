@@ -84,6 +84,9 @@ targets:
     sources:
       - mDone
       - mDoneShared
+    dependencies:
+      - target: mDoneMacWidgets
+        embed: true
     settings:
       base:
         INFOPLIST_FILE: mDone/Info.plist
@@ -163,6 +166,35 @@ targets:
         CODE_SIGN_ENTITLEMENTS: mDoneWidgets/mDoneWidgets.entitlements
         # The extension is its own bundle, so it needs its own copy of the
         # catalog and its own extraction pass. See docs/localization.md.
+        SWIFT_EMIT_LOC_STRINGS: "YES"
+
+  # The same widget sources as mDoneWidgets, built for the Mac (#240). The
+  # Live Activity and lock screen widgets are iOS-only and compile out behind
+  # `#if os(iOS)`. The iOS target's Info.plist and entitlements live in the
+  # same folder, so they are excluded here and this target brings its own.
+  mDoneMacWidgets:
+    type: app-extension
+    platform: macOS
+    sources:
+      - mDoneShared
+      - path: mDoneWidgets
+        excludes:
+          - Info.plist
+          - "*.entitlements"
+    info:
+      path: mDoneMacWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: mDone
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        # Same bundle ID as the iOS extension: the app shares com.mdone.app
+        # across platforms (universal purchase), and so do its extensions.
+        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.widgets
+        CODE_SIGN_ENTITLEMENTS: mDoneMacWidgets/mDoneMacWidgets.entitlements
         SWIFT_EMIT_LOC_STRINGS: "YES"
 
   mDoneTests:
