@@ -51,7 +51,7 @@ struct ReminderEditor: View {
                 Image(systemName: "bell")
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
-                Text(displayText(for: reminder))
+                Text(Self.displayText(for: reminder))
                 Spacer()
             }
         }
@@ -110,8 +110,9 @@ struct ReminderEditor: View {
         }
     }
 
-    private func displayText(for reminder: TaskReminder) -> String {
-        if let period = reminder.relativePeriod {
+    static func displayText(for reminder: TaskReminder) -> String {
+        if reminder.isRelative {
+            let period = reminder.relativePeriod ?? 0
             if period == 0 {
                 return String(localized: "At time of due date")
             }

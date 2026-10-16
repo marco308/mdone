@@ -243,6 +243,29 @@ struct TaskReminder: Codable, Hashable {
     var reminder: Date?
     var relativePeriod: Int64?
     var relativeTo: String?
+
+    /// Vikunja echoes a fixed-time reminder back as `relative_period: 0` and
+    /// `relative_to: ""` rather than leaving them out, so a non-nil
+    /// `relativePeriod` does not make a reminder relative. Only `relativeTo`
+    /// says so. Reading the period alone showed a 12 PM reminder as
+    /// "At time of due date" and fired it at the due time (#242).
+    var isRelative: Bool {
+        !(relativeTo ?? "").isEmpty
+    }
+
+    /// When this reminder should fire for `task`. A relative reminder is
+    /// worked out from the task's own date, since the `reminder` Vikunja
+    /// computes for it goes stale as soon as that date is edited locally.
+    /// Nil when the date it hangs off is unset.
+    func fireDate(for task: VTask) -> Date? {
+        guard isRelative else { return reminder }
+        let anchor: Date? = switch relativeTo {
+        case "start_date": task.effectiveStartDate
+        case "end_date": task.effectiveEndDate
+        default: task.effectiveDueDate
+        }
+        return anchor?.addingTimeInterval(TimeInterval(relativePeriod ?? 0))
+    }
 }
 
 enum PriorityLevel: Int, CaseIterable {

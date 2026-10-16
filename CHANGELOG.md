@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Completing a repeating task you are focusing on now ends that focus session. Vikunja moves a repeating task to its next date instead of marking it done, so focus used to carry on as if nothing had happened.
 - A task you add to a project sorted Manually now appears at the top of the list straight away, where the Vikunja web app shows it. It used to appear at the bottom and then jump to the top on the next refresh (#232).
 - Kanban boards now show completed tasks, so a Done column holds the same cards as in the Vikunja web app instead of saying "No tasks". Completed cards are struck through with a green tick, and each column's count includes them (#238).
+- A reminder set for a specific time now stays at that time. After saving, it used to show as "At time of due date" and notify you at the due time instead, so a custom reminder looked like it had been replaced. Reminders set relative to a task's start or end date now also notify at the right time (#242).
 
 ## [1.19.0] - 2026-09-24
 
