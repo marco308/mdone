@@ -97,6 +97,7 @@ Steps to test:
    - Open a task to edit its details, set a due date, or configure repeating.
    - Long-press a task (or open it) and choose "Mark as Current" to pin it to the new Current section at the top of the list, then update its progress from the task's detail view.
    - Try the focus timer from a task's detail view.
+   - On iPhone or iPad, long-press a task in the Inbox and choose "Start Focus Run". Tick the task off on the focus screen and the next task in the list comes up in focus.
    - In a task's Labels section, tap "Add Labels" to put labels on it or take them off.
    - Sort a project by "Manual" (sort menu) and drag the handles to reorder tasks.
    - Add a widget from the home screen (long press > Edit Home Screen > tap +).
@@ -105,6 +106,32 @@ Steps to test:
    - Say "Hey Siri, add a task in mDone" (the app can be closed). Siri asks for the task, adds it to the first project, and reads back where it went and when it is due. On a Mac, use the Shortcuts app's "Add Task" action for mDone.
 
 This is a private test server maintained by the developer for App Store review purposes.
+
+## What's New (v1.20.0)
+
+### iPhone and iPad
+
+Focus that moves on to the next task.
+
+- New Focus Run. Long-press a task and choose Start Focus Run: tick it off and the next task in the list comes up in focus straight away, until the list runs out or you end the run.
+- Skip moves on without completing. The focus screen shows what is up next and how many are left, and a finished run tells you how many tasks you got through.
+- A reminder set for a specific time now stays at that time. It used to show as "At time of due date" after saving and notify you at the due time instead.
+- The Inbox's advanced filter now behaves: Status: Done shows your completed tasks, Reset brings every task back, and a filter stays on when the list refreshes.
+- Clearing a search brings your full list back straight away, and search now matches task descriptions and works offline.
+- Kanban boards show completed tasks, so a Done column holds the same cards as in the Vikunja web app.
+- A task added to a project sorted Manually appears at the top straight away, where Vikunja puts it.
+- Completing a repeating task you are focusing on now ends that focus session.
+
+### Mac
+
+Fixes for reminders, filters and boards.
+
+- A reminder set for a specific time now stays at that time. It used to show as "At time of due date" after saving and notify you at the due time instead.
+- The filter chips, search and advanced filter now narrow the Inbox. It used to show the same sections whatever was selected.
+- The advanced filter's Status: Done shows your completed tasks, Reset brings every task back, and a filter stays on when the list refreshes.
+- Clearing a search brings your full list back straight away, and search now matches task descriptions and works offline.
+- Kanban boards show completed tasks, so a Done column holds the same cards as in the Vikunja web app.
+- A task added to a project sorted Manually appears at the top straight away, where Vikunja puts it.
 
 ## What's New (v1.19.0)
 
