@@ -1,8 +1,12 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 struct TaskListScreen: View {
     @Environment(AppState.self) private var appState
     @Environment(NetworkMonitor.self) private var networkMonitor
+    @Environment(\.scenePhase) private var scenePhase
     #if os(iOS)
     @Environment(FocusManager.self) private var focusManager
     #endif
@@ -20,6 +24,9 @@ struct TaskListScreen: View {
     /// keep their own selection.
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var inlineSelection = InlineTaskSelection()
+    /// Live refresh pauses while the keyboard is up, so rows do not move
+    /// under someone typing.
+    @State private var keyboardPresented = false
     #endif
 
     /// A board (Kanban) view is offered only for real, editable projects that
@@ -76,12 +83,47 @@ struct TaskListScreen: View {
         return projectFilter.id >= 0 && sortPreference.order == .manual
     }
 
+    /// Whether this list should keep itself up to date with changes made
+    /// elsewhere (#241). Only an on-screen, editable list in the foreground
+    /// polls, and never while the user is busy with a task on this screen.
+    /// Changing this restarts or stops the polling task below.
+    private var liveRefreshActive: Bool {
+        guard scenePhase == .active, appState.isAuthenticated, networkMonitor.isConnected,
+              !readOnly, !boardActive, !showAdvancedFilter else { return false }
+        #if os(iOS)
+        guard !keyboardPresented, inlineSelection.task == nil else { return false }
+        #endif
+        return true
+    }
+
+    /// Checked on every tick, for the one case SwiftUI does not tell this
+    /// screen about: a row's task detail sheet belongs to the row, so only
+    /// UIKit knows it is up. Refreshing under it could drop the row being
+    /// edited and the sheet with it. Alerts and the focus screen pause it too.
+    private static var nothingPresented: Bool {
+        #if os(iOS)
+        let keyWindow = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)
+        return keyWindow?.rootViewController?.presentedViewController == nil
+        #else
+        return true
+        #endif
+    }
+
     var body: some View {
         @Bindable var bindableAppState = appState
         adaptiveContent
             .task(id: projectFilter?.id) {
                 if let projectFilter {
                     await appState.fetchProjectTasks(project: projectFilter)
+                }
+            }
+            .task(id: LiveRefreshKey(projectId: projectFilter?.id, isActive: liveRefreshActive)) {
+                guard liveRefreshActive else { return }
+                await LiveListRefresh.poll {
+                    await appState.refreshVisibleList(project: projectFilter) { Self.nothingPresented }
                 }
             }
             .task {
@@ -91,6 +133,12 @@ struct TaskListScreen: View {
             .navigationTitle(projectFilter?.title ?? String(localized: "Inbox"))
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+                keyboardPresented = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                keyboardPresented = false
+            }
             .onChange(of: projectFilter?.id) { _, _ in
                 boardOverride = nil
             }
@@ -106,6 +154,11 @@ struct TaskListScreen: View {
                     LoadingOverlay()
                 }
             }
+    }
+
+    private struct LiveRefreshKey: Equatable {
+        let projectId: Int64?
+        let isActive: Bool
     }
 
     /// The list (or board) alone on iPhone; on iPad with room, the same beside
