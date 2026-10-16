@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - Focus Run on iPhone and iPad: long-press a task in the Inbox (or any list) and choose Start Focus Run, or pick Focus Run from Here in the task's details. When you tick the task off, the next task in the list comes up in focus straight away, until the list runs out or you end the run. Skip moves on without completing, the focus screen shows what is up next and how many are left, and a finished run tells you how many tasks you got through. Plain Start Focus still focuses on a single task.
+- On iPhone and iPad, an open list now keeps itself up to date. Tasks added, edited, completed or deleted in another Vikunja app, or by server automation, show up in the Inbox, a project or a saved filter within about 15 seconds, without pulling to refresh or leaving the list. It pauses while you are editing a task, typing, or offline (#241).
 
 ### Fixed
 - The Inbox's advanced filter now behaves. Filtering by Status: Done shows your completed tasks instead of "All done!", reopening the filter shows what you applied, Reset brings back every task (it used to leave some out until the next refresh), and a filter stays in place when the list refreshes instead of quietly switching off while the icon still showed it on. Opening the filter and tapping Apply without changing anything no longer counts as filtering.

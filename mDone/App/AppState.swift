@@ -9,12 +9,18 @@ import WidgetKit
 
 @Observable
 final class AppState {
-    var isAuthenticated: Bool = false
+    var isAuthenticated: Bool = false {
+        didSet { listRevision &+= 1 }
+    }
+
     var isLoading: Bool = false
     var errorMessage: String?
     var activeError: NetworkError?
 
-    var tasks: [VTask] = []
+    var tasks: [VTask] = [] {
+        didSet { listRevision &+= 1 }
+    }
+
     var projects: [Project] = []
     /// Archived projects, loaded on demand for the Archived view. Kept separate
     /// from `projects`, which only ever holds active (non-archived) projects.
@@ -98,7 +104,15 @@ final class AppState {
     }
 
     /// Per-project ordered task lists fetched from the view endpoint (preserves positions).
-    var projectTaskCache: [Int64: [VTask]] = [:]
+    var projectTaskCache: [Int64: [VTask]] = [:] {
+        didSet { listRevision &+= 1 }
+    }
+
+    /// Bumped by every change to the lists above (and by sign-in/out) so a
+    /// quiet background read that raced a local change is thrown away
+    /// instead of putting older rows back. See `refreshVisibleList`.
+    @ObservationIgnored private var listRevision: UInt64 = 0
+    @ObservationIgnored private let liveListRefresh = LiveListRefresh()
 
     /// Sort choices changed this session, keyed by list. Lives here rather
     /// than in view state so it survives navigation and so every screen
@@ -1792,12 +1806,92 @@ final class AppState {
     @MainActor
     private func applyProjectTasks(_ viewTasks: [VTask], projectId: Int64) {
         projectTaskCache[projectId] = viewTasks
+        tasks = Self.merging(viewTasks, into: tasks)
+    }
+
+    /// `tasks` with each view task replacing its row, or appended when new.
+    static func merging(_ viewTasks: [VTask], into tasks: [VTask]) -> [VTask] {
+        var result = tasks
+        let indexById = Dictionary(
+            result.enumerated().map { ($1.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
         for viewTask in viewTasks {
-            if let index = tasks.firstIndex(where: { $0.id == viewTask.id }) {
-                tasks[index] = viewTask
+            if let index = indexById[viewTask.id] {
+                result[index] = viewTask
             } else {
-                tasks.append(viewTask)
+                result.append(viewTask)
             }
+        }
+        return result
+    }
+
+    // MARK: - Live List Refresh
+
+    /// Whether a quiet read may run now. Anything that could be overwritten
+    /// by, or race, a fresh server snapshot holds it off: a full refresh in
+    /// flight, a save in flight, or offline edits still waiting to go out.
+    @MainActor
+    private var canRefreshQuietly: Bool {
+        isAuthenticated && !isOffline && !isLoading
+            && pendingOperationsCount == 0 && activeTaskUpdates.isEmpty
+    }
+
+    /// Re-reads the tasks behind the visible list, so changes made by another
+    /// client or by server-side automation show up while it stays on screen
+    /// (issue #241). `project` is `nil` for the Inbox. A project's list view
+    /// is read too: a saved filter's membership is not its tasks' project id,
+    /// so only the view says which tasks belong to it, and an empty view is a
+    /// real answer.
+    ///
+    /// Unlike `refreshAll` this is silent: no loading state, no error banner,
+    /// and nothing changes when the server has nothing new. A failed read
+    /// leaves the list as it was for the next tick to try again.
+    @MainActor
+    func refreshVisibleList(project: Project?, isEnabled: () -> Bool = { true }) async {
+        let viewId = project?.listViewId
+        await liveListRefresh.refresh(
+            isEnabled: { isEnabled() && canRefreshQuietly },
+            revision: { listRevision },
+            fetch: { () async throws -> ([VTask], [VTask]?) in
+                async let all = taskService.fetchAllTasks(perPage: 200)
+                var members: [VTask]?
+                if let project, let viewId {
+                    members = try await taskService.fetchProjectTasks(projectId: project.id, viewId: viewId)
+                }
+                return try await (all, members)
+            },
+            apply: { all, members in
+                applyQuietRefresh(all: all, members: members, projectId: project?.id)
+            }
+        )
+    }
+
+    @MainActor
+    private func applyQuietRefresh(all: [VTask], members: [VTask]?, projectId: Int64?) {
+        if isShowingCachedData {
+            isShowingCachedData = false
+        }
+        let members = members.map(Self.uniquedById)
+        var latest = Self.uniquedById(all)
+        if let members {
+            latest = Self.merging(members, into: latest)
+        }
+        let membersChanged = projectId.map { id in members != nil && members != projectTaskCache[id] } ?? false
+        // Most ticks find nothing new. Leave the lists alone then, so SwiftUI
+        // does not re-render and the cache and widgets are not rewritten.
+        guard latest != tasks || membersChanged else { return }
+
+        tasks = latest
+        if let projectId, let members {
+            projectTaskCache[projectId] = members
+        }
+        persistToCache()
+        pushWidgetData()
+        WidgetCenter.shared.reloadAllTimelines()
+        if UserDefaults.standard.bool(forKey: "notificationsEnabled") {
+            let snapshot = tasks
+            Task { await notificationService.scheduleReminders(for: snapshot) }
         }
     }
 
