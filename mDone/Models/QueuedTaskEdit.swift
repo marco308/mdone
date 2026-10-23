@@ -30,6 +30,9 @@ struct QueuedTaskEdit: Codable, Equatable {
     /// favourite status doesn't silently lose it offline.
     var hexColor: String?
     var isFavorite: Bool?
+    /// Only set when the user changed who the task is assigned to while
+    /// offline. Optional, so rows queued by older builds still decode.
+    var assignees: [User]?
     var clearDueDate: Bool?
     var clearStartDate: Bool?
     var clearEndDate: Bool?
@@ -51,6 +54,7 @@ struct QueuedTaskEdit: Codable, Equatable {
         reminders = request.reminders
         hexColor = request.hexColor
         isFavorite = request.isFavorite
+        assignees = request.assignees
         clearDueDate = request.clearDueDate
         clearStartDate = request.clearStartDate
         clearEndDate = request.clearEndDate
@@ -74,6 +78,7 @@ struct QueuedTaskEdit: Codable, Equatable {
         result.reminders = reminders
         result.hexColor = hexColor
         result.isFavorite = isFavorite
+        result.assignees = assignees
         result.clearDueDate = clearDueDate
         result.clearStartDate = clearStartDate
         result.clearEndDate = clearEndDate
@@ -120,6 +125,9 @@ struct QueuedTaskEdit: Codable, Equatable {
         }
         if let value = newer.isFavorite {
             result.isFavorite = value
+        }
+        if let value = newer.assignees {
+            result.assignees = value
         }
 
         if newer.clearDueDate == true {
@@ -185,6 +193,9 @@ struct QueuedTaskEdit: Codable, Equatable {
         }
         if let isFavorite {
             result.isFavorite = isFavorite
+        }
+        if let assignees {
+            result.assignees = assignees
         }
         if clearDueDate == true {
             result.dueDate = nil

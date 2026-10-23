@@ -321,6 +321,10 @@ struct TaskUpdateRequest: Encodable {
     /// Same as `hexColor`: carried so completing a task in mDone doesn't drop
     /// it from favorites lists in other clients.
     var isFavorite: Bool?
+    /// Who the task is assigned to. Vikunja's update **does** replace these:
+    /// leave them out and every assignee is removed, so completing a task
+    /// in mDone used to unassign it for the whole team. Encoded as ids only.
+    var assignees: [User]?
     var clearDueDate: Bool?
     var clearStartDate: Bool?
     var clearEndDate: Bool?
@@ -331,7 +335,7 @@ struct TaskUpdateRequest: Encodable {
 
     private enum CodingKeys: String, CodingKey {
         case title, description, done, dueDate, startDate, endDate, priority, projectId, labels
-        case repeatAfter, repeatMode, reminders, percentDone, hexColor, isFavorite
+        case repeatAfter, repeatMode, reminders, percentDone, hexColor, isFavorite, assignees
     }
 
     func encode(to encoder: Encoder) throws {
@@ -363,6 +367,7 @@ struct TaskUpdateRequest: Encodable {
         try container.encodeIfPresent(percentDone, forKey: .percentDone)
         try container.encodeIfPresent(hexColor, forKey: .hexColor)
         try container.encodeIfPresent(isFavorite, forKey: .isFavorite)
+        try container.encodeIfPresent(assignees?.map { UserRef(id: $0.id) }, forKey: .assignees)
     }
 
     /// Carries every field this request doesn't set forward from `task`.
@@ -415,6 +420,9 @@ struct TaskUpdateRequest: Encodable {
         }
         if request.reminders == nil {
             request.reminders = task.reminders
+        }
+        if request.assignees == nil {
+            request.assignees = task.assignees
         }
         return request
     }

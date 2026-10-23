@@ -3,6 +3,7 @@ import SwiftUI
 struct TaskFilterSheet: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(TeamFeaturesPreference.storageKey) private var teamFeatures = TeamFeaturesPreference.defaultValue
 
     /// A working copy of the applied filter. Seeded from it, so reopening the
     /// sheet shows what is in effect rather than the defaults; only Apply or
@@ -61,6 +62,15 @@ struct TaskFilterSheet: View {
                         }
                     }
                     .pickerStyle(.menu)
+                }
+
+                if teamFeatures, let me = appState.currentUser {
+                    Section("Assignee") {
+                        Toggle("Assigned to me", isOn: Binding(
+                            get: { draft.assigneeId == me.id },
+                            set: { draft.assigneeId = $0 ? me.id : nil }
+                        ))
+                    }
                 }
             }
             .navigationTitle("Advanced Filter")

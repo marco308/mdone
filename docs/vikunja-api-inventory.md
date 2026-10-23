@@ -257,7 +257,7 @@ Query params for listing: `page`, `per_page`, `s` (search), `is_archived` (bool)
 | PUT | `/projects/:project/users` | Share project with a user |
 | POST | `/projects/:project/users/:user` | Update user permission |
 | DELETE | `/projects/:project/users/:user` | Remove user access |
-| GET | `/projects/:project/projectusers` | List users (without emails, for autocomplete) |
+| GET | `/projects/:project/projectusers` | List users (without emails, for autocomplete). Includes the owner and team members, not paginated. mDone's assignee picker reads it (#272). |
 
 **ProjectUser fields:** `id`, `user_id`, `project_id`, `permission` (0=Read, 1=Read&Write, 2=Admin), `created`, `updated`
 
@@ -720,6 +720,12 @@ Internal events: `task.reminder.fired` (used for notifications)
 | POST | `/tasks/:projecttask/assignees/bulk` | Bulk set assignees |
 
 Bulk assignee body: `{"assignees": [{"id": 1}, {"id": 2}]}` -- replaces all assignees.
+mDone uses the bulk endpoint for every assignee change (#272). It answers 7003 when a user cannot see
+the project, and echoes the ids back with blank names.
+
+**`POST /tasks/{id}` replaces assignees too.** A task update whose body has no `assignees` removes every
+assignee (verified on v2.4.0), so mDone carries the task's assignees in every update. A create with an
+inaccessible assignee fails as a whole (7003), which is why mDone assigns after creating.
 
 ---
 

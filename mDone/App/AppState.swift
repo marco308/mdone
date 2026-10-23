@@ -123,6 +123,16 @@ final class AppState {
     /// overwrite the order a later drag produced.
     @ObservationIgnored private var reorderGeneration = 0
 
+    // MARK: Team features (#272)
+
+    /// The signed-in user, read only while Team features is on. Drives the
+    /// "Assigned to me" filter; nil until loaded, and after sign-out.
+    private(set) var currentUser: User?
+
+    /// Who each project's tasks can be assigned to, read when the assignee
+    /// picker opens and kept for the session.
+    private(set) var assignableUsers: [Int64: [User]] = [:]
+
     var unreadNotificationCount: Int {
         notifications.filter(\.isUnread).count
     }
@@ -137,17 +147,20 @@ final class AppState {
     init(
         taskService: TaskService = TaskService(),
         projectService: ProjectService = ProjectService(),
-        labelService: LabelService = LabelService()
+        labelService: LabelService = LabelService(),
+        userService: UserService = UserService()
     ) {
         self.taskService = taskService
         self.projectService = projectService
         self.labelService = labelService
+        self.userService = userService
         AppState.shared = self
     }
 
     private let taskService: TaskService
     private let projectService: ProjectService
     private let labelService: LabelService
+    private let userService: UserService
     private let authService = AuthService.shared
     private let notificationService = NotificationService.shared
 
@@ -556,6 +569,8 @@ final class AppState {
         projects = []
         labels = []
         notifications = []
+        currentUser = nil
+        assignableUsers = [:]
         isAuthenticated = false
         isShowingCachedData = false
 
@@ -692,6 +707,7 @@ final class AppState {
             }
 
             await refreshCachedProjectOrders()
+            await loadCurrentUserIfNeeded()
 
             errorMessage = nil
             activeError = nil
@@ -868,6 +884,11 @@ final class AppState {
         }
         if result.reminders == nil {
             result.reminders = request.reminders ?? existing?.reminders
+        }
+        // Vikunja echoes assignees as bare ids with blank names, so the users
+        // that were sent (carried from the task, or picked) are the truth.
+        if let assignees = request.assignees {
+            result.assignees = assignees
         }
         return result
     }
@@ -1102,7 +1123,8 @@ final class AppState {
         description: String? = nil,
         dueDate: Date? = nil,
         priority: Int64 = 0,
-        labelIds: [Int64] = []
+        labelIds: [Int64] = [],
+        assignees: [User] = []
     ) async -> VTask? {
         // Creating offline isn't queueable yet: a queued create has no server id,
         // so any later edit or completion of that task would have nothing to
@@ -1130,6 +1152,17 @@ final class AppState {
                     handleError(error)
                 }
             }
+            // Assigned after the create rather than in its body: one user who
+            // cannot see the project makes Vikunja refuse the whole create,
+            // and the task matters more than the assignment.
+            if !assignees.isEmpty {
+                do {
+                    try await taskService.setAssignees(taskId: newTask.id, userIds: assignees.map(\.id))
+                    setAssigneesLocally(taskId: newTask.id, assignees: assignees)
+                } catch {
+                    handleError(error)
+                }
+            }
             await refetchProjectOrder(of: newTask)
             if let updated = tasks.first(where: { $0.id == newTask.id }) {
                 newTask = updated
@@ -1143,6 +1176,82 @@ final class AppState {
             handleError(error)
             return nil
         }
+    }
+
+    // MARK: - Assignees (#272)
+
+    /// Reads the signed-in user for "Assigned to me". Does nothing while
+    /// Team features is off, so personal use costs no request.
+    @MainActor
+    func loadCurrentUserIfNeeded() async {
+        guard TeamFeaturesPreference.isEnabled(), isAuthenticated, currentUser == nil, !isOffline else { return }
+        do {
+            currentUser = try await userService.fetchCurrentUser()
+        } catch {
+            // The filter just stays hidden; nothing else depends on this.
+            #if DEBUG
+            print("[mDone] loadCurrentUserIfNeeded failed: \(error)")
+            #endif
+        }
+    }
+
+    /// Called when the Team features setting changes. Turning it off clears
+    /// the assignee filter so nothing hidden keeps narrowing the lists.
+    @MainActor
+    func teamFeaturesDidChange(enabled: Bool) async {
+        if enabled {
+            await loadCurrentUserIfNeeded()
+        } else {
+            advancedFilter.assigneeId = nil
+        }
+    }
+
+    /// The people a task in `projectId` can be assigned to, from the server,
+    /// falling back to what this session last read when that fails.
+    @MainActor
+    func loadAssignableUsers(projectId: Int64) async -> [User] {
+        do {
+            let users = try await userService.fetchProjectUsers(projectId: projectId)
+                .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+            assignableUsers[projectId] = users
+            return users
+        } catch {
+            if assignableUsers[projectId] == nil {
+                handleError(error)
+            }
+            return assignableUsers[projectId] ?? []
+        }
+    }
+
+    /// Replaces who `task` is assigned to. Applied at once, like labels, so
+    /// there is nothing to save. Offline, the change is queued as an edit and
+    /// replayed through the task update, which carries assignees too.
+    @MainActor
+    @discardableResult
+    func setAssignees(_ assignees: [User], on task: VTask) async -> Bool {
+        guard await acquireTaskUpdateSlot(id: task.id) else { return false }
+        defer { releaseTaskUpdateSlot(id: task.id) }
+
+        let current = taskSnapshot(id: task.id) ?? task
+        if queueOfflineEdit(TaskUpdateRequest(assignees: assignees), for: current) != nil {
+            return true
+        }
+        do {
+            try await taskService.setAssignees(taskId: task.id, userIds: assignees.map(\.id))
+            setAssigneesLocally(taskId: task.id, assignees: assignees)
+            return true
+        } catch {
+            handleError(error)
+            return false
+        }
+    }
+
+    @MainActor
+    private func setAssigneesLocally(taskId: Int64, assignees: [User]) {
+        guard let index = tasks.firstIndex(where: { $0.id == taskId }) else { return }
+        tasks[index].assignees = assignees
+        syncEmbeddedRelations(with: tasks[index])
+        syncService?.updateCachedTask(tasks[index])
     }
 
     // MARK: - Siri and Shortcuts

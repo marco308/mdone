@@ -38,6 +38,13 @@ struct QuickAddBar: View {
     @State private var rejectedFields: Set<SmartTaskParse.Field> = []
     @State private var parseTask: Task<Void, Never>?
 
+    /// Team features (#272). Off by default; with it off there is no
+    /// assignee button and nothing is assigned.
+    @AppStorage(TeamFeaturesPreference.storageKey) private var teamFeatures = TeamFeaturesPreference.defaultValue
+    /// People the next task will be assigned to once it is created.
+    @State private var assignees: [User] = []
+    @State private var isPickingAssignees = false
+
     var body: some View {
         VStack(spacing: 8) {
             if let suggestion, suggestionMatchesCurrentTitle, !isHintDismissed, estimateSeconds == nil {
@@ -78,6 +85,25 @@ struct QuickAddBar: View {
                             .foregroundStyle(.secondary)
                     }
                     .accessibilityLabel("Add time estimate")
+                }
+
+                if teamFeatures {
+                    Button {
+                        isPickingAssignees = true
+                    } label: {
+                        if assignees.isEmpty {
+                            Image(systemName: "person.badge.plus")
+                                .font(.title3)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            AssigneeStack(users: assignees, size: 24)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(assignees.isEmpty ? "Assign people" : "Change assignees")
+                    .sheet(isPresented: $isPickingAssignees) {
+                        AssigneePickerSheet(projectId: projectId, target: .draft($assignees))
+                    }
                 }
 
                 if !title.isEmpty {
@@ -344,9 +370,11 @@ struct QuickAddBar: View {
                 description: description,
                 dueDate: submission.dueDate,
                 priority: submission.priority,
-                labelIds: submission.labelIds
+                labelIds: submission.labelIds,
+                assignees: teamFeatures ? assignees : []
             )
             title = ""
+            assignees = []
             parse = nil
             rejectedFields = []
             estimateSeconds = nil

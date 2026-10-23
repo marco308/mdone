@@ -51,13 +51,16 @@ struct AdvancedTaskFilter: Equatable {
     var customEnd: Date = .init().addingTimeInterval(7 * 24 * 3600)
     var status: Status = .undone
     var projectId: Int64?
+    /// "Assigned to me": the signed-in user's id, or nil for anyone. Only
+    /// offered while Team features is on (#272).
+    var assigneeId: Int64?
 
     /// Whether the filter narrows anything. Undone is what the Inbox shows
     /// anyway, so the sheet's defaults count as no filter: opening the sheet
     /// and tapping Apply must not light up the toolbar icon, and Reset must
     /// genuinely clear it.
     var isActive: Bool {
-        priority != nil || dateRange != .any || status != .undone || projectId != nil
+        priority != nil || dateRange != .any || status != .undone || projectId != nil || assigneeId != nil
     }
 
     func apply(to tasks: [VTask], now: Date = Date(), calendar: Calendar = .current) -> [VTask] {
@@ -81,6 +84,10 @@ struct AdvancedTaskFilter: Equatable {
         }
 
         if let projectId, task.projectId != projectId {
+            return false
+        }
+
+        if let assigneeId, !(task.assignees ?? []).contains(where: { $0.id == assigneeId }) {
             return false
         }
 

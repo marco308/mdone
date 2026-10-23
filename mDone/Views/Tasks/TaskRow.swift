@@ -23,6 +23,12 @@ struct TaskRow: View {
     @AppStorage("calmMode") private var calmMode = false
     @AppStorage("currentStallDays") private var stallDays = 7
     @AppStorage(TaskListDensity.storageKey) private var densityRaw = TaskListDensity.standard.rawValue
+    @AppStorage(TeamFeaturesPreference.storageKey) private var teamFeatures = TeamFeaturesPreference.defaultValue
+
+    /// Assignees to badge on the row: none while Team features is off.
+    private var visibleAssignees: [User] {
+        teamFeatures ? task.assignees ?? [] : []
+    }
 
     /// The user's chosen row size. Falls back to `.standard` if the stored
     /// value is ever unrecognised.
@@ -304,6 +310,10 @@ struct TaskRow: View {
 
             Spacer()
 
+            if !visibleAssignees.isEmpty {
+                AssigneeStack(users: visibleAssignees)
+            }
+
             if task.priority > 0 {
                 PriorityBadge(priority: task.priorityLevel)
             }
@@ -342,6 +352,9 @@ struct TaskRow: View {
         }
         if task.priority > 0 {
             parts.append("priority \(task.priorityLevel.label)")
+        }
+        if !visibleAssignees.isEmpty {
+            parts.append("assigned to \(visibleAssignees.map(\.displayName).joined(separator: ", "))")
         }
         if let dateRangeMetadata {
             parts.append(dateRangeMetadata.accessibilityText)
