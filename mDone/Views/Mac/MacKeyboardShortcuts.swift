@@ -62,6 +62,12 @@ struct MacQuickAddSheet: View {
     @State private var appliedDueDate: Date?
     @State private var appliedPriority: Int64?
 
+    /// Team features (#272). Off by default; with it off the sheet has no
+    /// assignee row.
+    @AppStorage(TeamFeaturesPreference.storageKey) private var teamFeatures = TeamFeaturesPreference.defaultValue
+    @State private var assignees: [User] = []
+    @State private var isPickingAssignees = false
+
     var body: some View {
         VStack(spacing: 16) {
             Text("New Task")
@@ -106,6 +112,26 @@ struct MacQuickAddSheet: View {
             Picker("Priority", selection: $priority) {
                 ForEach(PriorityLevel.allCases, id: \.rawValue) { level in
                     Text(level.label).tag(Int64(level.rawValue))
+                }
+            }
+
+            if teamFeatures, selectedProjectId > 0 {
+                HStack {
+                    Text("Assignees")
+                    Spacer()
+                    if !assignees.isEmpty {
+                        AssigneeStack(users: assignees)
+                    }
+                    Button(assignees.isEmpty ? "Assign" : "Change") {
+                        isPickingAssignees = true
+                    }
+                }
+                .sheet(isPresented: $isPickingAssignees) {
+                    AssigneePickerSheet(projectId: selectedProjectId, target: .draft($assignees))
+                }
+                // People picked for one project may not see another.
+                .onChange(of: selectedProjectId) { _, _ in
+                    assignees = []
                 }
             }
 
@@ -197,7 +223,8 @@ struct MacQuickAddSheet: View {
                 projectId: values.projectId,
                 dueDate: values.dueDate,
                 priority: values.priority,
-                labelIds: currentParse?.labelIds ?? []
+                labelIds: currentParse?.labelIds ?? [],
+                assignees: teamFeatures ? assignees : []
             )
             dismiss()
         }

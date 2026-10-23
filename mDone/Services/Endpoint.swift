@@ -76,6 +76,14 @@ struct Endpoint {
         Endpoint(path: "/api/v1/projects/\(projectId)/views")
     }
 
+    /// The users who can see a project, through a direct share, a team or as
+    /// its owner: the people a task in it can be assigned to. Unlike
+    /// `/projects/{id}/users` it leaves out email addresses and needs only read
+    /// access. Not paginated.
+    static func projectUsers(projectId: Int64) -> Endpoint {
+        Endpoint(path: "/api/v1/projects/\(projectId)/projectusers")
+    }
+
     // MARK: - Kanban Buckets
 
     /// Lists the buckets (columns) of a project's kanban view, with each
@@ -187,6 +195,15 @@ struct Endpoint {
     /// the other task.
     static func deleteTaskRelation(taskId: Int64, relationKind: String, otherTaskId: Int64) -> Endpoint {
         Endpoint(path: "/api/v1/tasks/\(taskId)/relations/\(relationKind)/\(otherTaskId)", method: .DELETE)
+    }
+
+    // MARK: - Task Assignees
+
+    /// Replaces every assignee of a task in one call. Body:
+    /// `{ "assignees": [{ "id": <userId> }] }`; an empty list unassigns all.
+    /// Vikunja answers 7003 when a user cannot see the task's project.
+    static func setTaskAssignees(taskId: Int64) -> Endpoint {
+        Endpoint(path: "/api/v1/tasks/\(taskId)/assignees/bulk", method: .POST)
     }
 
     // MARK: - Labels

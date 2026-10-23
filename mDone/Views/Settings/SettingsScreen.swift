@@ -14,6 +14,7 @@ struct SettingsScreen: View {
         .defaultValue.rawValue
     @AppStorage(DefaultProjectPreference.storageKey) private var defaultProjectId = DefaultProjectPreference.automatic
     @AppStorage(SmartParsingPreference.storageKey) private var smartParsing = SmartParsingPreference.defaultValue
+    @AppStorage(TeamFeaturesPreference.storageKey) private var teamFeatures = TeamFeaturesPreference.defaultValue
     @AppStorage("calmMode") private var calmMode = false
     @AppStorage(AllDayEventPreference.storageKey) private var hideAllDayEvents = false
     @AppStorage("currentStallDays") private var currentStallDays = 7
@@ -109,6 +110,19 @@ struct SettingsScreen: View {
             } footer: {
                 Text(
                     "Tasks you add from the Inbox or through Siri go to the default project. Automatic uses your project named Inbox, or your first project if there is none. Default due time applies when those tasks get a due date: pick a time later in the day so a new task does not show as overdue right away. Smart parsing reads dates, +project, !priority and *label from what you type in the quick-add bar and shows each one as a chip you can remove before adding."
+                )
+            }
+
+            Section {
+                Toggle("Team features", isOn: $teamFeatures)
+                    .onChange(of: teamFeatures) { _, newValue in
+                        Task { await appState.teamFeaturesDidChange(enabled: newValue) }
+                    }
+            } header: {
+                Text("Teams")
+            } footer: {
+                Text(
+                    "For projects you share with other people in Vikunja. Shows who each task is assigned to, lets you assign people when adding or editing a task, and adds an Assigned to me filter. Leave it off if you use mDone on your own."
                 )
             }
 

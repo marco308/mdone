@@ -65,6 +65,13 @@ actor TaskService {
         )
     }
 
+    /// Sets the task's assignees to exactly `userIds`. The response echoes the
+    /// ids with blank names, so it is discarded: callers keep the full users.
+    func setAssignees(taskId: Int64, userIds: [Int64]) async throws {
+        let request = TaskAssigneesRequest(assignees: userIds.map { UserRef(id: $0) })
+        try await apiClient.sendExpectingEmpty(Endpoint.setTaskAssignees(taskId: taskId), body: request)
+    }
+
     /// Moves a task into a kanban bucket (column) within a project view.
     func moveTaskToBucket(taskId: Int64, projectId: Int64, viewId: Int64, bucketId: Int64) async throws {
         let request = TaskBucketRequest(taskId: taskId)
@@ -73,6 +80,15 @@ actor TaskService {
             body: request
         )
     }
+}
+
+struct TaskAssigneesRequest: Encodable {
+    var assignees: [UserRef]
+}
+
+/// A user by id alone, the way Vikunja takes assignees in request bodies.
+struct UserRef: Encodable, Equatable {
+    var id: Int64
 }
 
 struct TaskPositionRequest: Encodable {
