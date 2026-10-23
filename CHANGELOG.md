@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-10-23
+
 ### Added
 - Team features, off by default: turn them on in Settings > Teams if you share Vikunja projects with other people. Each task shows who it is assigned to, you can assign people when adding a task or from a task's details, and the advanced filter gains Assigned to me. With the setting off, mDone looks and works exactly as before (#272).
 - Widgets on the Mac. Add Today's Tasks, Upcoming and Quick Add to your desktop or Notification Centre, in the same sizes as on iPhone and iPad. Tick tasks off right from the widget, and Add Task opens the new task sheet in mDone (#240).

@@ -103,9 +103,27 @@ Steps to test:
    - Add a widget from the home screen (long press > Edit Home Screen > tap +).
    - Open Settings > Tasks and set "Default project", then add a task from the Inbox to see it land there.
    - Turn on Settings > Tasks > "Smart parsing in quick add", then type "Call the dentist tomorrow at 3pm !3" in the Inbox's add-task field. Chips for the date and priority appear under the field before you add it.
+   - Turn on Settings > Teams > "Team features", open a task and tap "Assign" in its Assignees section. Pick yourself from the list: the task row now shows your initials, and the advanced filter offers "Assigned to me". (Only people a project is shared with in Vikunja can be assigned, so on this test account the list holds just the review user.)
    - Say "Hey Siri, add a task in mDone" (the app can be closed). Siri asks for the task, adds it to the first project, and reads back where it went and when it is due. On a Mac, use the Shortcuts app's "Add Task" action for mDone.
 
 This is a private test server maintained by the developer for App Store review purposes.
+
+## What's New (v1.21.0)
+
+### iPhone and iPad
+
+Assign tasks to the people you share projects with.
+
+- New Team features, off by default. Turn them on in Settings > Teams if you share Vikunja projects with other people: tasks show who they are assigned to, you can assign people when adding a task or from its details, and the advanced filter adds Assigned to me.
+- Completing, rescheduling or editing a task no longer removes its assignees in Vikunja.
+
+### Mac
+
+Widgets on the Mac, and assigning tasks.
+
+- Widgets on the Mac. Add Today's Tasks, Upcoming and Quick Add to your desktop or Notification Centre, and tick tasks off right from the widget.
+- New Team features, off by default. Turn them on in Settings > Teams if you share Vikunja projects with other people: tasks show who they are assigned to, you can assign people when adding a task or from its details, and the advanced filter adds Assigned to me.
+- Completing, rescheduling or editing a task no longer removes its assignees in Vikunja.
 
 ## What's New (v1.20.0)
 
