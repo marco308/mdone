@@ -163,18 +163,18 @@ struct AssigneePickerSheet: View {
             .formStyle(.grouped)
             .navigationTitle("Assignees")
             #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.inline)
             #endif
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { dismiss() }
-                    }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
                 }
-                .task {
-                    users = appState.assignableUsers[projectId] ?? []
-                    users = await appState.loadAssignableUsers(projectId: projectId)
-                    isLoading = false
-                }
+            }
+            .task {
+                users = appState.assignableUsers[projectId] ?? []
+                users = await appState.loadAssignableUsers(projectId: projectId)
+                isLoading = false
+            }
         }
         #if os(macOS)
         .frame(minWidth: 340, minHeight: 380)

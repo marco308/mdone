@@ -41,8 +41,8 @@ final class TaskAssigneeTests: XCTestCase {
 
     // MARK: - The setting
 
-    func testTeamFeaturesAreOffByDefault() {
-        let defaults = UserDefaults(suiteName: #function)!
+    func testTeamFeaturesAreOffByDefault() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: #function))
         defaults.removePersistentDomain(forName: #function)
         XCTAssertFalse(TeamFeaturesPreference.isEnabled(defaults: defaults))
         defaults.set(true, forKey: TeamFeaturesPreference.storageKey)
@@ -186,7 +186,7 @@ final class TaskAssigneeTests: XCTestCase {
         let request = MockURLProtocol.capturedRequests.last
         XCTAssertEqual(request?.url?.path, "/api/v1/tasks/1/assignees/bulk")
         XCTAssertEqual(request?.httpMethod, "POST")
-        XCTAssertEqual(assigneeIds(in: try jsonBody(of: request)), [3])
+        XCTAssertEqual(try assigneeIds(in: jsonBody(of: request)), [3])
         XCTAssertEqual(appState.tasks[0].assignees, [alice])
         XCTAssertEqual(appState.tasks[0].assignees?.first?.displayName, "Alice Smith")
     }
@@ -224,7 +224,7 @@ final class TaskAssigneeTests: XCTestCase {
         let requests = MockURLProtocol.capturedRequests
         XCTAssertEqual(requests.map(\.url?.path), ["/api/v1/projects/1/tasks", "/api/v1/tasks/9/assignees/bulk"])
         XCTAssertNil(try jsonBody(of: requests.first)["assignees"], "One inaccessible user would refuse the create")
-        XCTAssertEqual(assigneeIds(in: try jsonBody(of: requests.last)), [3])
+        XCTAssertEqual(try assigneeIds(in: jsonBody(of: requests.last)), [3])
         XCTAssertEqual(created?.assignees, [alice])
         XCTAssertEqual(appState.tasks.first?.assignees, [alice])
     }
@@ -273,7 +273,10 @@ final class TaskAssigneeTests: XCTestCase {
         XCTAssertEqual(edit.coalesced(with: newer).assignees, [bob])
         XCTAssertEqual(edit.coalesced(with: QueuedTaskEdit(from: TaskUpdateRequest(done: true))).assignees, [alice])
 
-        let legacy = try JSONDecoder().decode(QueuedTaskEdit.self, from: #"{"done": true}"#.data(using: .utf8)!)
+        let legacy = try JSONDecoder().decode(
+            QueuedTaskEdit.self,
+            from: XCTUnwrap(#"{"done": true}"#.data(using: .utf8))
+        )
         XCTAssertNil(legacy.assignees)
     }
 

@@ -516,6 +516,16 @@
         }
       }
     },
+    "+%lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%lld"
+          }
+        }
+      }
+    },
     "+24h" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1016,6 +1026,66 @@
         }
       }
     },
+    "Assign" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指派"
+          }
+        }
+      }
+    },
+    "Assign people" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指派成员"
+          }
+        }
+      }
+    },
+    "Assigned to %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已指派给 %@"
+          }
+        }
+      }
+    },
+    "Assigned to me" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指派给我的"
+          }
+        }
+      }
+    },
+    "Assignee" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "负责人"
+          }
+        }
+      }
+    },
+    "Assignees" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "负责人"
+          }
+        }
+      }
+    },
     "At time of due date" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1143,6 +1213,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "取消"
+          }
+        }
+      }
+    },
+    "Change" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改"
+          }
+        }
+      }
+    },
+    "Change assignees" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改负责人"
           }
         }
       }
@@ -1730,6 +1820,16 @@
         }
       }
     },
+    "Edit Assignees" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑负责人"
+          }
+        }
+      }
+    },
     "Edit Labels" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2178,6 +2278,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "后于"
+          }
+        }
+      }
+    },
+    "For projects you share with other people in Vikunja. Shows who each task is assigned to, lets you assign people when adding or editing a task, and adds an Assigned to me filter. Leave it off if you use mDone on your own." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "适用于你在 Vikunja 中与他人共享的项目。显示每个任务的负责人，可在添加或编辑任务时指派成员，并新增“指派给我的”筛选。如果你只是个人使用 mDone，请保持关闭。"
           }
         }
       }
@@ -2917,6 +3027,26 @@
         }
       }
     },
+    "No one else can see this project yet." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目前还没有其他人能看到此项目。"
+          }
+        }
+      }
+    },
+    "No one matches." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有匹配的成员。"
+          }
+        }
+      }
+    },
     "No open task titles match your search." : {
       "localizations" : {
         "zh-Hans" : {
@@ -3158,6 +3288,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "只有已启用日历中的日程才会显示在 mDone 的“日历”和“今天”视图中。"
+          }
+        }
+      }
+    },
+    "Only people this project is shared with in Vikunja can be assigned." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只能指派在 Vikunja 中与此项目共享的成员。"
           }
         }
       }
@@ -3698,6 +3838,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "搜索或添加标签"
+          }
+        }
+      }
+    },
+    "Search people" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索成员"
           }
         }
       }
@@ -4248,6 +4398,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "标记为“当前”的任务会带着进度条置于列表顶部。任务超过指定天数未更新时会显示闲置标记。"
+          }
+        }
+      }
+    },
+    "Team features" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "团队功能"
+          }
+        }
+      }
+    },
+    "Teams" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "团队"
           }
         }
       }
