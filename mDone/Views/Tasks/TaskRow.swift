@@ -184,6 +184,10 @@ struct TaskRow: View {
                     }
                 }
             }
+
+            // Sharing only reads, so read-only rows get it too.
+            Divider()
+            TaskShareButtons(task: task)
         }
         #if os(iOS)
         .sheet(isPresented: $showDetail) {
