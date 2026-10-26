@@ -208,6 +208,9 @@ struct MacTaskDetailView: View {
         .navigationTitle(task.title)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
+                TaskShareMenu(task: task)
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button("Save") { saveTask() }
                     .keyboardShortcut("s", modifiers: .command)
                     .disabled(

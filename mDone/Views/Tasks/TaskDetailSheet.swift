@@ -74,6 +74,9 @@ struct TaskDetailSheet: View {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("Cancel") { close() }
                         }
+                        ToolbarItem(placement: .primaryAction) {
+                            TaskShareMenu(task: task)
+                        }
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Save") { saveTask() }
                                 .fontWeight(.semibold)
@@ -111,6 +114,8 @@ struct TaskDetailSheet: View {
                 Button("Cancel") { close() }
                     .keyboardShortcut(.cancelAction)
                 Spacer()
+                TaskShareMenu(task: task)
+                    .labelStyle(.iconOnly)
                 Button("Save") { saveTask() }
                     .fontWeight(.semibold)
                     .keyboardShortcut("s", modifiers: .command)
