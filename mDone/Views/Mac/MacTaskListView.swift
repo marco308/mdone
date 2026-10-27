@@ -52,6 +52,21 @@ struct MacTaskListView: View {
             }
         }
         .navigationTitle(sectionTitle)
+        // A saved filter's tasks come only from its list view, so it stays
+        // empty until that view is read (#278). Reading it also caches the
+        // project, which makes `refreshAll` keep it current from then on.
+        .task(id: selectedProject?.id) {
+            if let selectedProject {
+                await appState.fetchProjectTasks(project: selectedProject)
+            }
+        }
+    }
+
+    private var selectedProject: Project? {
+        if case let .project(project) = section {
+            return project
+        }
+        return nil
     }
 
     @ViewBuilder

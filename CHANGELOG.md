@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - Share a task as a link. Long-press a task (right-click on the Mac) or use the share button in its details to share or copy a link to it on your Vikunja server, ready to hand to an agent or open in the Vikunja web app.
 
+### Fixed
+- On the Mac, saved filters and My Open Tasks show their tasks again. They used to open as an empty list, although the same filter worked on iPhone and iPad (#278).
+
 ## [1.21.0] - 2026-10-23
 
 ### Added
