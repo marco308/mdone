@@ -288,7 +288,10 @@ struct TaskListScreen: View {
                 .contentMargins(.bottom, 72, for: .scrollContent)
                 .refreshable {
                     await appState.refreshAll()
-                    if let projectFilter {
+                    // `refreshAll` already re-reads every project opened this
+                    // session, this one included; reading it again made the
+                    // pull wait for a second round trip (#276).
+                    if let projectFilter, appState.projectTaskCache[projectFilter.id] == nil {
                         await appState.fetchProjectTasks(project: projectFilter)
                     }
                 }
