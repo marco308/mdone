@@ -12,6 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 - Refreshing is quicker, most of all with a lot of tasks or a server far away. mDone now asks the server for your tasks, projects and labels at the same time instead of one after another, and the spinner goes away as soon as your lists are up to date (#276).
 
+### Fixed
+- Editing a description written in the Vikunja web app no longer shows raw HTML. The editor now shows readable text with simple formatting: **bold**, *italic*, [links](https://example.com), bullets, numbered lists and `- [ ]` checklists, and saving keeps them as formatting and checkboxes in the web app. A description with formatting mDone cannot edit, such as a table or an image, still opens as HTML so nothing in it is lost (#277).
+
 ## [1.21.0] - 2026-10-23
 
 ### Added

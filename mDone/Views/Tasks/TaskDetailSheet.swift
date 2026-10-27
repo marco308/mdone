@@ -31,7 +31,10 @@ struct TaskDetailSheet: View {
     @State private var repeatInterval: Int64
     @State private var reminders: [TaskReminder]
     @State private var showDeleteConfirm = false
-    @State private var isShowingDescriptionPreview: Bool
+    /// The description editor's state while it is open; `nil` shows the
+    /// preview. `description` stays the stored text (HTML for web-app
+    /// descriptions) until the editor closes (#277).
+    @State private var descriptionEdit: DescriptionEditSession?
     /// Loaded from the description's estimate marker; `nil` == no estimate.
     @State private var estimateSeconds: TimeInterval?
     @State private var percentDone: Double
@@ -49,7 +52,7 @@ struct TaskDetailSheet: View {
         _selectedProjectId = State(initialValue: task.projectId)
         _repeatInterval = State(initialValue: task.repeatAfter ?? 0)
         _reminders = State(initialValue: task.reminders ?? [])
-        _isShowingDescriptionPreview = State(initialValue: !initialDescription.isEmpty)
+        _descriptionEdit = State(initialValue: initialDescription.isEmpty ? DescriptionEditSession(stored: "") : nil)
         _estimateSeconds = State(initialValue: task.estimatedSeconds)
         _percentDone = State(initialValue: task.percentDone ?? 0)
     }
@@ -127,6 +130,21 @@ struct TaskDetailSheet: View {
         .background(.bar)
     }
 
+    private var isShowingDescriptionPreview: Bool {
+        descriptionEdit == nil
+    }
+
+    /// Opens the editor on the stored description, or closes it and keeps
+    /// what was typed, converted back to the stored form.
+    private func toggleDescriptionEditing() {
+        if let descriptionEdit {
+            description = descriptionEdit.storedDescription
+            self.descriptionEdit = nil
+        } else {
+            descriptionEdit = DescriptionEditSession(stored: description)
+        }
+    }
+
     private var canSave: Bool {
         !title.isEmpty && TaskScheduleEditor.isValid(startDate: startDate, endDate: endDate)
     }
@@ -155,7 +173,7 @@ struct TaskDetailSheet: View {
                             .foregroundStyle(.secondary)
                         Spacer()
                         Button {
-                            isShowingDescriptionPreview.toggle()
+                            toggleDescriptionEditing()
                         } label: {
                             Image(systemName: isShowingDescriptionPreview ? "pencil" : "eye")
                                 .font(.caption)
@@ -178,10 +196,16 @@ struct TaskDetailSheet: View {
                             RichDescriptionView(html: description, onToggle: toggleChecklistItem)
                         }
                     } else {
-                        TextEditor(text: $description)
-                            .font(.body)
-                            .frame(minHeight: 80)
-                            .scrollContentBackground(.hidden)
+                        TextEditor(text: Binding(
+                            get: { descriptionEdit?.text ?? "" },
+                            set: { descriptionEdit?.text = $0 }
+                        ))
+                        .font(.body)
+                        .frame(minHeight: 80)
+                        .scrollContentBackground(.hidden)
+                        if let mode = descriptionEdit?.mode {
+                            DescriptionEditHint(mode: mode)
+                        }
                     }
                 }
             }
@@ -350,7 +374,8 @@ struct TaskDetailSheet: View {
         // Bake the optional estimate into the description as a marker so it
         // round-trips through Vikunja and is visible to any agent that reads
         // the task via the API. `apply` strips any prior marker first.
-        let body = description.isEmpty ? nil : description
+        let current = descriptionEdit?.storedDescription ?? description
+        let body = current.isEmpty ? nil : current
         // Empty string, not nil: preservingExistingValues treats nil as "keep
         // the old text", so a cleared description must be sent explicitly.
         let composedDescription = EstimateMarker.apply(estimateSeconds, to: body) ?? ""
