@@ -435,6 +435,60 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(appState.tasksForProject(filterId).map(\.id), [1])
     }
 
+    /// The Mac list reads a saved filter's view when it is selected and then
+    /// relies on `refreshAll` (toolbar, Command-R, app activation) to keep it
+    /// current (#278). The filter's matches change on the server between the
+    /// two reads.
+    func testRefreshAllKeepsAnOpenedSavedFilterCurrent() async throws {
+        let client = MockURLProtocol.mockClient()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+        let appState = AppState(
+            taskService: TaskService(apiClient: client),
+            projectService: ProjectService(apiClient: client),
+            labelService: LabelService(apiClient: client)
+        )
+        func json(_ value: Any) throws -> Data {
+            try JSONSerialization.data(withJSONObject: value)
+        }
+        func tasks(_ ids: [Int64]) throws -> Data {
+            try json(ids.map { ["id": $0, "title": "Task \($0)", "done": false, "priority": 0, "project_id": 4] })
+        }
+        let projects = try json([
+            ["id": 4, "title": "Errands", "views": [["id": 13, "title": "List", "project_id": 4, "view_kind": "list"]]],
+            [
+                "id": -3,
+                "title": "High priority",
+                "views": [["id": 21, "title": "List", "project_id": -3, "view_kind": "list"]],
+            ],
+        ])
+        let all = try tasks([1, 2, 3, 14])
+        let empty = try json([])
+        var matches = try tasks([1, 3])
+        MockURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
+            if path.hasSuffix("/projects/-3/views/21/tasks") {
+                return (response, matches)
+            }
+            if path.hasSuffix("/projects") {
+                return (response, projects)
+            }
+            if path.hasSuffix("/labels") {
+                return (response, empty)
+            }
+            return (response, all)
+        }
+
+        await appState.refreshAll()
+        let filter = try XCTUnwrap(appState.projects.first { $0.id == -3 })
+        await appState.fetchProjectTasks(project: filter)
+        XCTAssertEqual(appState.tasksForProject(-3).map(\.id), [1, 3])
+
+        matches = try tasks([3, 14])
+        await appState.refreshAll()
+        XCTAssertEqual(appState.tasksForProject(-3).map(\.id), [3, 14])
+    }
+
     // MARK: - Session expiry vs logout (issue #80)
 
     func testExpireSessionKeepsServerURL() async {

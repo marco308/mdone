@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Share a task as a link. Long-press a task (right-click on the Mac) or use the share button in its details to share or copy a link to it on your Vikunja server, ready to hand to an agent or open in the Vikunja web app.
 
 ### Fixed
+- On the Mac, saved filters and My Open Tasks show their tasks again. They used to open as an empty list, although the same filter worked on iPhone and iPad (#278).
 - Editing a description written in the Vikunja web app no longer shows raw HTML. The editor now shows readable text with simple formatting: **bold**, *italic*, [links](https://example.com), bullets, numbered lists and `- [ ]` checklists, and saving keeps them as formatting and checkboxes in the web app. A description with formatting mDone cannot edit, such as a table or an image, still opens as HTML so nothing in it is lost (#277).
 
 ## [1.21.0] - 2026-10-23
