@@ -455,7 +455,11 @@ final class AppStateTests: XCTestCase {
         }
         let projects = try json([
             ["id": 4, "title": "Errands", "views": [["id": 13, "title": "List", "project_id": 4, "view_kind": "list"]]],
-            ["id": -3, "title": "High priority", "views": [["id": 21, "title": "List", "project_id": -3, "view_kind": "list"]]],
+            [
+                "id": -3,
+                "title": "High priority",
+                "views": [["id": 21, "title": "List", "project_id": -3, "view_kind": "list"]],
+            ],
         ])
         let all = try tasks([1, 2, 3, 14])
         let empty = try json([])
@@ -463,9 +467,15 @@ final class AppStateTests: XCTestCase {
         MockURLProtocol.requestHandler = { request in
             let path = request.url?.path ?? ""
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
-            if path.hasSuffix("/projects/-3/views/21/tasks") { return (response, matches) }
-            if path.hasSuffix("/projects") { return (response, projects) }
-            if path.hasSuffix("/labels") { return (response, empty) }
+            if path.hasSuffix("/projects/-3/views/21/tasks") {
+                return (response, matches)
+            }
+            if path.hasSuffix("/projects") {
+                return (response, projects)
+            }
+            if path.hasSuffix("/labels") {
+                return (response, empty)
+            }
             return (response, all)
         }
 
