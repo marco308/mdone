@@ -571,7 +571,7 @@ actor APIClient {
         let (firstItems, totalPages) = try await fetchPage(endpointBuilder(1, perPage)) as ([T], Int)
         guard totalPages > 1, !firstItems.isEmpty else { return firstItems }
 
-        let endpoints = (2...totalPages).map { endpointBuilder($0, perPage) }
+        let endpoints = (2 ... totalPages).map { endpointBuilder($0, perPage) }
         var pages = [[T]](repeating: [], count: endpoints.count)
         try await withThrowingTaskGroup(of: (Int, [T]).self) { group in
             var next = 0
@@ -579,10 +579,10 @@ actor APIClient {
                 guard next < endpoints.count else { return }
                 let index = next
                 let endpoint = endpoints[index]
-                group.addTask { (index, try await self.fetchPage(endpoint).0) }
+                group.addTask { try await (index, self.fetchPage(endpoint).0) }
                 next += 1
             }
-            for _ in 0..<Self.maxConcurrentPages {
+            for _ in 0 ..< Self.maxConcurrentPages {
                 addNext()
             }
             while let (index, items) = try await group.next() {

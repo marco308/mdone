@@ -72,7 +72,7 @@ final class RefreshLatencyTests: XCTestCase {
             Endpoint.allTasks(page: page, perPage: perPage)
         }, perPage: 2)
 
-        XCTAssertEqual(tasks.map(\.id), (1...9).flatMap { [Int64($0 * 10), Int64($0 * 10 + 1)] })
+        XCTAssertEqual(tasks.map(\.id), (1 ... 9).flatMap { [Int64($0 * 10), Int64($0 * 10 + 1)] })
         XCTAssertEqual(server.requests, 9)
         XCTAssertEqual(server.maxInFlight, APIClient.maxConcurrentPages)
     }
@@ -114,7 +114,11 @@ final class RefreshLatencyTests: XCTestCase {
             state.projectTaskCache[id] = []
         }
         let projectsJSON = Self.json(projectIds.map {
-            ["id": $0, "title": "P\($0)", "views": [["id": $0 * 10, "title": "List", "project_id": $0, "view_kind": "list"]]]
+            [
+                "id": $0,
+                "title": "P\($0)",
+                "views": [["id": $0 * 10, "title": "List", "project_id": $0, "view_kind": "list"]],
+            ]
         })
         let server = Server()
         MockURLProtocol.asynchronousRequestHandler = { request, proto in
