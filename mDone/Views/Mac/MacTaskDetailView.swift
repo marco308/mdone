@@ -14,7 +14,10 @@ struct MacTaskDetailView: View {
     @State private var repeatInterval: Int64
     @State private var reminders: [TaskReminder]
     @State private var showDeleteConfirm = false
-    @State private var isShowingDescriptionPreview: Bool
+    /// The description editor's state while it is open; `nil` shows the
+    /// preview. `descriptionText` stays the stored text (HTML for web-app
+    /// descriptions) until the editor closes (#277).
+    @State private var descriptionEdit: DescriptionEditSession?
     @State private var estimateSeconds: TimeInterval?
     @State private var percentDone: Double
     /// The description a checklist tap just sent, so the resulting task
@@ -33,7 +36,7 @@ struct MacTaskDetailView: View {
         _selectedProjectId = State(initialValue: task.projectId)
         _repeatInterval = State(initialValue: task.repeatAfter ?? 0)
         _reminders = State(initialValue: task.reminders ?? [])
-        _isShowingDescriptionPreview = State(initialValue: !initialDescription.isEmpty)
+        _descriptionEdit = State(initialValue: initialDescription.isEmpty ? DescriptionEditSession(stored: "") : nil)
         _estimateSeconds = State(initialValue: task.estimatedSeconds)
         _percentDone = State(initialValue: task.percentDone ?? 0)
     }
@@ -42,6 +45,21 @@ struct MacTaskDetailView: View {
     /// changes made while the detail view is open.
     private var isCurrentNow: Bool {
         appState.isCurrent(appState.tasks.first(where: { $0.id == task.id }) ?? task)
+    }
+
+    private var isShowingDescriptionPreview: Bool {
+        descriptionEdit == nil
+    }
+
+    /// Opens the editor on the stored description, or closes it and keeps
+    /// what was typed, converted back to the stored form.
+    private func toggleDescriptionEditing() {
+        if let descriptionEdit {
+            descriptionText = descriptionEdit.storedDescription
+            self.descriptionEdit = nil
+        } else {
+            descriptionEdit = DescriptionEditSession(stored: descriptionText)
+        }
     }
 
     var body: some View {
@@ -60,7 +78,7 @@ struct MacTaskDetailView: View {
                             .foregroundStyle(.secondary)
                         Spacer()
                         Button {
-                            isShowingDescriptionPreview.toggle()
+                            toggleDescriptionEditing()
                         } label: {
                             Image(systemName: isShowingDescriptionPreview ? "pencil" : "eye")
                                 .font(.caption)
@@ -88,10 +106,16 @@ struct MacTaskDetailView: View {
                             .frame(minHeight: 100, maxHeight: 200)
                         }
                     } else {
-                        TextEditor(text: $descriptionText)
-                            .font(.body)
-                            .frame(minHeight: 100, maxHeight: 200)
-                            .scrollContentBackground(.hidden)
+                        TextEditor(text: Binding(
+                            get: { descriptionEdit?.text ?? "" },
+                            set: { descriptionEdit?.text = $0 }
+                        ))
+                        .font(.body)
+                        .frame(minHeight: 100, maxHeight: 200)
+                        .scrollContentBackground(.hidden)
+                        if let mode = descriptionEdit?.mode {
+                            DescriptionEditHint(mode: mode)
+                        }
                     }
                 }
             }
@@ -249,7 +273,7 @@ struct MacTaskDetailView: View {
             selectedProjectId = newTask.projectId
             repeatInterval = newTask.repeatAfter ?? 0
             reminders = newTask.reminders ?? []
-            isShowingDescriptionPreview = !newDescription.isEmpty
+            descriptionEdit = newDescription.isEmpty ? DescriptionEditSession(stored: "") : nil
             estimateSeconds = newTask.estimatedSeconds
             percentDone = newTask.percentDone ?? 0
         }
@@ -288,7 +312,8 @@ struct MacTaskDetailView: View {
     }
 
     private func saveTask() {
-        let body = descriptionText.isEmpty ? nil : descriptionText
+        let current = descriptionEdit?.storedDescription ?? descriptionText
+        let body = current.isEmpty ? nil : current
         // Empty string, not nil: preservingExistingValues treats nil as "keep
         // the old text", so a cleared description must be sent explicitly.
         let composedDescription = EstimateMarker.apply(estimateSeconds, to: body) ?? ""
