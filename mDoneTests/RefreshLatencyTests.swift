@@ -16,15 +16,15 @@ final class RefreshLatencyTests: XCTestCase {
         super.tearDown()
     }
 
-    private static func json(_ value: Any) -> Data {
+    private nonisolated static func json(_ value: Any) -> Data {
         (try? JSONSerialization.data(withJSONObject: value)) ?? Data()
     }
 
-    private static func tasksJSON(_ ids: [Int64]) -> Data {
+    private nonisolated static func tasksJSON(_ ids: [Int64]) -> Data {
         json(ids.map { ["id": $0, "title": "Task \($0)", "done": false, "priority": 0, "project_id": 1] })
     }
 
-    private static func page(of request: URLRequest) -> Int {
+    private nonisolated static func page(of request: URLRequest) -> Int {
         let items = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems
         return Int(items?.first { $0.name == "page" }?.value ?? "1") ?? 1
     }
@@ -72,7 +72,11 @@ final class RefreshLatencyTests: XCTestCase {
             Endpoint.allTasks(page: page, perPage: perPage)
         }, perPage: 2)
 
-        XCTAssertEqual(tasks.map(\.id), (1 ... 9).flatMap { [Int64($0 * 10), Int64($0 * 10 + 1)] })
+        var expected: [Int64] = []
+        for page: Int64 in 1 ... 9 {
+            expected += [page * 10, page * 10 + 1]
+        }
+        XCTAssertEqual(tasks.map(\.id), expected)
         XCTAssertEqual(server.requests, 9)
         XCTAssertEqual(server.maxInFlight, APIClient.maxConcurrentPages)
     }
