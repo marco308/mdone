@@ -680,8 +680,11 @@ final class AppState {
         }
 
         do {
+            // All three at once: each waited for the one before it, which
+            // made a refresh a long chain of round trips (#276).
             async let fetchedTasks = taskService.fetchAllTasks(perPage: 200)
             async let fetchedProjects = projectService.fetchProjects()
+            async let fetchedLabels = labelService.fetchLabels()
 
             tasks = try await fetchedTasks
             await updateRetryState()
@@ -696,15 +699,10 @@ final class AppState {
             print("[mDone] refreshAll: got \(projects.count) projects")
             #endif
 
-            labels = try await labelService.fetchLabels()
+            labels = try await fetchedLabels
             #if DEBUG
             print("[mDone] refreshAll: got \(labels.count) labels")
             #endif
-
-            let notificationsEnabled = UserDefaults.standard.bool(forKey: "notificationsEnabled")
-            if notificationsEnabled {
-                await notificationService.scheduleReminders(for: tasks)
-            }
 
             await refreshCachedProjectOrders()
             await loadCurrentUserIfNeeded()
@@ -720,6 +718,13 @@ final class AppState {
             pushWidgetData()
             WidgetCenter.shared.reloadAllTimelines()
 
+            // The lists are up to date now; reminders and calendar events
+            // follow without holding the spinner (#276).
+            isLoading = false
+            let notificationsEnabled = UserDefaults.standard.bool(forKey: "notificationsEnabled")
+            if notificationsEnabled {
+                await notificationService.scheduleReminders(for: tasks)
+            }
             await refreshCalendarEvents()
         } catch let error as NetworkError {
             #if DEBUG
@@ -748,8 +753,8 @@ final class AppState {
     /// a queued offline edit replayed just before this refresh, would sit at
     /// the bottom of that project's manual order until its screen was
     /// reopened (issue #185). Only projects opened this session are cached,
-    /// so this is a handful of requests at most. Orders for projects that no
-    /// longer exist are dropped.
+    /// so this is a handful of requests at most, read together rather than
+    /// in turn (#276). Orders for projects that no longer exist are dropped.
     @MainActor
     private func refreshCachedProjectOrders() async {
         let cachedIds = Set(projectTaskCache.keys)
@@ -758,8 +763,15 @@ final class AppState {
         for id in goneIds {
             projectTaskCache[id] = nil
         }
-        for project in stillPresent {
-            await fetchProjectTasks(project: project)
+        await withTaskGroup(of: (Int64, [VTask]?).self) { group in
+            for project in stillPresent {
+                group.addTask { await (project.id, self.loadProjectTasks(project: project)) }
+            }
+            for await (projectId, viewTasks) in group {
+                if let viewTasks {
+                    applyProjectTasks(viewTasks, projectId: projectId)
+                }
+            }
         }
     }
 

@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - Share a task as a link. Long-press a task (right-click on the Mac) or use the share button in its details to share or copy a link to it on your Vikunja server, ready to hand to an agent or open in the Vikunja web app.
 
+### Changed
+- Refreshing is quicker, most of all with a lot of tasks or a server far away. mDone now asks the server for your tasks, projects and labels at the same time instead of one after another, and the spinner goes away as soon as your lists are up to date (#276).
+
 ## [1.21.0] - 2026-10-23
 
 ### Added

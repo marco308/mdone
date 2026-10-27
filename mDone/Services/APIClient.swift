@@ -558,32 +558,56 @@ actor APIClient {
     }
 
     /// Fetches all pages of a paginated endpoint and returns the combined results.
-    func fetchAllPages<T: Decodable>(
+    ///
+    /// The first page says how many there are; the rest are then read a few
+    /// at a time instead of one after another. Vikunja caps a page at 50
+    /// tasks whatever `perPage` asks for, so a long list is many pages, and
+    /// waiting for each in turn made a refresh slow on a distant server
+    /// (#276). Results keep page order.
+    func fetchAllPages<T: Decodable & Sendable>(
         _ endpointBuilder: (Int, Int) -> Endpoint,
         perPage: Int = 100
     ) async throws -> [T] {
-        var allItems: [T] = []
-        var page = 1
+        let (firstItems, totalPages) = try await fetchPage(endpointBuilder(1, perPage)) as ([T], Int)
+        guard totalPages > 1, !firstItems.isEmpty else { return firstItems }
 
-        while true {
-            let endpoint = endpointBuilder(page, perPage)
-            let (data, httpResponse) = try await executeWithRefresh { try self.buildRequest(for: endpoint) }
-            let responseData = try handleResponse(data: data, httpResponse: httpResponse)
-
-            let items: [T]
-            do {
-                items = try decoder.decode([T].self, from: responseData)
-            } catch {
-                throw NetworkError.decodingError(error)
+        let endpoints = (2...totalPages).map { endpointBuilder($0, perPage) }
+        var pages = [[T]](repeating: [], count: endpoints.count)
+        try await withThrowingTaskGroup(of: (Int, [T]).self) { group in
+            var next = 0
+            func addNext() {
+                guard next < endpoints.count else { return }
+                let index = next
+                let endpoint = endpoints[index]
+                group.addTask { (index, try await self.fetchPage(endpoint).0) }
+                next += 1
             }
-            allItems.append(contentsOf: items)
-
-            let totalPages = Int(httpResponse.value(forHTTPHeaderField: "x-pagination-total-pages") ?? "1") ?? 1
-            if page >= totalPages || items.isEmpty {
-                return allItems
+            for _ in 0..<Self.maxConcurrentPages {
+                addNext()
             }
-            page += 1
+            while let (index, items) = try await group.next() {
+                pages[index] = items
+                addNext()
+            }
         }
+        return firstItems + pages.flatMap { $0 }
+    }
+
+    /// How many pages `fetchAllPages` reads at once. Enough to hide the
+    /// round trips without hammering a small self-hosted server.
+    static let maxConcurrentPages = 4
+
+    private func fetchPage<T: Decodable>(_ endpoint: Endpoint) async throws -> ([T], Int) {
+        let (data, httpResponse) = try await executeWithRefresh { try self.buildRequest(for: endpoint) }
+        let responseData = try handleResponse(data: data, httpResponse: httpResponse)
+        let items: [T]
+        do {
+            items = try decoder.decode([T].self, from: responseData)
+        } catch {
+            throw NetworkError.decodingError(error)
+        }
+        let totalPages = Int(httpResponse.value(forHTTPHeaderField: "x-pagination-total-pages") ?? "1") ?? 1
+        return (items, totalPages)
     }
 
     func send<R: Decodable>(_ endpoint: Endpoint, body: some Encodable) async throws -> R {
