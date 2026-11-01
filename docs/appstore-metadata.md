@@ -104,9 +104,29 @@ Steps to test:
    - Open Settings > Tasks and set "Default project", then add a task from the Inbox to see it land there.
    - Turn on Settings > Tasks > "Smart parsing in quick add", then type "Call the dentist tomorrow at 3pm !3" in the Inbox's add-task field. Chips for the date and priority appear under the field before you add it.
    - Turn on Settings > Teams > "Team features", open a task and tap "Assign" in its Assignees section. Pick yourself from the list: the task row now shows your initials, and the advanced filter offers "Assigned to me". (Only people a project is shared with in Vikunja can be assigned, so on this test account the list holds just the review user.)
+   - Open a task and tap the share button (or long-press a task and choose "Copy Link") to share a link to it on the Vikunja server.
    - Say "Hey Siri, add a task in mDone" (the app can be closed). Siri asks for the task, adds it to the first project, and reads back where it went and when it is due. On a Mac, use the Shortcuts app's "Add Task" action for mDone.
 
 This is a private test server maintained by the developer for App Store review purposes.
+
+## What's New (v1.22.0)
+
+### iPhone and iPad
+
+Share a link to a task, and quicker refreshing.
+
+- Share a task as a link. Long-press a task or use the share button in its details to share or copy a link to it on your Vikunja server.
+- Descriptions written in the Vikunja web app now edit as readable text with bold, italic, links, lists and checklists, instead of raw HTML.
+- Refreshing is quicker, most of all with a lot of tasks or a distant server.
+
+### Mac
+
+Share a link to a task, and saved filters fixed.
+
+- Share a task as a link. Right-click a task or use the share button in its details to share or copy a link to it on your Vikunja server.
+- Saved filters and My Open Tasks show their tasks again instead of an empty list.
+- Descriptions written in the Vikunja web app now edit as readable text with bold, italic, links, lists and checklists, instead of raw HTML.
+- Refreshing is quicker, most of all with a lot of tasks or a distant server.
 
 ## What's New (v1.21.0)
 
