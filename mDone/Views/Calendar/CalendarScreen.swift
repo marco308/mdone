@@ -17,7 +17,7 @@ struct CalendarScreen: View {
             CalendarGrid(
                 displayedMonth: $displayedMonth,
                 selectedDate: $selectedDate,
-                tasksForMonth: appState.datesWithTasks(in: displayedMonth),
+                tasksForMonth: appState.occurrencesByDay(in: displayedMonth),
                 eventsForMonth: monthCalendarEvents
             )
             .padding(.horizontal)
@@ -27,7 +27,7 @@ struct CalendarScreen: View {
 
             DayTaskList(
                 date: selectedDate,
-                tasks: appState.tasksForDate(selectedDate),
+                occurrences: appState.occurrences(on: selectedDate),
                 calendarEvents: dayCalendarEvents
             )
         }

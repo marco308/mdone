@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Repeating tasks now show on the calendar on every day they are due, not only on their next one. A daily task appears on each remaining day of the month and a weekly task on each week it falls in, so you can see what is coming. These future occurrences are drawn in a lighter shade with a dashed circle and cannot be ticked off, edited or deleted, because Vikunja keeps a single copy of a repeating task and moves it forward when you complete the real one (#35).
+- Monthly repeating tasks are now recognised as repeating. Vikunja records a monthly repeat without an interval, which the app read as "does not repeat", so those tasks showed no repeat marker anywhere (#35).
+
 ## [1.22.0] - 2026-11-01
 
 ### Added

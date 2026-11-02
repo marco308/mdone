@@ -66,8 +66,12 @@ struct VTask: Codable, Identifiable, Hashable {
         return (subs.filter(\.done).count, subs.count)
     }
 
+    /// Whether this task repeats. Delegates to `TaskRecurrence` rather than
+    /// reading `repeatAfter`, which alone misses Vikunja's monthly mode: that
+    /// mode carries `repeat_after = 0`, so a monthly task used to be invisible
+    /// as a repeating one everywhere in the app (issue #35).
     var isRepeating: Bool {
-        (repeatAfter ?? 0) > 0
+        recurrence != nil
     }
 
     /// The interval picker edits fixed-second recurrences. Preserve Vikunja's
@@ -99,16 +103,7 @@ struct VTask: Codable, Identifiable, Hashable {
     }
 
     var repeatDescription: String? {
-        guard let interval = repeatAfter, interval > 0 else { return nil }
-        let hours = interval / 3600
-        let days = hours / 24
-        if days == 1 { return String(localized: "Daily") }
-        if days == 7 { return String(localized: "Weekly") }
-        if days >= 28 && days <= 31 { return String(localized: "Monthly") }
-        if days == 365 || days == 366 { return String(localized: "Yearly") }
-        if days > 0 { return String(localized: "Every \(days) days") }
-        if hours > 0 { return String(localized: "Every \(hours) hours") }
-        return String(localized: "Repeating")
+        recurrence?.label
     }
 
     /// Whether the due date has a specific time (not midnight)

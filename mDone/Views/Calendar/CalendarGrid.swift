@@ -3,7 +3,7 @@ import SwiftUI
 struct CalendarGrid: View {
     @Binding var displayedMonth: Date
     @Binding var selectedDate: Date
-    let tasksForMonth: [Date: [VTask]]
+    let tasksForMonth: [Date: [TaskOccurrence]]
     var eventsForMonth: [Date: [CalendarEvent]] = [:]
 
     @AppStorage(WeekStartPreference.storageKey) private var firstWeekdayPref = WeekStartPreference.system.rawValue
@@ -66,14 +66,18 @@ struct CalendarGrid: View {
 
             // Day cells
             LazyVGrid(columns: columns, spacing: 8) {
-                ForEach(daysInMonth(), id: \.self) { date in
-                    if let date {
+                // Indexed rather than `id: \.self`: the leading padding cells
+                // are all `nil`, so identifying by value gives every one of
+                // them the same id, which is undefined behaviour in a ForEach.
+                let days = daysInMonth()
+                ForEach(days.indices, id: \.self) { index in
+                    if let date = days[index] {
                         let dayKey = calendar.startOfDay(for: date)
                         DayCell(
                             date: date,
                             isToday: calendar.isDateInToday(date),
                             isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
-                            tasks: tasksForMonth[dayKey] ?? [],
+                            occurrences: tasksForMonth[dayKey] ?? [],
                             events: eventsForMonth[dayKey] ?? []
                         )
                         .onTapGesture {
@@ -134,7 +138,9 @@ struct DayCell: View {
     let date: Date
     let isToday: Bool
     let isSelected: Bool
-    let tasks: [VTask]
+    /// Real placements first, then projected future occurrences of repeating
+    /// tasks. The order matters: the dot row shows the first three.
+    let occurrences: [TaskOccurrence]
     var events: [CalendarEvent] = []
 
     /// One color per distinct calendar represented that day, capped so the row of dots
@@ -168,9 +174,12 @@ struct DayCell: View {
 
             // Task and event dots
             HStack(spacing: 2) {
-                ForEach(0 ..< min(tasks.count, 3), id: \.self) { index in
+                ForEach(0 ..< min(occurrences.count, 3), id: \.self) { index in
                     Circle()
-                        .fill(dotColor(for: tasks[index]))
+                        .fill(dotColor(for: occurrences[index].task))
+                        // A projection is a note that the task will be back,
+                        // not work scheduled for that day, so it reads fainter.
+                        .opacity(occurrences[index].isProjected ? 0.4 : 1)
                         .frame(width: 5, height: 5)
                 }
 
@@ -193,12 +202,16 @@ struct DayCell: View {
         // Whole-string variants rather than fragments appended to the date, so
         // a translator controls the word order and punctuation.
         let day = date.formatted(date: .complete, time: .omitted)
-        switch (isToday, tasks.isEmpty) {
-        case (false, true): return day
-        case (true, true): return String(localized: "\(day), today")
-        case (false, false): return String(localized: "\(day), \(tasks.count) tasks")
-        case (true, false): return String(localized: "\(day), today, \(tasks.count) tasks")
+        let taskCount = occurrences.filter { !$0.isProjected }.count
+        let label = switch (isToday, taskCount == 0) {
+        case (false, true): day
+        case (true, true): String(localized: "\(day), today")
+        case (false, false): String(localized: "\(day), \(taskCount) tasks")
+        case (true, false): String(localized: "\(day), today, \(taskCount) tasks")
         }
+        let projectedCount = occurrences.filter(\.isProjected).count
+        guard projectedCount > 0 else { return label }
+        return String(localized: "\(label), \(projectedCount) upcoming")
     }
 
     private func dotColor(for task: VTask) -> Color {

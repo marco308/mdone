@@ -382,6 +382,22 @@ final class TaskServiceTests: XCTestCase {
         XCTAssertFalse(task.isRepeating)
     }
 
+    /// Vikunja's monthly mode carries `repeat_after = 0`, so reading the
+    /// interval alone reported a monthly task as not repeating: no repeat badge
+    /// on the row, and nothing for the calendar to project from (issue #35).
+    func testIsRepeatingTrueForMonthlyModeWithZeroInterval() {
+        let task = VTask(
+            id: 1,
+            title: "T",
+            done: false,
+            priority: 0,
+            projectId: 1,
+            repeatAfter: 0,
+            repeatMode: 1
+        )
+        XCTAssertTrue(task.isRepeating)
+    }
+
     // MARK: - VTask repeatDescription
 
     func testRepeatDescriptionDaily() {
@@ -421,6 +437,19 @@ final class TaskServiceTests: XCTestCase {
         // 2 hours = 7200 seconds
         let task = VTask(id: 1, title: "T", done: false, priority: 0, projectId: 1, repeatAfter: 7200)
         XCTAssertEqual(task.repeatDescription, "Every 2 hours")
+    }
+
+    func testRepeatDescriptionMonthlyModeWithZeroInterval() {
+        let task = VTask(
+            id: 1,
+            title: "T",
+            done: false,
+            priority: 0,
+            projectId: 1,
+            repeatAfter: 0,
+            repeatMode: 1
+        )
+        XCTAssertEqual(task.repeatDescription, "Monthly")
     }
 
     // MARK: - VTask isOverdue end-of-day grace
