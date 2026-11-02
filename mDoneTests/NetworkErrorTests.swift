@@ -80,6 +80,9 @@ final class NetworkErrorTests: XCTestCase {
         let errors: [NetworkError] = [
             .invalidURL,
             .unauthorized,
+            .invalidCredentials,
+            .totpRequired,
+            .invalidTOTPPasscode,
             .serverError(statusCode: 400, message: "Bad Request"),
             .serverError(statusCode: 500, message: nil),
             .decodingError(NSError(domain: "Test", code: 0)),
@@ -135,6 +138,22 @@ final class NetworkErrorTests: XCTestCase {
 
         XCTAssertEqual(json?["username"] as? String, "testuser")
         XCTAssertEqual(json?["password"] as? String, "secret123")
+        // Omitted, not null: Vikunja treats an empty passcode as a wrong one,
+        // and an account without two-factor should never see the field.
+        XCTAssertNil(json?["totp_passcode"] ?? json?["totpPasscode"])
+        XCTAssertEqual(json?.count, 2)
+    }
+
+    func testLoginRequestEncodesTOTPPasscodeInSnakeCase() throws {
+        // The real client encodes with `convertToSnakeCase`; the field has to
+        // land as `totp_passcode`, which is what Vikunja reads (issue #179).
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let request = LoginRequest(username: "testuser", password: "secret123", totpPasscode: "123456")
+        let json = try JSONSerialization.jsonObject(with: encoder.encode(request)) as? [String: Any]
+
+        XCTAssertEqual(json?["totp_passcode"] as? String, "123456")
+        XCTAssertNil(json?["totpPasscode"])
     }
 
     func testLoginResponseDecoding() throws {

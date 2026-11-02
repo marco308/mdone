@@ -13,6 +13,11 @@ struct AuthOptions: Equatable {
     var showsAPIToken: Bool
     /// SSO buttons to render, in server order. Empty when OIDC is off.
     var providers: [OIDCProvider]
+    /// Whether to offer a two-factor code field alongside the password. True
+    /// when the instance has TOTP turned on. The field is optional either
+    /// way, because the instance flag says nothing about whether this
+    /// particular account has enrolled (issue #179).
+    var showsTOTP: Bool
 
     /// True when the server offers neither password nor SSO login, leaving an
     /// API token as the only way in. Worth saying out loud in the UI rather
@@ -26,10 +31,11 @@ struct AuthOptions: Equatable {
     /// the credentials form and no SSO.
     static let unknownServer = AuthOptions(showsCredentials: true, showsAPIToken: true, providers: [])
 
-    init(showsCredentials: Bool, showsAPIToken: Bool, providers: [OIDCProvider]) {
+    init(showsCredentials: Bool, showsAPIToken: Bool, providers: [OIDCProvider], showsTOTP: Bool = false) {
         self.showsCredentials = showsCredentials
         self.showsAPIToken = showsAPIToken
         self.providers = providers
+        self.showsTOTP = showsTOTP
     }
 
     init(info: ServerInfo) {
@@ -47,5 +53,7 @@ struct AuthOptions: Equatable {
         // `enabled: false` with a populated `providers` array is not something
         // Vikunja is expected to send, but trust the flag over the list.
         providers = auth.openidConnect.enabled ? (auth.openidConnect.providers ?? []) : []
+
+        showsTOTP = info.totpEnabled
     }
 }

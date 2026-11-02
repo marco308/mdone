@@ -28,11 +28,44 @@ final class FocusManager {
         return session.isPaused
     }
 
+    /// The Focus Run in progress, if the current session is part of one.
+    /// Plain Focus leaves this nil and ends when its task is done.
+    private(set) var run: FocusRun?
+
+    /// Set once when a run reaches the end of its list, so the focus screen
+    /// can say how it went. Cleared by `dismissRunSummary()` or a new start.
+    private(set) var finishedRun: FocusRunSummary?
+
+    /// Looks a task id up in the live task list, returning it with its
+    /// project's name. The app wires this to `AppState`; a run needs it to
+    /// turn the next queued id into something it can focus.
+    var taskLookup: ((Int64) -> (task: VTask, projectName: String)?)?
+
+    var isRunActive: Bool {
+        run != nil
+    }
+
+    /// The task a run will move to next, if any.
+    var runUpNext: VTask? {
+        guard let run else { return nil }
+        return run.peekNext(where: isEligibleForRun).flatMap { taskLookup?($0)?.task }
+    }
+
+    /// Eligible tasks left in the run after the focused one.
+    var runRemainingCount: Int {
+        run?.remainingCount(where: isEligibleForRun) ?? 0
+    }
+
     // MARK: - Private
+
+    static let focusRunKey = "com.mdone.focusRun"
 
     private var activity: Activity<FocusTaskAttributes>?
     private let modelContainer: ModelContainer?
     private let outbox: FocusOutboxService?
+    /// Off in unit tests so a run can advance without asking ActivityKit for
+    /// a real Live Activity on the test host.
+    private let liveActivitiesEnabled: Bool
 
     private var sharedDefaults: UserDefaults {
         FocusConstants.sharedDefaults
@@ -40,10 +73,16 @@ final class FocusManager {
 
     // MARK: - Init
 
-    init(modelContainer: ModelContainer? = nil, outbox: FocusOutboxService? = nil) {
+    init(
+        modelContainer: ModelContainer? = nil,
+        outbox: FocusOutboxService? = nil,
+        liveActivitiesEnabled: Bool = true
+    ) {
         self.modelContainer = modelContainer
         self.outbox = outbox
+        self.liveActivitiesEnabled = liveActivitiesEnabled
         restoreSession()
+        restoreRun()
     }
 
     // MARK: - Public Methods
@@ -53,6 +92,7 @@ final class FocusManager {
         if currentSession != nil {
             endFocus()
         }
+        finishedRun = nil
 
         let now = Date()
         var session = FocusSession(
@@ -67,7 +107,7 @@ final class FocusManager {
         )
 
         // Start Live Activity — first end any lingering activities to avoid stale display
-        if ActivityAuthorizationInfo().areActivitiesEnabled {
+        if liveActivitiesEnabled, ActivityAuthorizationInfo().areActivitiesEnabled {
             for existingActivity in Activity<FocusTaskAttributes>.activities {
                 Task { await existingActivity.end(nil, dismissalPolicy: .immediate) }
             }
@@ -160,6 +200,7 @@ final class FocusManager {
         activity = nil
         currentSession = nil
         clearPersistedSession()
+        clearRun()
 
         Task {
             // End the specific activity
@@ -195,10 +236,11 @@ final class FocusManager {
             persistCompletedSession(session, endedAt: endedAt, focusedSeconds: elapsed)
         }
 
-        // Clear state immediately
+        // Clear state immediately. Switching by hand leaves any run behind.
         activity = nil
         currentSession = nil
         clearPersistedSession()
+        clearRun()
 
         // End old activity and start new focus sequentially
         Task {
@@ -224,6 +266,10 @@ final class FocusManager {
 
     func handleTaskCompleted(taskId: Int64) {
         guard focusedTaskId == taskId else { return }
+        if run != nil {
+            advanceRun(completedCurrent: true)
+            return
+        }
         endFocus()
         #if DEBUG
         print("[FocusManager] Focused task completed, ending focus")
@@ -232,10 +278,104 @@ final class FocusManager {
 
     func handleTaskDeleted(taskId: Int64) {
         guard focusedTaskId == taskId else { return }
+        if run != nil {
+            advanceRun(completedCurrent: false)
+            return
+        }
         endFocus()
         #if DEBUG
         print("[FocusManager] Focused task deleted, ending focus")
         #endif
+    }
+
+    // MARK: - Focus Run
+
+    /// Focuses `task` and queues the tasks listed after it in `order`, so
+    /// finishing one brings up the next. `order` is the list as the user sees
+    /// it, top to bottom.
+    func startFocusRun(task: VTask, projectName: String, order: [Int64]) {
+        let newRun = FocusRun(startingAt: task.id, in: order)
+        // Both paths clear any previous run; the new one is set after them.
+        // With nothing focused there is no old Live Activity to wait out, so
+        // start straight away rather than on switchFocus's follow-up task.
+        if currentSession == nil {
+            clearRun()
+            startFocus(task: task, projectName: projectName)
+        } else {
+            switchFocus(task: task, projectName: projectName)
+        }
+        finishedRun = nil
+        run = newRun
+        persistRun()
+    }
+
+    /// Moves on to the next task without completing the focused one.
+    func skipToNextInRun() {
+        guard run != nil, currentSession != nil else { return }
+        advanceRun(completedCurrent: false)
+    }
+
+    func dismissRunSummary() {
+        finishedRun = nil
+    }
+
+    /// Records the focused task's session and starts the next one in the run,
+    /// or ends focus with a summary when the list has run out.
+    private func advanceRun(completedCurrent: Bool) {
+        guard var advancing = run else { return }
+        let nextId = advancing.advance(completedCurrent: completedCurrent, where: isEligibleForRun)
+        guard let nextId, let next = taskLookup?(nextId) else {
+            let summary = FocusRunSummary(
+                completedCount: advancing.completedCount,
+                skippedCount: advancing.skippedCount
+            )
+            endFocus()
+            finishedRun = summary
+            #if DEBUG
+            print("[FocusManager] Focus run finished: \(summary.completedCount) done")
+            #endif
+            return
+        }
+
+        // Close out the current session without the lingering-activity sweep
+        // in endFocus: that sweep runs later and would take the next task's
+        // new Live Activity down with it.
+        let activityToEnd = activity
+        let endedAt = Date()
+        if let session = currentSession {
+            let elapsed = session.totalElapsed(at: endedAt)
+            persistCompletedSession(session, endedAt: endedAt, focusedSeconds: elapsed)
+            Task {
+                await activityToEnd?.end(
+                    .init(
+                        state: FocusTaskAttributes.ContentState(
+                            focusStartDate: endedAt,
+                            isPaused: true,
+                            elapsedBeforePause: elapsed
+                        ),
+                        staleDate: nil
+                    ),
+                    dismissalPolicy: .immediate
+                )
+            }
+        }
+        activity = nil
+        currentSession = nil
+        clearPersistedSession()
+
+        startFocus(task: next.task, projectName: next.projectName)
+        run = advancing
+        persistRun()
+        #if DEBUG
+        print("[FocusManager] Focus run moved on to: \(next.task.title)")
+        #endif
+    }
+
+    /// A queued task is worth focusing while it is still in the live list
+    /// and not done.
+    private func isEligibleForRun(_ taskId: Int64) -> Bool {
+        guard let task = taskLookup?(taskId)?.task else { return false }
+        return !task.done
     }
 
     // MARK: - Private Methods
@@ -353,6 +493,32 @@ final class FocusManager {
 
     private func clearPersistedSession() {
         sharedDefaults.removeObject(forKey: FocusConstants.focusSessionKey)
+    }
+
+    private func persistRun() {
+        guard let run, let data = try? JSONEncoder().encode(run) else {
+            sharedDefaults.removeObject(forKey: Self.focusRunKey)
+            return
+        }
+        sharedDefaults.set(data, forKey: Self.focusRunKey)
+    }
+
+    private func clearRun() {
+        run = nil
+        sharedDefaults.removeObject(forKey: Self.focusRunKey)
+    }
+
+    /// A run only means something alongside the session it belongs to, so it
+    /// is restored only when a session was.
+    private func restoreRun() {
+        guard currentSession != nil,
+              let data = sharedDefaults.data(forKey: Self.focusRunKey),
+              let saved = try? JSONDecoder().decode(FocusRun.self, from: data)
+        else {
+            sharedDefaults.removeObject(forKey: Self.focusRunKey)
+            return
+        }
+        run = saved
     }
 
     // Internal (not private) so unit tests can drive it without going through ActivityKit.

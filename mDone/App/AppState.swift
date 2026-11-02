@@ -1,3 +1,4 @@
+import AppIntents
 import EventKit
 import Foundation
 import SwiftUI
@@ -8,12 +9,18 @@ import WidgetKit
 
 @Observable
 final class AppState {
-    var isAuthenticated: Bool = false
+    var isAuthenticated: Bool = false {
+        didSet { listRevision &+= 1 }
+    }
+
     var isLoading: Bool = false
     var errorMessage: String?
     var activeError: NetworkError?
 
-    var tasks: [VTask] = []
+    var tasks: [VTask] = [] {
+        didSet { listRevision &+= 1 }
+    }
+
     var projects: [Project] = []
     /// Archived projects, loaded on demand for the Archived view. Kept separate
     /// from `projects`, which only ever holds active (non-archived) projects.
@@ -56,7 +63,9 @@ final class AppState {
 
     var searchQuery: String = ""
     var activeFilter: TaskFilter?
-    var advancedFilterString: String?
+    /// The advanced filter sheet's choices, applied on top of `tasks` by
+    /// `applyingFilters(to:)`. Never used to replace `tasks` itself.
+    var advancedFilter = AdvancedTaskFilter()
     var pendingOperationsCount: Int = 0
     var isRetrying: Bool = false
 
@@ -75,6 +84,8 @@ final class AppState {
     /// the grid and day list immediately, not just the Today view.
     private(set) var calendarFilterToken = UUID()
 
+    /// Called when the user marks a task done, including a repeating task
+    /// the server hands back undone with its next date.
     var onTaskCompleted: ((Int64) -> Void)?
     var onTaskDeleted: ((Int64) -> Void)?
 
@@ -93,10 +104,37 @@ final class AppState {
     }
 
     /// Per-project ordered task lists fetched from the view endpoint (preserves positions).
-    var projectTaskCache: [Int64: [VTask]] = [:]
+    var projectTaskCache: [Int64: [VTask]] = [:] {
+        didSet { listRevision &+= 1 }
+    }
+
+    /// Bumped by every change to the lists above (and by sign-in/out) so a
+    /// quiet background read that raced a local change is thrown away
+    /// instead of putting older rows back. See `refreshVisibleList`.
+    @ObservationIgnored private var listRevision: UInt64 = 0
+    @ObservationIgnored private let liveListRefresh = LiveListRefresh()
+
+    /// Sort choices changed this session, keyed by list. Lives here rather
+    /// than in view state so it survives navigation and so every screen
+    /// showing the same project agrees; `UserDefaults` holds the rest.
+    private var sortPreferences: [TaskSortScope: TaskSortPreference] = [:]
+
+    /// Bumped by every reorder so a refetch started by an earlier drag cannot
+    /// overwrite the order a later drag produced.
+    @ObservationIgnored private var reorderGeneration = 0
+
+    // MARK: Team features (#272)
+
+    /// The signed-in user, read only while Team features is on. Drives the
+    /// "Assigned to me" filter; nil until loaded, and after sign-out.
+    private(set) var currentUser: User?
+
+    /// Who each project's tasks can be assigned to, read when the assignee
+    /// picker opens and kept for the session.
+    private(set) var assignableUsers: [Int64: [User]] = [:]
 
     var unreadNotificationCount: Int {
-        notifications.filter { $0.read != true }.count
+        notifications.filter(\.isUnread).count
     }
 
     /// The live instance backing the UI, set on init. App Intents run in the
@@ -109,17 +147,20 @@ final class AppState {
     init(
         taskService: TaskService = TaskService(),
         projectService: ProjectService = ProjectService(),
-        labelService: LabelService = LabelService()
+        labelService: LabelService = LabelService(),
+        userService: UserService = UserService()
     ) {
         self.taskService = taskService
         self.projectService = projectService
         self.labelService = labelService
+        self.userService = userService
         AppState.shared = self
     }
 
     private let taskService: TaskService
     private let projectService: ProjectService
     private let labelService: LabelService
+    private let userService: UserService
     private let authService = AuthService.shared
     private let notificationService = NotificationService.shared
 
@@ -254,19 +295,43 @@ final class AppState {
         tasks.filter { !$0.done }
     }
 
+    /// Whether a search, a filter chip or the advanced filter is narrowing
+    /// the list, in which case the task screens show flat results instead of
+    /// their usual sections.
+    var isFiltering: Bool {
+        !searchQuery.isEmpty || activeFilter != nil || advancedFilter.isActive
+    }
+
     var filteredTasks: [VTask] {
-        var result = tasks
+        applyingFilters(to: tasks)
+    }
+
+    /// Applies the advanced filter, the active chip and the search text to
+    /// `tasks`, in that order. Everything here is local: `tasks` already holds
+    /// every page, so nothing is fetched and nothing is overwritten, which is
+    /// what keeps a refresh from silently dropping a filter.
+    func applyingFilters(to tasks: [VTask]) -> [VTask] {
+        var result = advancedFilter.apply(to: tasks)
 
         if let activeFilter {
             result = activeFilter.apply(to: result)
         }
 
-        if !searchQuery.isEmpty {
-            let query = searchQuery.lowercased()
-            result = result.filter { $0.title.lowercased().contains(query) }
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !query.isEmpty {
+            result = result.filter { Self.task($0, matchesSearch: query) }
         }
 
         return result
+    }
+
+    /// Case- and diacritic-insensitive match on the title or description.
+    static func task(_ task: VTask, matchesSearch query: String) -> Bool {
+        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
+        if task.title.range(of: query, options: options) != nil {
+            return true
+        }
+        return task.description?.range(of: query, options: options) != nil
     }
 
     // MARK: - Current (long-running) tasks
@@ -347,7 +412,9 @@ final class AppState {
     /// exists to stop us copying three times (noted in the PR #103 review).
     private enum LoginMethod {
         case apiToken(String)
-        case credentials(username: String, password: String)
+        /// `totpPasscode` is nil when the user left the two-factor field
+        /// empty, so the request omits it rather than sending "".
+        case credentials(username: String, password: String, totpPasscode: String?)
         /// `redirectURI` must be byte-identical to the one sent on the
         /// authorization request, or Vikunja's exchange fails with
         /// `invalid_grant`. Thread the same constant through, never rebuild it.
@@ -359,9 +426,21 @@ final class AppState {
         try await completeLogin(serverURL: serverURL, using: .apiToken(token))
     }
 
+    /// Signs in with a username and password, plus the account's two-factor
+    /// passcode when it has one (issue #179). Throws `NetworkError.totpRequired`
+    /// when the account needs a passcode and none was given, so the setup
+    /// screen can reveal the field.
     @MainActor
-    func loginWithCredentials(serverURL: String, username: String, password: String) async throws {
-        try await completeLogin(serverURL: serverURL, using: .credentials(username: username, password: password))
+    func loginWithCredentials(
+        serverURL: String,
+        username: String,
+        password: String,
+        totpPasscode: String? = nil
+    ) async throws {
+        try await completeLogin(
+            serverURL: serverURL,
+            using: .credentials(username: username, password: password, totpPasscode: totpPasscode)
+        )
     }
 
     /// Finishes an OIDC login with the code the auth session brought back.
@@ -435,13 +514,18 @@ final class AppState {
             // refresh it", which cannot work for an API token.
             return (token, nil)
 
-        case let .credentials(username, password):
+        case let .credentials(username, password, totpPasscode):
             await APIClient.shared.configure(serverURL: serverURL, token: "")
-            let response: LoginResponse = try await APIClient.shared.send(
-                Endpoint.login,
-                body: LoginRequest(username: username, password: password)
-            )
-            return await (response.token, APIClient.shared.currentRefreshToken())
+            do {
+                let response: LoginResponse = try await APIClient.shared.send(
+                    Endpoint.login,
+                    body: LoginRequest(username: username, password: password, totpPasscode: totpPasscode)
+                )
+                return await (response.token, APIClient.shared.currentRefreshToken())
+            } catch let error as NetworkError {
+                // Vikunja cannot tell a missing passcode from a wrong one; we can.
+                throw error.forCredentialLogin(sentPasscode: totpPasscode != nil)
+            }
 
         case let .oidc(provider, code, redirectURI):
             await APIClient.shared.configure(serverURL: serverURL, token: "")
@@ -485,6 +569,8 @@ final class AppState {
         projects = []
         labels = []
         notifications = []
+        currentUser = nil
+        assignableUsers = [:]
         isAuthenticated = false
         isShowingCachedData = false
 
@@ -594,8 +680,11 @@ final class AppState {
         }
 
         do {
+            // All three at once: each waited for the one before it, which
+            // made a refresh a long chain of round trips (#276).
             async let fetchedTasks = taskService.fetchAllTasks(perPage: 200)
             async let fetchedProjects = projectService.fetchProjects()
+            async let fetchedLabels = labelService.fetchLabels()
 
             tasks = try await fetchedTasks
             await updateRetryState()
@@ -603,20 +692,20 @@ final class AppState {
             print("[mDone] refreshAll: got \(tasks.count) tasks")
             #endif
             projects = try await fetchedProjects
+            // Siri's vocabulary for "add a task to <project> in mDone".
+            MDoneAppShortcuts.updateAppShortcutParameters()
             await updateRetryState()
             #if DEBUG
             print("[mDone] refreshAll: got \(projects.count) projects")
             #endif
 
-            labels = try await labelService.fetchLabels()
+            labels = try await fetchedLabels
             #if DEBUG
             print("[mDone] refreshAll: got \(labels.count) labels")
             #endif
 
-            let notificationsEnabled = UserDefaults.standard.bool(forKey: "notificationsEnabled")
-            if notificationsEnabled {
-                await notificationService.scheduleReminders(for: tasks)
-            }
+            await refreshCachedProjectOrders()
+            await loadCurrentUserIfNeeded()
 
             errorMessage = nil
             activeError = nil
@@ -629,6 +718,13 @@ final class AppState {
             pushWidgetData()
             WidgetCenter.shared.reloadAllTimelines()
 
+            // The lists are up to date now; reminders and calendar events
+            // follow without holding the spinner (#276).
+            isLoading = false
+            let notificationsEnabled = UserDefaults.standard.bool(forKey: "notificationsEnabled")
+            if notificationsEnabled {
+                await notificationService.scheduleReminders(for: tasks)
+            }
             await refreshCalendarEvents()
         } catch let error as NetworkError {
             #if DEBUG
@@ -651,6 +747,34 @@ final class AppState {
         }
     }
 
+    /// Re-reads the list view of every project whose order this session has
+    /// cached, so a full refresh brings the per-project order along with the
+    /// tasks. Without it a task moved into a project by another client, or by
+    /// a queued offline edit replayed just before this refresh, would sit at
+    /// the bottom of that project's manual order until its screen was
+    /// reopened (issue #185). Only projects opened this session are cached,
+    /// so this is a handful of requests at most, read together rather than
+    /// in turn (#276). Orders for projects that no longer exist are dropped.
+    @MainActor
+    private func refreshCachedProjectOrders() async {
+        let cachedIds = Set(projectTaskCache.keys)
+        let stillPresent = projects.filter { cachedIds.contains($0.id) }
+        let goneIds = cachedIds.subtracting(stillPresent.map(\.id))
+        for id in goneIds {
+            projectTaskCache[id] = nil
+        }
+        await withTaskGroup(of: (Int64, [VTask]?).self) { group in
+            for project in stillPresent {
+                group.addTask { await (project.id, self.loadProjectTasks(project: project)) }
+            }
+            for await (projectId, viewTasks) in group {
+                if let viewTasks {
+                    applyProjectTasks(viewTasks, projectId: projectId)
+                }
+            }
+        }
+    }
+
     /// Flags the UI as showing cached data when a refresh failed for
     /// connectivity reasons. `NetworkMonitor` only reports the device's own
     /// link, so a reachable Wi-Fi with an unreachable Vikunja (VPN down, server
@@ -663,51 +787,6 @@ final class AppState {
             isShowingCachedData = true
         default:
             break
-        }
-    }
-
-    @MainActor
-    func searchTasks(query: String) async {
-        guard !query.isEmpty else {
-            await refreshAll()
-            return
-        }
-
-        do {
-            let results: [VTask] = try await APIClient.shared.fetch(
-                Endpoint.allTasks(perPage: 200, search: query)
-            )
-            tasks = results
-            errorMessage = nil
-            activeError = nil
-        } catch let error as NetworkError {
-            if case .unauthorized = error {
-                await expireSession()
-            }
-            handleError(error)
-        } catch {
-            handleError(error)
-        }
-    }
-
-    @MainActor
-    func applyAdvancedFilter(_ filterString: String?) async {
-        advancedFilterString = filterString
-
-        do {
-            let results: [VTask] = try await APIClient.shared.fetch(
-                Endpoint.allTasks(perPage: 200, filter: filterString)
-            )
-            tasks = results
-            errorMessage = nil
-            activeError = nil
-        } catch let error as NetworkError {
-            if case .unauthorized = error {
-                await expireSession()
-            }
-            handleError(error)
-        } catch {
-            handleError(error)
         }
     }
 
@@ -818,6 +897,11 @@ final class AppState {
         if result.reminders == nil {
             result.reminders = request.reminders ?? existing?.reminders
         }
+        // Vikunja echoes assignees as bare ids with blank names, so the users
+        // that were sent (carried from the task, or picked) are the truth.
+        if let assignees = request.assignees {
+            result.assignees = assignees
+        }
         return result
     }
 
@@ -884,7 +968,10 @@ final class AppState {
     @MainActor
     func refreshPendingState() {
         pendingTaskIds = syncService?.pendingTaskIds() ?? []
-        pendingOperationsCount = pendingTaskIds.count
+        // Counted separately from the ids: a task created from Siri while
+        // offline is queued with no task id, and it must still be drained
+        // and shown in the banner.
+        pendingOperationsCount = syncService?.pendingOperationCount() ?? 0
     }
 
     /// Collects changes the queue gave up on so the user finds out rather than
@@ -899,9 +986,9 @@ final class AppState {
             let title = operation.taskId.flatMap { id in
                 tasks.first(where: { $0.id == id })?.title
             }
-            let reason = operation.failureReason ?? "the server rejected it"
-            return title.map { "\"\($0)\" could not be synced: \(reason)" }
-                ?? "A queued change could not be synced: \(reason)"
+            let reason = operation.failureReason ?? String(localized: "the server rejected it")
+            return title.map { String(localized: "\"\($0)\" could not be synced: \(reason)") }
+                ?? String(localized: "A queued change could not be synced: \(reason)")
         }
         syncService.discardFailedOperations()
         refreshPendingState()
@@ -920,9 +1007,11 @@ final class AppState {
         if let updated = queueOfflineEdit(intent, for: current) {
             if updated.done {
                 recordCompletionForUndo(current)
-                onTaskCompleted?(updated.id)
             } else {
                 clearUndoIfMatches(id: updated.id)
+            }
+            if intent.done == true {
+                onTaskCompleted?(updated.id)
             }
             #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -951,9 +1040,13 @@ final class AppState {
             syncService?.updateCachedTask(updated)
             if updated.done {
                 recordCompletionForUndo(current)
-                onTaskCompleted?(updated.id)
             } else {
                 clearUndoIfMatches(id: updated.id)
+            }
+            // A repeating task comes back undone with its next date, but the
+            // user still finished this occurrence: focus should move on.
+            if intent.done == true {
+                onTaskCompleted?(updated.id)
             }
             #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -1041,7 +1134,9 @@ final class AppState {
         projectId: Int64,
         description: String? = nil,
         dueDate: Date? = nil,
-        priority: Int64 = 0
+        priority: Int64 = 0,
+        labelIds: [Int64] = [],
+        assignees: [User] = []
     ) async -> VTask? {
         // Creating offline isn't queueable yet: a queued create has no server id,
         // so any later edit or completion of that task would have nothing to
@@ -1054,9 +1149,36 @@ final class AppState {
 
         let request = TaskCreateRequest(title: title, description: description, dueDate: dueDate, priority: priority)
         do {
-            let newTask = try await taskService.createTask(projectId: projectId, request: request)
+            var newTask = try await taskService.createTask(projectId: projectId, request: request)
             tasks.append(newTask)
             syncService?.updateCachedTask(newTask)
+            // Vikunja ignores labels in the create body, so smart quick add's
+            // `*label` goes through the label endpoints once the task exists.
+            // A failure here leaves the task created without that label.
+            for labelId in labelIds {
+                guard let label = labels.first(where: { $0.id == labelId }) else { continue }
+                do {
+                    try await labelService.addLabel(taskId: newTask.id, labelId: labelId)
+                    setLabelLocally(taskId: newTask.id, label: label, present: true)
+                } catch {
+                    handleError(error)
+                }
+            }
+            // Assigned after the create rather than in its body: one user who
+            // cannot see the project makes Vikunja refuse the whole create,
+            // and the task matters more than the assignment.
+            if !assignees.isEmpty {
+                do {
+                    try await taskService.setAssignees(taskId: newTask.id, userIds: assignees.map(\.id))
+                    setAssigneesLocally(taskId: newTask.id, assignees: assignees)
+                } catch {
+                    handleError(error)
+                }
+            }
+            await refetchProjectOrder(of: newTask)
+            if let updated = tasks.first(where: { $0.id == newTask.id }) {
+                newTask = updated
+            }
             #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             #endif
@@ -1066,6 +1188,205 @@ final class AppState {
             handleError(error)
             return nil
         }
+    }
+
+    // MARK: - Assignees (#272)
+
+    /// Reads the signed-in user for "Assigned to me". Does nothing while
+    /// Team features is off, so personal use costs no request.
+    @MainActor
+    func loadCurrentUserIfNeeded() async {
+        guard TeamFeaturesPreference.isEnabled(), isAuthenticated, currentUser == nil, !isOffline else { return }
+        do {
+            currentUser = try await userService.fetchCurrentUser()
+        } catch {
+            // The filter just stays hidden; nothing else depends on this.
+            #if DEBUG
+            print("[mDone] loadCurrentUserIfNeeded failed: \(error)")
+            #endif
+        }
+    }
+
+    /// Called when the Team features setting changes. Turning it off clears
+    /// the assignee filter so nothing hidden keeps narrowing the lists.
+    @MainActor
+    func teamFeaturesDidChange(enabled: Bool) async {
+        if enabled {
+            await loadCurrentUserIfNeeded()
+        } else {
+            advancedFilter.assigneeId = nil
+        }
+    }
+
+    /// The people a task in `projectId` can be assigned to, from the server,
+    /// falling back to what this session last read when that fails.
+    @MainActor
+    func loadAssignableUsers(projectId: Int64) async -> [User] {
+        do {
+            let users = try await userService.fetchProjectUsers(projectId: projectId)
+                .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+            assignableUsers[projectId] = users
+            return users
+        } catch {
+            if assignableUsers[projectId] == nil {
+                handleError(error)
+            }
+            return assignableUsers[projectId] ?? []
+        }
+    }
+
+    /// Replaces who `task` is assigned to. Applied at once, like labels, so
+    /// there is nothing to save. Offline, the change is queued as an edit and
+    /// replayed through the task update, which carries assignees too.
+    @MainActor
+    @discardableResult
+    func setAssignees(_ assignees: [User], on task: VTask) async -> Bool {
+        guard await acquireTaskUpdateSlot(id: task.id) else { return false }
+        defer { releaseTaskUpdateSlot(id: task.id) }
+
+        let current = taskSnapshot(id: task.id) ?? task
+        if queueOfflineEdit(TaskUpdateRequest(assignees: assignees), for: current) != nil {
+            return true
+        }
+        do {
+            try await taskService.setAssignees(taskId: task.id, userIds: assignees.map(\.id))
+            setAssigneesLocally(taskId: task.id, assignees: assignees)
+            return true
+        } catch {
+            handleError(error)
+            return false
+        }
+    }
+
+    @MainActor
+    private func setAssigneesLocally(taskId: Int64, assignees: [User]) {
+        guard let index = tasks.firstIndex(where: { $0.id == taskId }) else { return }
+        tasks[index].assignees = assignees
+        syncEmbeddedRelations(with: tasks[index])
+        syncService?.updateCachedTask(tasks[index])
+    }
+
+    // MARK: - Siri and Shortcuts
+
+    /// Where a task goes when the caller names no project: the one picked in
+    /// Settings, else the "Inbox" project, else the first. The quick-add bar
+    /// on the Inbox and the Mac new-task sheet use it too (#210).
+    var defaultProject: Project? {
+        DefaultProjectPreference.resolve(in: projects)
+    }
+
+    /// Creates a task on behalf of Siri or Shortcuts, where there is no UI to
+    /// fall back on. Unlike `createTask` this works from a cold background
+    /// launch: it signs in from the Keychain and reads projects from the cache
+    /// when nothing has loaded yet. When offline it queues the create rather
+    /// than refusing it. The UI refuses because a queued task has no id for a
+    /// later edit to address (issue #146); a driver talking to Siri cannot
+    /// edit anything anyway, and losing the thought is the worse outcome.
+    /// - Parameters:
+    ///   - dueDate: a date the caller named explicitly. Smart parsing never
+    ///     overrides it.
+    ///   - fallbackDueDate: the "Siri adds tasks due" default, used only when
+    ///     neither the caller nor the parsed text gives a date.
+    @MainActor
+    func createTaskFromIntent(
+        title: String,
+        projectId: Int64?,
+        dueDate: Date?,
+        fallbackDueDate: Date? = nil,
+        smartParsingEnabled: Bool = SmartParsingPreference.isEnabled()
+    ) async throws -> IntentTaskOutcome {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else { throw IntentTaskError.emptyTitle }
+
+        if !isAuthenticated {
+            await checkAuth()
+        }
+        guard isAuthenticated else { throw IntentTaskError.notSignedIn }
+
+        if projects.isEmpty {
+            hydrateFromCache()
+        }
+        if projects.isEmpty, !isOffline {
+            projects = await (try? projectService.fetchProjects()) ?? []
+        }
+
+        // Smart parsing fills only what the caller left out (#215). There is
+        // no chip row here, so the spoken confirmation is the safety net.
+        // `*label` needs the label list, which a cold background launch has
+        // not loaded: the cache first, the server only if it is still empty.
+        // Only when the text actually names a label, so the common Siri add
+        // does not wait on a request it has no use for.
+        if smartParsingEnabled, labels.isEmpty, trimmedTitle.contains("*") {
+            if let cached = try? syncService?.loadCachedLabels(), !cached.isEmpty {
+                labels = cached
+            } else if !isOffline {
+                labels = await (try? labelService.fetchLabels()) ?? []
+            }
+        }
+        let parse = smartParsingEnabled
+            ? SmartTaskParser(projects: projects, labels: labels).parse(trimmedTitle)
+            : nil
+        let taskTitle = parse?.title ?? trimmedTitle
+        let resolvedDueDate = dueDate ?? parse?.dueDate ?? fallbackDueDate
+        let resolvedProjectId = projectId ?? parse?.projectId
+
+        let project: Project? = if let resolvedProjectId {
+            projects.first(where: { $0.id == resolvedProjectId }) ?? Project(
+                id: resolvedProjectId,
+                title: String(localized: "your project")
+            )
+        } else {
+            defaultProject
+        }
+        guard let project else { throw IntentTaskError.noProject }
+
+        let request = TaskCreateRequest(
+            title: taskTitle,
+            dueDate: resolvedDueDate,
+            priority: parse?.priority.map(Int64.init)
+        )
+        if isOffline {
+            // A queued create has no id yet, so parsed labels cannot be
+            // attached; the rest of the parse still applies.
+            return try queueIntentCreate(request, in: project)
+        }
+
+        do {
+            let newTask = try await taskService.createTask(projectId: project.id, request: request)
+            tasks.append(newTask)
+            syncService?.updateCachedTask(newTask)
+            // Same as `createTask`: the task exists by now, so a failed
+            // association is surfaced rather than rolled back or thrown.
+            for labelId in parse?.labelIds ?? [] {
+                guard let label = labels.first(where: { $0.id == labelId }) else { continue }
+                do {
+                    try await labelService.addLabel(taskId: newTask.id, labelId: labelId)
+                    setLabelLocally(taskId: newTask.id, label: label, present: true)
+                } catch {
+                    handleError(error)
+                }
+            }
+            await refetchProjectOrder(of: newTask)
+            WidgetCenter.shared.reloadAllTimelines()
+            return .created(taskTitle: taskTitle, projectTitle: project.title, dueDate: resolvedDueDate)
+        } catch let error as NetworkError where error.isConnectivityFailure {
+            // The monitor said we were online but the server was not there:
+            // a tunnel, a car park, a dead mobile link. Same answer as offline.
+            return try queueIntentCreate(request, in: project)
+        } catch {
+            let friendly = NetworkError.friendly(from: error)
+            throw IntentTaskError.failed(friendly.errorDescription ?? error.localizedDescription)
+        }
+    }
+
+    @MainActor
+    private func queueIntentCreate(_ request: TaskCreateRequest, in project: Project) throws -> IntentTaskOutcome {
+        guard let syncService else {
+            throw IntentTaskError.failed(NetworkError.networkUnavailable.errorDescription ?? "No connection.")
+        }
+        syncService.queueOperation(endpoint: .createTask(projectId: project.id), body: request)
+        refreshPendingState()
+        return .queued(taskTitle: request.title, projectTitle: project.title, dueDate: request.dueDate)
     }
 
     @MainActor
@@ -1157,15 +1478,22 @@ final class AppState {
         }
     }
 
+    /// Returns `true` when the edit reached the server or was queued for
+    /// replay while offline, `false` when nothing was saved: the request
+    /// failed, or the calling task was cancelled. An update that finds the
+    /// task busy waits for its turn rather than failing. Callers that showed
+    /// the change before saving use `false` to put the old state back; every
+    /// other caller can ignore the result.
     @MainActor
-    func updateTask(id: Int64, request: TaskUpdateRequest) async {
-        guard await acquireTaskUpdateSlot(id: id) else { return }
+    @discardableResult
+    func updateTask(id: Int64, request: TaskUpdateRequest) async -> Bool {
+        guard await acquireTaskUpdateSlot(id: id) else { return false }
         defer { releaseTaskUpdateSlot(id: id) }
 
         let existing = taskSnapshot(id: id)
 
         if let existing, queueOfflineEdit(request, for: existing) != nil {
-            return
+            return true
         }
 
         let safeRequest = existing.map { request.preservingExistingValues(from: $0) } ?? request
@@ -1184,9 +1512,32 @@ final class AppState {
             syncEmbeddedRelations(with: updated)
             syncService?.updateCachedTask(updated)
             WidgetCenter.shared.reloadAllTimelines()
+            if let existing, existing.projectId != updated.projectId {
+                await refetchProjectOrder(of: updated)
+            }
+            return true
         } catch {
             handleError(error)
+            return false
         }
+    }
+
+    /// A task that is new to a project, because it was just created there or
+    /// moved in from another one, has a fresh position in that project's list
+    /// view which the cached order knows nothing about: in Manual sort it
+    /// would sit at the bottom until that screen was next opened, then jump.
+    /// Vikunja puts new tasks at the top, so this looked like the order was
+    /// reversed from the web app (issues #185, #232). Reading the view back
+    /// puts the task where the server did. A project whose order was never
+    /// cached is skipped: its screen reads the order when it opens. When a
+    /// task moves, the old project needs nothing: its order is filtered by
+    /// project id, so the task simply stops appearing there.
+    @MainActor
+    private func refetchProjectOrder(of task: VTask) async {
+        guard projectTaskCache[task.projectId] != nil,
+              let project = projects.first(where: { $0.id == task.projectId })
+        else { return }
+        await fetchProjectTasks(project: project)
     }
 
     // MARK: - Subtasks & Relations
@@ -1337,12 +1688,44 @@ final class AppState {
             handleError(error)
             return
         }
+        await toggleLabel(label, on: task)
+    }
 
-        let wasCurrent = isCurrent(task)
-        setCurrentLabelLocally(taskId: task.id, label: label, present: !wasCurrent)
+    // MARK: - Label mutations
+
+    /// Whether `task` carries `label`. Reads the live copy in `tasks` when
+    /// there is one, so a stale snapshot held by an open sheet can't flip the
+    /// label the wrong way.
+    @MainActor
+    func hasLabel(_ label: VLabel, on task: VTask) -> Bool {
+        let live = tasks.first(where: { $0.id == task.id }) ?? task
+        return live.labels?.contains { $0.id == label.id } ?? false
+    }
+
+    /// Adds `label` to `task` when it is missing and removes it when present,
+    /// through the dedicated label endpoints: Vikunja ignores labels on the
+    /// task-update call. Optimistic: the local copy updates immediately and
+    /// reverts if the network call fails. Returns whether the change stuck
+    /// (issue #4).
+    @MainActor
+    @discardableResult
+    func toggleLabel(_ label: VLabel, on task: VTask) async -> Bool {
+        // Label changes are not queued for replay (issue #146 covers task
+        // edits only), so fail fast rather than retrying a connection that
+        // isn't there and losing the change.
+        if isEffectivelyOffline {
+            rejectOffline("Changing labels")
+            return false
+        }
+
+        let wasPresent = hasLabel(label, on: task)
+        // `setLabelLocally` bumps `updated`; keep the original so a rejected
+        // change does not leave the task looking freshly touched.
+        let originalUpdated = tasks.first(where: { $0.id == task.id })?.updated
+        setLabelLocally(taskId: task.id, label: label, present: !wasPresent)
 
         do {
-            if wasCurrent {
+            if wasPresent {
                 try await labelService.removeLabel(taskId: task.id, labelId: label.id)
             } else {
                 try await labelService.addLabel(taskId: task.id, labelId: label.id)
@@ -1351,9 +1734,43 @@ final class AppState {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             #endif
             WidgetCenter.shared.reloadAllTimelines()
+            return true
         } catch {
-            setCurrentLabelLocally(taskId: task.id, label: label, present: wasCurrent)
+            setLabelLocally(taskId: task.id, label: label, present: wasPresent)
+            if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+                tasks[index].updated = originalUpdated
+                syncService?.updateCachedTask(tasks[index])
+            }
             handleError(error)
+            return false
+        }
+    }
+
+    /// Creates a label on the server and adds it to the loaded list. Returns
+    /// nil for a blank title, or after surfacing the error when the call
+    /// fails. The colour is sent without a leading `#`, the form Vikunja's
+    /// own web client stores.
+    @MainActor
+    func createLabel(title: String, hexColor: String? = nil) async -> VLabel? {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if isEffectivelyOffline {
+            rejectOffline("Creating a label")
+            return nil
+        }
+        let color = hexColor?.trimmingCharacters(in: CharacterSet(charactersIn: "# "))
+        do {
+            let created = try await labelService.createLabel(
+                LabelCreateRequest(title: trimmed, hexColor: (color?.isEmpty ?? true) ? nil : color)
+            )
+            if !labels.contains(where: { $0.id == created.id }) {
+                labels.append(created)
+                try? syncService?.cacheLabels(labels)
+            }
+            return created
+        } catch {
+            handleError(error)
+            return nil
         }
     }
 
@@ -1361,7 +1778,7 @@ final class AppState {
     /// bumps its `updated` timestamp so the stall indicator resets. The
     /// `tasks` array is the source of truth.
     @MainActor
-    private func setCurrentLabelLocally(taskId: Int64, label: VLabel, present: Bool) {
+    private func setLabelLocally(taskId: Int64, label: VLabel, present: Bool) {
         guard let index = tasks.firstIndex(where: { $0.id == taskId }) else { return }
         var labelList = tasks[index].labels ?? []
         if present {
@@ -1447,6 +1864,19 @@ final class AppState {
     }
 
     func tasksForProject(_ projectId: Int64) -> [VTask] {
+        // Saved filters appear as virtual projects with negative IDs; their tasks keep
+        // their real (positive) home project's ID, so a `projectId ==` filter always
+        // comes back empty. The cache from the view fetch is the only membership source
+        // of truth for those (#209). Drop any cached id no longer in `tasks` (e.g. a
+        // delete, which updates `tasks` but not this cache) instead of showing stale data.
+        if projectId < 0 {
+            guard let cached = projectTaskCache[projectId] else { return [] }
+            let latest = Self.uniquedById(cached.compactMap { cachedTask in
+                tasks.first(where: { $0.id == cachedTask.id })
+            })
+            return latest.filter { !$0.done }
+        }
+
         // Always read latest task data from the tasks array (source of truth).
         // Use the cache only for position ordering.
         let projectTasks = tasks.filter { $0.projectId == projectId && !$0.done }
@@ -1468,27 +1898,121 @@ final class AppState {
     /// Fetches tasks for a specific project via the view endpoint, which returns correct positions.
     @MainActor
     func fetchProjectTasks(project: Project) async {
-        guard let viewId = project.listViewId else { return }
+        guard let viewTasks = await loadProjectTasks(project: project) else { return }
+        applyProjectTasks(viewTasks, projectId: project.id)
+    }
+
+    /// Reads the project's list view. `nil` when the project has no list view
+    /// or the request failed; the caller keeps whatever it was showing.
+    @MainActor
+    private func loadProjectTasks(project: Project) async -> [VTask]? {
+        guard let viewId = project.listViewId else { return nil }
         do {
             let viewTasks: [VTask] = try await taskService.fetchProjectTasks(
                 projectId: project.id, viewId: viewId
             )
-            // Store in cache — these have correct per-view positions.
             // Dedupe by id: Vikunja's view-tasks endpoint can return the same task
             // more than once when task_positions has duplicate rows for the view.
-            projectTaskCache[project.id] = Self.uniquedById(viewTasks)
-            // Also update the global task list with any new tasks
-            for viewTask in viewTasks {
-                if let index = tasks.firstIndex(where: { $0.id == viewTask.id }) {
-                    tasks[index] = viewTask
-                } else {
-                    tasks.append(viewTask)
-                }
-            }
+            return Self.uniquedById(viewTasks)
         } catch {
             #if DEBUG
             print("[mDone] fetchProjectTasks error: \(error)")
             #endif
+            return nil
+        }
+    }
+
+    /// Stores a view's tasks as the project's order (they carry per-view
+    /// positions) and folds them into the global task list.
+    @MainActor
+    private func applyProjectTasks(_ viewTasks: [VTask], projectId: Int64) {
+        projectTaskCache[projectId] = viewTasks
+        tasks = Self.merging(viewTasks, into: tasks)
+    }
+
+    /// `tasks` with each view task replacing its row, or appended when new.
+    static func merging(_ viewTasks: [VTask], into tasks: [VTask]) -> [VTask] {
+        var result = tasks
+        let indexById = Dictionary(
+            result.enumerated().map { ($1.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        for viewTask in viewTasks {
+            if let index = indexById[viewTask.id] {
+                result[index] = viewTask
+            } else {
+                result.append(viewTask)
+            }
+        }
+        return result
+    }
+
+    // MARK: - Live List Refresh
+
+    /// Whether a quiet read may run now. Anything that could be overwritten
+    /// by, or race, a fresh server snapshot holds it off: a full refresh in
+    /// flight, a save in flight, or offline edits still waiting to go out.
+    @MainActor
+    private var canRefreshQuietly: Bool {
+        isAuthenticated && !isOffline && !isLoading
+            && pendingOperationsCount == 0 && activeTaskUpdates.isEmpty
+    }
+
+    /// Re-reads the tasks behind the visible list, so changes made by another
+    /// client or by server-side automation show up while it stays on screen
+    /// (issue #241). `project` is `nil` for the Inbox. A project's list view
+    /// is read too: a saved filter's membership is not its tasks' project id,
+    /// so only the view says which tasks belong to it, and an empty view is a
+    /// real answer.
+    ///
+    /// Unlike `refreshAll` this is silent: no loading state, no error banner,
+    /// and nothing changes when the server has nothing new. A failed read
+    /// leaves the list as it was for the next tick to try again.
+    @MainActor
+    func refreshVisibleList(project: Project?, isEnabled: () -> Bool = { true }) async {
+        let viewId = project?.listViewId
+        await liveListRefresh.refresh(
+            isEnabled: { isEnabled() && canRefreshQuietly },
+            revision: { listRevision },
+            fetch: { () async throws -> ([VTask], [VTask]?) in
+                async let all = taskService.fetchAllTasks(perPage: 200)
+                var members: [VTask]?
+                if let project, let viewId {
+                    members = try await taskService.fetchProjectTasks(projectId: project.id, viewId: viewId)
+                }
+                return try await (all, members)
+            },
+            apply: { all, members in
+                applyQuietRefresh(all: all, members: members, projectId: project?.id)
+            }
+        )
+    }
+
+    @MainActor
+    private func applyQuietRefresh(all: [VTask], members: [VTask]?, projectId: Int64?) {
+        if isShowingCachedData {
+            isShowingCachedData = false
+        }
+        let members = members.map(Self.uniquedById)
+        var latest = Self.uniquedById(all)
+        if let members {
+            latest = Self.merging(members, into: latest)
+        }
+        let membersChanged = projectId.map { id in members != nil && members != projectTaskCache[id] } ?? false
+        // Most ticks find nothing new. Leave the lists alone then, so SwiftUI
+        // does not re-render and the cache and widgets are not rewritten.
+        guard latest != tasks || membersChanged else { return }
+
+        tasks = latest
+        if let projectId, let members {
+            projectTaskCache[projectId] = members
+        }
+        persistToCache()
+        pushWidgetData()
+        WidgetCenter.shared.reloadAllTimelines()
+        if UserDefaults.standard.bool(forKey: "notificationsEnabled") {
+            let snapshot = tasks
+            Task { await notificationService.scheduleReminders(for: snapshot) }
         }
     }
 
@@ -1875,11 +2399,11 @@ final class AppState {
     @MainActor
     func markNotificationRead(_ id: Int64) async {
         do {
-            // Send empty body to mark as read
-            struct EmptyBody: Encodable {}
+            // Vikunja reads the `read` flag off the body and writes read_at from it.
+            // An empty body decodes as read = false, which clears read_at instead.
             let _: VNotification = try await APIClient.shared.send(
                 Endpoint.markNotificationRead(id: id),
-                body: EmptyBody()
+                body: MarkNotificationReadRequest(read: true)
             )
             if let index = notifications.firstIndex(where: { $0.id == id }) {
                 notifications[index].read = true
@@ -1895,8 +2419,10 @@ final class AppState {
     @MainActor
     func markAllNotificationsRead() async {
         do {
-            struct EmptyBody: Encodable {}
-            try await APIClient.shared.sendExpectingEmpty(Endpoint.markAllNotificationsRead, body: EmptyBody())
+            try await APIClient.shared.sendExpectingEmpty(
+                Endpoint.markAllNotificationsRead,
+                body: MarkNotificationReadRequest(read: true)
+            )
             for index in notifications.indices {
                 notifications[index].read = true
                 notifications[index].readAt = Date()
@@ -1915,25 +2441,91 @@ final class AppState {
         return project?.listViewId ?? 0
     }
 
+    /// Moves `task` to `position` in its project's list view.
+    ///
+    /// `newOrder` is the list as the user just dropped it. It is shown at once
+    /// so the row stays where it landed, then the view is refetched so the
+    /// server's positions win: Vikunja repairs colliding or too-small
+    /// positions and answers with a different number than it was sent. A
+    /// failed request puts the old order back. Returns `true` on success.
+    ///
+    /// Not queued for offline replay: a stale position replayed against a
+    /// list that has since moved on would land the task somewhere random, so
+    /// this asks for a connection instead.
     @MainActor
-    func moveTask(_ task: VTask, toPosition position: Double, viewId: Int64 = 0) async {
-        let resolvedViewId = viewId > 0 ? viewId : listViewId(for: task)
-        guard resolvedViewId > 0 else { return }
+    @discardableResult
+    func moveTask(_ task: VTask, toPosition position: Double, newOrder: [VTask]? = nil) async -> Bool {
+        let viewId = listViewId(for: task)
+        guard viewId > 0 else { return false }
+        if isEffectivelyOffline {
+            rejectOffline("Reordering tasks")
+            return false
+        }
+
+        reorderGeneration += 1
+        let generation = reorderGeneration
+        let previousOrder = projectTaskCache[task.projectId]
+        if let newOrder {
+            projectTaskCache[task.projectId] = newOrder
+        }
+
         do {
-            try await taskService.updatePosition(taskId: task.id, position: position, viewId: resolvedViewId)
-            if let index = tasks.firstIndex(where: { $0.id == task.id }) {
-                tasks[index].position = position
+            try await taskService.updatePosition(taskId: task.id, position: position, viewId: viewId)
+        } catch {
+            if generation == reorderGeneration {
+                projectTaskCache[task.projectId] = previousOrder
             }
-            // Update cached project task order
-            if var cached = projectTaskCache[task.projectId] {
-                if let cacheIndex = cached.firstIndex(where: { $0.id == task.id }) {
-                    cached[cacheIndex].position = position
-                }
-                projectTaskCache[task.projectId] = cached.sorted { ($0.position ?? 0) < ($1.position ?? 0) }
-            }
+            handleError(error)
+            return false
+        }
+
+        if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+            tasks[index].position = position
+        }
+        guard let project = projects.first(where: { $0.id == task.projectId }) else { return true }
+        if let refreshed = await loadProjectTasks(project: project), generation == reorderGeneration {
+            applyProjectTasks(refreshed, projectId: project.id)
+        }
+        return true
+    }
+
+    /// Puts `task` at `position` on the project's board, moving it into
+    /// `bucketId` first when it is in another column. The position row is per
+    /// view, not per bucket, so a cross-column drop is the bucket move plus
+    /// the same position write as a same-column one. Returns `true` when
+    /// every call succeeded.
+    @MainActor
+    @discardableResult
+    func placeTask(_ task: VTask, inBucket bucketId: Int64, at position: Double, in project: Project) async -> Bool {
+        guard let viewId = project.kanbanViewId else { return false }
+        if isEffectivelyOffline {
+            rejectOffline("Moving tasks on the board")
+            return false
+        }
+        if task.bucketId != bucketId {
+            guard await moveTask(task, toBucket: bucketId, in: project) else { return false }
+        }
+        do {
+            try await taskService.updatePosition(taskId: task.id, position: position, viewId: viewId)
+            return true
         } catch {
             handleError(error)
+            return false
         }
+    }
+
+    // MARK: - Sort Preferences
+
+    /// The sort for a list. Falls through to `UserDefaults` until the list is
+    /// changed in this session; no write happens here, since views ask for
+    /// it mid-body.
+    func sortPreference(for scope: TaskSortScope) -> TaskSortPreference {
+        sortPreferences[scope] ?? TaskSortPreference.load(for: scope)
+    }
+
+    func setSortPreference(_ preference: TaskSortPreference, for scope: TaskSortScope) {
+        sortPreferences[scope] = preference
+        preference.save(for: scope)
     }
 
     /// Every appearance of a task across `month`, keyed by start of day.

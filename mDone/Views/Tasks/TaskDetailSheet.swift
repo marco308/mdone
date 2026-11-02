@@ -1,12 +1,25 @@
 import SwiftUI
 
+/// How `TaskDetailSheet` is shown.
+enum TaskDetailPresentation {
+    /// A modal sheet with Cancel and Save in its navigation bar: iPhone, and
+    /// any iPad layout too narrow for a pane.
+    case sheet
+    /// A pane beside the task list on iPad, with its own header row in place
+    /// of a navigation bar. `onClose` replaces dismiss: it runs when the user
+    /// cancels, saves or deletes (issue #34).
+    case inline(onClose: () -> Void)
+}
+
 struct TaskDetailSheet: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     #if os(iOS)
     @Environment(FocusManager.self) private var focusManager
+    @Environment(\.focusRunOrder) private var focusRunOrder
     #endif
     let task: VTask
+    var presentation: TaskDetailPresentation = .sheet
 
     @State private var title: String
     @State private var description: String
@@ -18,13 +31,17 @@ struct TaskDetailSheet: View {
     @State private var repeatInterval: Int64
     @State private var reminders: [TaskReminder]
     @State private var showDeleteConfirm = false
-    @State private var isShowingDescriptionPreview: Bool
+    /// The description editor's state while it is open; `nil` shows the
+    /// preview. `description` stays the stored text (HTML for web-app
+    /// descriptions) until the editor closes (#277).
+    @State private var descriptionEdit: DescriptionEditSession?
     /// Loaded from the description's estimate marker; `nil` == no estimate.
     @State private var estimateSeconds: TimeInterval?
     @State private var percentDone: Double
 
-    init(task: VTask) {
+    init(task: VTask, presentation: TaskDetailPresentation = .sheet) {
         self.task = task
+        self.presentation = presentation
         let initialDescription = task.userVisibleDescription ?? ""
         _title = State(initialValue: task.title)
         _description = State(initialValue: initialDescription)
@@ -35,7 +52,7 @@ struct TaskDetailSheet: View {
         _selectedProjectId = State(initialValue: task.projectId)
         _repeatInterval = State(initialValue: task.repeatAfter ?? 0)
         _reminders = State(initialValue: task.reminders ?? [])
-        _isShowingDescriptionPreview = State(initialValue: !initialDescription.isEmpty)
+        _descriptionEdit = State(initialValue: initialDescription.isEmpty ? DescriptionEditSession(stored: "") : nil)
         _estimateSeconds = State(initialValue: task.estimatedSeconds)
         _percentDone = State(initialValue: task.percentDone ?? 0)
     }
@@ -48,203 +65,317 @@ struct TaskDetailSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("Task title", text: $title)
-                        .font(.headline)
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Description")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Button {
-                                isShowingDescriptionPreview.toggle()
-                            } label: {
-                                Image(systemName: isShowingDescriptionPreview ? "pencil" : "eye")
-                                    .font(.caption)
-                            }
-                            .buttonStyle(.borderless)
-                            .accessibilityLabel(isShowingDescriptionPreview ? "Edit description" :
-                                "Preview description")
+        switch presentation {
+        case .sheet:
+            NavigationStack {
+                form
+                    .navigationTitle("Edit Task")
+                    #if os(iOS)
+                    .navigationBarTitleDisplayMode(.inline)
+                    #endif
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") { close() }
                         }
-
-                        if isShowingDescriptionPreview {
-                            if description.isEmpty {
-                                Text("No description")
-                                    .font(.body)
-                                    .foregroundStyle(.secondary)
-                                    .italic()
-                            } else {
-                                Text(RichTextRenderer.render(description))
-                                    .font(.body)
-                                    .textSelection(.enabled)
-                            }
-                        } else {
-                            TextEditor(text: $description)
-                                .font(.body)
-                                .frame(minHeight: 80)
-                                .scrollContentBackground(.hidden)
+                        ToolbarItem(placement: .primaryAction) {
+                            TaskShareMenu(task: task)
+                        }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Save") { saveTask() }
+                                .fontWeight(.semibold)
+                                .disabled(!canSave)
                         }
                     }
-                }
+            }
+            #if os(iOS)
+            .presentationDetents([.medium, .large])
+            #endif
+        case .inline:
+            VStack(spacing: 0) {
+                inlineHeader
+                Divider()
+                form
+            }
+            #if os(iOS)
+            // Match the list's grouped background, and carry it up under the
+            // floating top bar the way the list does, so the pane does not
+            // sit on a white strip.
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            #endif
+        }
+    }
 
-                #if os(iOS)
-                Section("Focus") {
-                    if focusManager.focusedTaskId == task.id {
+    /// The header the inline pane shows instead of a navigation bar. Escape
+    /// and Cmd-S mirror the sheet's Cancel and Save for an iPad keyboard.
+    private var inlineHeader: some View {
+        ZStack {
+            Text("Edit Task")
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+
+            HStack {
+                Button("Cancel") { close() }
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                TaskShareMenu(task: task)
+                    .labelStyle(.iconOnly)
+                Button("Save") { saveTask() }
+                    .fontWeight(.semibold)
+                    .keyboardShortcut("s", modifiers: .command)
+                    .disabled(!canSave)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 12)
+        .background(.bar)
+    }
+
+    private var isShowingDescriptionPreview: Bool {
+        descriptionEdit == nil
+    }
+
+    /// Opens the editor on the stored description, or closes it and keeps
+    /// what was typed, converted back to the stored form.
+    private func toggleDescriptionEditing() {
+        if let descriptionEdit {
+            description = descriptionEdit.storedDescription
+            self.descriptionEdit = nil
+        } else {
+            descriptionEdit = DescriptionEditSession(stored: description)
+        }
+    }
+
+    private var canSave: Bool {
+        !title.isEmpty && TaskScheduleEditor.isValid(startDate: startDate, endDate: endDate)
+    }
+
+    /// Leaves the detail view the way it was shown: dismissing the sheet, or
+    /// telling the hosting screen to clear the pane.
+    private func close() {
+        switch presentation {
+        case .sheet:
+            dismiss()
+        case let .inline(onClose):
+            onClose()
+        }
+    }
+
+    private var form: some View {
+        Form {
+            Section {
+                TextField("Task title", text: $title)
+                    .font(.headline)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Description")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Spacer()
                         Button {
-                            focusManager.endFocus()
+                            toggleDescriptionEditing()
                         } label: {
-                            Label("End Focus", systemImage: "scope")
-                                .foregroundStyle(.orange)
+                            Image(systemName: isShowingDescriptionPreview ? "pencil" : "eye")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel(isShowingDescriptionPreview ? "Edit description" :
+                            "Preview description")
+                    }
+
+                    if isShowingDescriptionPreview {
+                        if description.isEmpty {
+                            Text("No description")
+                                .font(.body)
+                                .foregroundStyle(.secondary)
+                                .italic()
+                        } else {
+                            if let checklist = DescriptionChecklist.parse(description) {
+                                ChecklistSummaryView(checklist: checklist)
+                            }
+                            RichDescriptionView(html: description, onToggle: toggleChecklistItem)
                         }
                     } else {
-                        Button {
-                            let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
-                            focusManager.startFocus(task: task, projectName: projectName)
-                        } label: {
-                            Label("Focus on This Task", systemImage: "scope")
+                        TextEditor(text: Binding(
+                            get: { descriptionEdit?.text ?? "" },
+                            set: { descriptionEdit?.text = $0 }
+                        ))
+                        .font(.body)
+                        .frame(minHeight: 80)
+                        .scrollContentBackground(.hidden)
+                        if let mode = descriptionEdit?.mode {
+                            DescriptionEditHint(mode: mode)
                         }
                     }
-                    FocusHistoryRow(taskId: task.id)
                 }
-                #endif
+            }
 
-                Section("Current") {
+            #if os(iOS)
+            Section("Focus") {
+                if focusManager.focusedTaskId == task.id {
                     Button {
-                        Task { await appState.toggleCurrent(task) }
+                        focusManager.endFocus()
                     } label: {
-                        Label(
-                            isCurrentNow ? "Remove from Current" : "Mark as Current",
-                            systemImage: isCurrentNow ? "pin.slash" : "pin"
-                        )
+                        Label("End Focus", systemImage: "scope")
+                            .foregroundStyle(.orange)
                     }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Progress")
-                            Spacer()
-                            Text("\(Int((percentDone * 100).rounded()))%")
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
+                } else {
+                    Button {
+                        let projectName = appState.projects
+                            .first(where: { $0.id == task.projectId })?.title ?? String(localized: "Inbox")
+                        focusManager.startFocus(task: task, projectName: projectName)
+                    } label: {
+                        Label("Focus on This Task", systemImage: "scope")
+                    }
+                    if !task.done, FocusRun.canStart(at: task.id, in: focusRunOrder) {
+                        Button {
+                            focusManager.startFocusRun(
+                                task: task,
+                                projectName: appState.focusProjectName(for: task),
+                                order: focusRunOrder
+                            )
+                        } label: {
+                            Label("Focus Run from Here", systemImage: "forward.end.circle")
                         }
-                        Slider(value: $percentDone, in: 0 ... 1, step: 0.05)
-                            .accessibilityLabel("Progress")
-                            .accessibilityValue("\(Int((percentDone * 100).rounded())) percent")
                     }
                 }
+                FocusHistoryRow(taskId: task.id)
+            }
+            #endif
 
-                TaskRelationsSections(task: task)
-
-                TaskScheduleEditor(
-                    dueDate: $dueDate,
-                    startDate: $startDate,
-                    endDate: $endDate
-                )
-
-                Section {
-                    EstimatePicker(estimateSeconds: $estimateSeconds)
+            Section("Current") {
+                Button {
+                    Task { await appState.toggleCurrent(task) }
+                } label: {
+                    Label(
+                        isCurrentNow ? "Remove from Current" : "Mark as Current",
+                        systemImage: isCurrentNow ? "pin.slash" : "pin"
+                    )
                 }
 
-                Section("Repeat") {
-                    Picker("Repeat", selection: $repeatInterval) {
-                        Text("Never").tag(Int64(0))
-                        Text("Daily").tag(Int64(86400))
-                        Text("Weekly").tag(Int64(604_800))
-                        Text("Every 2 Weeks").tag(Int64(1_209_600))
-                        Text("Monthly").tag(Int64(2_592_000))
-                        Text("Yearly").tag(Int64(31_536_000))
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Progress")
+                        Spacer()
+                        Text("\(Int((percentDone * 100).rounded()))%")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                    Slider(value: $percentDone, in: 0 ... 1, step: 0.05)
+                        .accessibilityLabel("Progress")
+                        .accessibilityValue("\(Int((percentDone * 100).rounded())) percent")
+                }
+            }
+
+            TaskRelationsSections(task: task)
+
+            TaskScheduleEditor(
+                dueDate: $dueDate,
+                startDate: $startDate,
+                endDate: $endDate
+            )
+
+            Section {
+                EstimatePicker(estimateSeconds: $estimateSeconds)
+            }
+
+            Section("Repeat") {
+                Picker("Repeat", selection: $repeatInterval) {
+                    Text("Never").tag(Int64(0))
+                    Text("Daily").tag(Int64(86400))
+                    Text("Weekly").tag(Int64(604_800))
+                    Text("Every 2 Weeks").tag(Int64(1_209_600))
+                    Text("Monthly").tag(Int64(2_592_000))
+                    Text("Yearly").tag(Int64(31_536_000))
+                }
+            }
+
+            Section("Reminders") {
+                ReminderEditor(reminders: $reminders)
+            }
+
+            Section("Priority") {
+                Picker("Priority", selection: $priority) {
+                    ForEach(PriorityLevel.allCases, id: \.rawValue) { level in
+                        HStack {
+                            PriorityBadge(priority: level)
+                            Text(level.label)
+                        }
+                        .tag(Int64(level.rawValue))
                     }
                 }
+                .pickerStyle(.menu)
+            }
 
-                Section("Reminders") {
-                    ReminderEditor(reminders: $reminders)
-                }
-
-                Section("Priority") {
-                    Picker("Priority", selection: $priority) {
-                        ForEach(PriorityLevel.allCases, id: \.rawValue) { level in
-                            HStack {
-                                PriorityBadge(priority: level)
-                                Text(level.label)
-                            }
-                            .tag(Int64(level.rawValue))
+            if !appState.projects.isEmpty {
+                Section("Project") {
+                    Picker("Project", selection: $selectedProjectId) {
+                        ForEach(appState.projects.projectHierarchy().flattened { _ in true }) { row in
+                            Text(String(repeating: "  ", count: row.depth) + row.project.title)
+                                .tag(row.project.id)
                         }
                     }
                     .pickerStyle(.menu)
                 }
+            }
 
-                if !appState.projects.isEmpty {
-                    Section("Project") {
-                        Picker("Project", selection: $selectedProjectId) {
-                            ForEach(appState.projects.projectHierarchy().flattened { _ in true }) { row in
-                                Text(String(repeating: "  ", count: row.depth) + row.project.title)
-                                    .tag(row.project.id)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                    }
-                }
+            TaskLabelsSection(task: task)
 
-                if let labels = task.labels, !labels.isEmpty {
-                    Section("Labels") {
-                        FlowLayout(spacing: 8) {
-                            ForEach(labels) { label in
-                                LabelChip(label: label)
-                            }
-                        }
-                    }
-                }
+            TaskAssigneesSection(task: task)
 
-                Section {
-                    Button("Delete Task", role: .destructive) {
-                        showDeleteConfirm = true
-                    }
+            Section {
+                Button("Delete Task", role: .destructive) {
+                    showDeleteConfirm = true
                 }
             }
-            .navigationTitle("Edit Task")
-            #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
-            #endif
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { dismiss() }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Save") { saveTask() }
-                            .fontWeight(.semibold)
-                            .disabled(
-                                title.isEmpty || !TaskScheduleEditor.isValid(
-                                    startDate: startDate,
-                                    endDate: endDate
-                                )
-                            )
-                    }
-                }
-                .alert("Delete Task?", isPresented: $showDeleteConfirm) {
-                    Button("Delete", role: .destructive) {
-                        Task {
-                            await appState.deleteTask(task)
-                            dismiss()
-                        }
-                    }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("This action cannot be undone.")
-                }
         }
-        #if os(iOS)
-        .presentationDetents([.medium, .large])
-        #endif
+        .alert("Delete Task?", isPresented: $showDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                // Explicitly main-actor: `close()` touches view state
+                // (dismiss, or the pane's selection) after the await.
+                Task { @MainActor in
+                    await appState.deleteTask(task)
+                    close()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This action cannot be undone.")
+        }
+    }
+
+    /// Ticks or unticks one checklist item in the description and saves that
+    /// straight away, the way the web app does, so a tick survives Cancel.
+    /// The rest of the form stays unsaved until Save: the request carries
+    /// only the description, and `updateTask` fills the other fields in
+    /// from the task as the server last had it.
+    private func toggleChecklistItem(_ index: Int) {
+        guard let updated = DescriptionChecklist.toggling(itemAt: index, in: description) else { return }
+        description = updated
+        // The task's committed estimate, not the form's draft: the estimate
+        // picker waits for Save like every other field.
+        let committedEstimate = (appState.tasks.first(where: { $0.id == task.id }) ?? task).estimatedSeconds
+        let composed = EstimateMarker.apply(committedEstimate, to: updated) ?? ""
+        Task { @MainActor in
+            let saved = await appState.updateTask(id: task.id, request: TaskUpdateRequest(description: composed))
+            // The tick was shown before it was saved. If the server refused
+            // it, put the boxes back the way Vikunja still has them, unless
+            // the description has moved on since. The task in AppState is
+            // the authority, not the text this tap started from: after two
+            // quick taps that both fail, the first tap's text was never saved
+            // either (#204).
+            if !saved, description == updated {
+                description = (appState.tasks.first(where: { $0.id == task.id }) ?? task).userVisibleDescription ?? ""
+            }
+        }
     }
 
     private func saveTask() {
         // Bake the optional estimate into the description as a marker so it
         // round-trips through Vikunja and is visible to any agent that reads
         // the task via the API. `apply` strips any prior marker first.
-        let body = description.isEmpty ? nil : description
+        let current = descriptionEdit?.storedDescription ?? description
+        let body = current.isEmpty ? nil : current
         // Empty string, not nil: preservingExistingValues treats nil as "keep
         // the old text", so a cleared description must be sent explicitly.
         let composedDescription = EstimateMarker.apply(estimateSeconds, to: body) ?? ""
@@ -264,9 +395,9 @@ struct TaskDetailSheet: View {
             clearStartDate: startDate == nil,
             clearEndDate: endDate == nil
         )
-        Task {
+        Task { @MainActor in
             await appState.updateTask(id: task.id, request: request)
-            dismiss()
+            close()
         }
     }
 }

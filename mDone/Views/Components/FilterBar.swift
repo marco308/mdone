@@ -13,11 +13,11 @@ enum TaskFilter: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .all: "All"
-        case .highPriority: "High Priority"
-        case .dueThisWeek: "Due in 7 Days"
-        case .completed: "Completed"
-        case .hasLabels: "Has Labels"
+        case .all: String(localized: "All")
+        case .highPriority: String(localized: "High Priority")
+        case .dueThisWeek: String(localized: "Due in 7 Days")
+        case .completed: String(localized: "Completed")
+        case .hasLabels: String(localized: "Has Labels")
         }
     }
 
@@ -28,24 +28,6 @@ enum TaskFilter: String, CaseIterable, Identifiable {
         case .dueThisWeek: "calendar"
         case .completed: "checkmark.circle"
         case .hasLabels: "tag"
-        }
-    }
-
-    /// Returns the Vikunja filter syntax string for server-side filtering.
-    var filterString: String? {
-        switch self {
-        case .all:
-            nil
-        case .highPriority:
-            "priority >= 3"
-        case .dueThisWeek:
-            "due_date > now && due_date < now+7d"
-        case .completed:
-            "done = true"
-        case .hasLabels:
-            // Vikunja does not have a direct "has labels" filter;
-            // this is applied locally instead.
-            nil
         }
     }
 

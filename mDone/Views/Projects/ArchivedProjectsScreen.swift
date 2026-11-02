@@ -12,8 +12,8 @@ struct ArchivedProjectsScreen: View {
                 Section {
                     EmptyStateView(
                         icon: "archivebox",
-                        title: "No archived projects",
-                        subtitle: "Projects you archive will appear here"
+                        title: String(localized: "No archived projects"),
+                        subtitle: String(localized: "Projects you archive will appear here")
                     )
                 }
             } else {

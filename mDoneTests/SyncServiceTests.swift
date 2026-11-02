@@ -305,7 +305,7 @@ final class SyncServiceTests: XCTestCase {
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         return SyncService(
             taskService: TaskService(apiClient: client),
             projectService: ProjectService(apiClient: client),

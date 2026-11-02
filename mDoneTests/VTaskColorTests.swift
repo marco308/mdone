@@ -40,6 +40,15 @@ final class VTaskColorTests: XCTestCase {
         XCTAssertNil(makeTask(hexColor: "12 34 56").normalizedHexColor)
     }
 
+    /// Only one leading `#` is a prefix; anything else is a malformed value, not
+    /// a color with decoration.
+    func testRepeatedOrTrailingHashIsNil() {
+        XCTAssertNil(makeTask(hexColor: "##FF0000").normalizedHexColor)
+        XCTAssertNil(makeTask(hexColor: "#FF0000#").normalizedHexColor)
+        XCTAssertNil(makeTask(hexColor: "FF0000#").normalizedHexColor)
+        XCTAssertNil(makeTask(hexColor: "##").normalizedHexColor)
+    }
+
     private func makeTask(hexColor: String?) -> VTask {
         VTask(
             id: 1,

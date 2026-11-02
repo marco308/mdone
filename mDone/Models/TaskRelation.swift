@@ -24,18 +24,18 @@ enum RelationKind: String, Codable, CaseIterable, Identifiable {
     /// Human-readable name, matching the wording of the Vikunja web frontend.
     var label: String {
         switch self {
-        case .unknown: "Unknown"
-        case .subtask: "Subtask"
-        case .parenttask: "Parent Task"
-        case .related: "Related"
-        case .duplicateof: "Duplicate Of"
-        case .duplicates: "Duplicates"
-        case .blocking: "Blocking"
-        case .blocked: "Blocked By"
-        case .precedes: "Precedes"
-        case .follows: "Follows"
-        case .copiedfrom: "Copied From"
-        case .copiedto: "Copied To"
+        case .unknown: String(localized: "Unknown")
+        case .subtask: String(localized: "Subtask")
+        case .parenttask: String(localized: "Parent Task")
+        case .related: String(localized: "Related")
+        case .duplicateof: String(localized: "Duplicate Of")
+        case .duplicates: String(localized: "Duplicates")
+        case .blocking: String(localized: "Blocking")
+        case .blocked: String(localized: "Blocked By")
+        case .precedes: String(localized: "Precedes")
+        case .follows: String(localized: "Follows")
+        case .copiedfrom: String(localized: "Copied From")
+        case .copiedto: String(localized: "Copied To")
         }
     }
 

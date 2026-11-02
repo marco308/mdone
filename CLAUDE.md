@@ -8,59 +8,15 @@ mDone is a native iOS/macOS task management app that connects to a self-hosted *
 
 Beyond plain task CRUD the app also covers: focus sessions with a Live Activity, Kanban boards, subtasks and task relations, calendar (EventKit) overlay, home/lock screen widgets, Shortcuts and Siri actions, and offline caching with a pending-operation queue.
 
-## Repository Layout
-
-| Path | What lives there |
-|---|---|
-| `mDone/App/` | `AppState`, `AppDependencies` (SwiftData container + network monitor), App Intents, preference types |
-| `mDone/Models/` | API models: `VTask`, `Project`, `Label`, `Bucket`, `TaskRelation`, `CalendarEvent`, `VNotification`, `ProjectHierarchy` |
-| `mDone/Services/` | Actors and managers: API, auth, sync, cache, labels, notifications, calendar, focus |
-| `mDone/Views/` | SwiftUI views, split by feature (`Tasks`, `Projects`, `Calendar`, `Focus`, `Settings`, `Notifications`, `Setup`, `Components`) plus `Mac/` for the macOS-only UI |
-| `mDoneShared/` | Sources compiled into **both** the app and the widget extension: `WidgetDataProvider`, `WidgetModels`, `FocusSession`, `SharedTokenStore`, `SharedConstants` |
-| `mDoneWidgets/` | WidgetKit extension: Today/Upcoming/QuickAdd/lock screen widgets and the focus Live Activity |
-| `mDoneTests/` | Unit tests (iOS, hosted by the app) |
-| `mDoneUITests/`, `mDoneMacUITests/` | XCUITests, including the App Store screenshot runs |
-| `mDoneWidgetRenderTests/` | Unhosted logic tests that render widget views to PNGs for the marketing site |
-| `docs/` | Dev setup, App Store metadata, Vikunja API inventory, research notes |
-| `scripts/` | `seed-dev-vikunja.sh`, `reset-dev-vikunja.sh` for the local dev server |
-| `website/` | The GitHub Pages site (deployed by `.github/workflows/deploy-pages.yml`) |
-
 ## Build & Development
 
 The project uses **XcodeGen** to generate the Xcode project from `project.yml`. The `.xcodeproj` is not committed, so generate it after any clone or target/settings change.
 
-```bash
-# Regenerate Xcode project after changing targets/settings
-xcodegen generate
-
-# Build iOS app
-xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build
-
-# Build macOS app
-xcodebuild -project mDone.xcodeproj -scheme mDone-macOS build
-
-# Run unit tests only (what CI runs)
-xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:mDoneTests test
-
-# Run a single test class
-xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:mDoneTests/TaskServiceTests test
-
-# Lint
-swiftlint lint --quiet
-
-# Format
-swiftformat .
-```
-
 **Simulator destinations:** build-only invocations use `generic/platform=iOS Simulator`, which needs no simulator by that name to exist. Test runs have to name a concrete device, so they use the same one CI pins in `.github/workflows/ios-tests.yml` (`iPhone 17`). If you change one, change the other, and check `xcrun simctl list devices available` when a destination stops resolving after an Xcode update.
-
-**Deployment targets:** iOS 18.0+, macOS 15.0+. Swift 5.9. Version and build number live in `project.yml` (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION`), not in an Info.plist.
 
 ### Targets and schemes
 
-- `mDone` (iOS app, embeds `mDoneWidgets`); its scheme runs `mDoneTests`, `mDoneUITests`, `mDoneWidgetRenderTests`.
-- `mDone-macOS` (macOS app); its scheme runs `mDoneMacUITests`.
-- `mDoneWidgets` (app extension), `mDoneTests`, `mDoneUITests`, `mDoneMacUITests`, `mDoneWidgetRenderTests`.
+`mDoneTests` and `mDoneMacTests` compile the **same** `mDoneTests/` sources against the iOS and macOS app respectively, so a shared service or model is covered on both platforms from one set of files. Cases that only make sense on iOS (Live Activity, focus outbox) guard themselves with `#if os(iOS)`. `mDone-macOS` pins `PRODUCT_MODULE_NAME: mDone` so the shared `@testable import mDone` resolves there too; without it the module would be `mDone_macOS` and every test file would fail to compile.
 
 The iOS and macOS app targets compile the **same** `mDone/` + `mDoneShared/` sources, so anything platform-specific needs `#if os(iOS)` / `#if os(macOS)`.
 
@@ -76,18 +32,9 @@ docker compose -f docker-compose.dev.yml up -d && ./scripts/seed-dev-vikunja.sh
 
 Log in with `devuser` / `devpassword`. `./scripts/reset-dev-vikunja.sh` nukes and reseeds it. Full walkthrough, including the environments table (dev vs Apple Review test server vs prod), in [docs/dev-setup.md](docs/dev-setup.md).
 
-### CI
-
-- `.github/workflows/ios-tests.yml` runs `mDoneTests` on the iOS Simulator for every PR to `main`, pinned to `-destination 'platform=iOS Simulator,name=iPhone 17'`. UI and snapshot targets are excluded: they need a booted app and are flaky on CI.
-- `.github/workflows/codeql.yml` runs CodeQL (build-only, so it uses `generic/platform=iOS Simulator`); `.github/workflows/deploy-pages.yml` publishes `website/`.
+- CI workflows and release tagging: see the `ci-release` skill.
 
 ## Architecture
-
-### Data Flow
-```
-View → AppState (method call) → Service (TaskService/ProjectService)
-→ APIClient (singleton actor) → Vikunja REST API → decode response → update AppState → SwiftUI re-renders
-```
 
 ### Key Patterns
 - **AppState** (`App/AppState.swift`): Single `@Observable` class holding all app state: tasks, projects, labels, notifications, auth status, filters. All mutating async methods are `@MainActor`. A weak `AppState.shared` exists purely so App Intents can reach the live instance.
@@ -101,6 +48,7 @@ View → AppState (method call) → Service (TaskService/ProjectService)
 - **Focus**: `FocusManager` runs the session and its Live Activity, writing a `FocusRecord` per session. `FocusOutboxService` delivers undelivered records to an optional external focus service; `deliveredAt == nil` is the pending marker, so there is no separate queue table. `EstimateSuggester` turns past `FocusRecord` rows into "similar tasks took ~25m" suggestions and is deliberately pure and DB-free so it stays unit-testable.
 - **Focus-service credentials are separate from Vikunja's**: `FocusSyncConfig` keeps its own URL (UserDefaults) and token (Keychain). Keep them apart so a leak of one cannot touch the other. A blank URL means the feature is off.
 - **App Intents live in the app target** (`App/AppIntents.swift`). An intent with `openAppWhenRun = true` cannot run from an app extension: when these lived in the widget extension, every Shortcuts run failed with "an internal error occurred" (#121).
+- **Siri adds tasks in the background**: `AddTaskIntent` (`App/AddTaskIntent.swift`) has no `openAppWhenRun`, which is what lets it run over CarPlay, AirPods and the Watch, where there is no screen to hand to. It calls `AppState.createTaskFromIntent`, which signs in from the Keychain on a cold launch, reads projects from the cache, and queues the create when offline. The UI deliberately does not queue creates (#146); the intent does, because its caller cannot see the list and losing the task is worse. `ProjectEntity` gives Siri the project names; `refreshAll` calls `updateAppShortcutParameters()` after every project fetch so that vocabulary stays current. A CarPlay app proper is off the table: Apple only grants the entitlement to fixed categories that exclude task managers.
 
 ### Vikunja API Notes
 - Task creation uses `PUT /api/v1/projects/{id}/tasks` (not POST)
@@ -120,28 +68,4 @@ Update `CHANGELOG.md` whenever making user-facing changes (features, fixes, UI c
 
 No em-dashes anywhere: user-facing copy, changelog entries, code comments, docs, or PR descriptions. Use a comma, colon, or a separate sentence instead. Everything else follows the surrounding prose.
 
-## Test Coverage
-
-Code coverage is gathered by default: `gatherCoverageData: true` is set on both schemes in `project.yml`. Read coverage from any test run with `xcrun xccov view --report <path-to-.xcresult>`.
-
-Apply tiered coverage targets by layer rather than chasing a single overall percentage:
-
-| Layer | Target |
-|---|---|
-| Services (`mDone/Services/`) | 85%+ (never drop a service below 70% without a reason) |
-| Models with logic (e.g. `VTask`) | 90%+ |
-| `AppState` | 75%+ |
-| Widgets (`mDoneShared/`, `mDoneWidgets/`) | 70%+ |
-| SwiftUI views | no line-coverage target, use snapshot tests |
-
-Rules of practice:
-- New code in services, models, or `AppState` ships with tests in the same PR. Coverage-of-the-diff matters more than overall %.
-- Verify a test file actually exercises its target with `xccov`: a file's existence isn't proof of coverage. `SyncServiceTests` once had 12 tests but only hit 3.78% of `SyncService` because it mocked the wrong layer.
-- Don't pad the overall % with shallow view tests. SwiftUI view files at 0% line coverage are normal.
-- If a service in a diff is below 70%, flag it as a good moment to add tests.
-
-## Linting & Formatting
-
-SwiftLint runs as a post-build script (configured in `project.yml`). Config in `.swiftlint.yml`, which notably disables `line_length`, `trailing_whitespace`, `type_body_length`, `file_length`, `function_body_length`, and `cyclomatic_complexity`.
-
-SwiftFormat config in `.swiftformat`: 4-space indent, 120 max width, semicolons never.
+- Coverage targets and the xccov verification workflow: see the `test-coverage` skill.

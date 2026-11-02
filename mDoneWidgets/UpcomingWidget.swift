@@ -264,11 +264,11 @@ struct UpcomingWidgetView: View {
         let now = Date()
 
         if calendar.isDateInTomorrow(date) {
-            return formatWithTime("Tomorrow", date: date)
+            return formatWithTime(String(localized: "Tomorrow"), date: date)
         }
 
         if calendar.isDateInToday(date) {
-            return formatWithTime("Today", date: date)
+            return formatWithTime(String(localized: "Today"), date: date)
         }
 
         if let weekFromNow = calendar.date(byAdding: .day, value: 7, to: now),

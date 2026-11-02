@@ -143,8 +143,18 @@ struct DayCell: View {
     let occurrences: [TaskOccurrence]
     var events: [CalendarEvent] = []
 
-    private var hasEvents: Bool {
-        !events.isEmpty
+    /// One color per distinct calendar represented that day, capped so the row of dots
+    /// stays legible next to the (also capped) task dots.
+    private var eventCalendarColors: [CGColor?] {
+        var seen = Set<String>()
+        var colors: [CGColor?] = []
+        for event in events where seen.insert(event.calendarIdentifier).inserted {
+            colors.append(event.calendarColor)
+            if colors.count == 3 {
+                break
+            }
+        }
+        return colors
     }
 
     var body: some View {
@@ -173,9 +183,9 @@ struct DayCell: View {
                         .frame(width: 5, height: 5)
                 }
 
-                if hasEvents {
+                ForEach(Array(eventCalendarColors.enumerated()), id: \.offset) { _, color in
                     Circle()
-                        .fill(Color.green)
+                        .fill(Color(cgColor: color ?? CalendarEvent.fallbackColor))
                         .frame(width: 5, height: 5)
                 }
             }
@@ -189,19 +199,19 @@ struct DayCell: View {
     }
 
     private var dayCellAccessibilityLabel: String {
-        var label = date.formatted(date: .complete, time: .omitted)
-        if isToday {
-            label += ", today"
-        }
+        // Whole-string variants rather than fragments appended to the date, so
+        // a translator controls the word order and punctuation.
+        let day = date.formatted(date: .complete, time: .omitted)
         let taskCount = occurrences.filter { !$0.isProjected }.count
-        if taskCount > 0 {
-            label += ", \(taskCount) \(taskCount == 1 ? "task" : "tasks")"
+        let label = switch (isToday, taskCount == 0) {
+        case (false, true): day
+        case (true, true): String(localized: "\(day), today")
+        case (false, false): String(localized: "\(day), \(taskCount) tasks")
+        case (true, false): String(localized: "\(day), today, \(taskCount) tasks")
         }
         let projectedCount = occurrences.filter(\.isProjected).count
-        if projectedCount > 0 {
-            label += ", \(projectedCount) upcoming"
-        }
-        return label
+        guard projectedCount > 0 else { return label }
+        return String(localized: "\(label), \(projectedCount) upcoming")
     }
 
     private func dotColor(for task: VTask) -> Color {

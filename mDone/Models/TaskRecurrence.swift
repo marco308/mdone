@@ -62,17 +62,17 @@ enum TaskRecurrence: Equatable {
     var label: String {
         switch self {
         case .monthly:
-            return "Monthly"
+            return String(localized: "Monthly")
         case let .interval(seconds), let .fromCompletion(seconds):
             let hours = seconds / 3600
             let days = hours / 24
-            if days == 1 { return "Daily" }
-            if days == 7 { return "Weekly" }
-            if days >= 28, days <= 31 { return "Monthly" }
-            if days == 365 || days == 366 { return "Yearly" }
-            if days > 0 { return "Every \(days) days" }
-            if hours > 0 { return "Every \(hours) hours" }
-            return "Repeating"
+            if days == 1 { return String(localized: "Daily") }
+            if days == 7 { return String(localized: "Weekly") }
+            if days >= 28, days <= 31 { return String(localized: "Monthly") }
+            if days == 365 || days == 366 { return String(localized: "Yearly") }
+            if days > 0 { return String(localized: "Every \(days) days") }
+            if hours > 0 { return String(localized: "Every \(hours) hours") }
+            return String(localized: "Repeating")
         }
     }
 

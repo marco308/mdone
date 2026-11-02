@@ -191,9 +191,9 @@ struct TodayTasksWidgetView: View {
 
     private var emptyStateSubtitle: String {
         switch filterMode {
-        case .todayAndOverdue: "No tasks due today"
-        case .todayOnly: "No tasks due today"
-        case .overdueOnly: "Nothing overdue"
+        case .todayAndOverdue: String(localized: "No tasks due today")
+        case .todayOnly: String(localized: "No tasks due today")
+        case .overdueOnly: String(localized: "Nothing overdue")
         }
     }
 
@@ -280,8 +280,8 @@ struct TodayTasksWidgetView: View {
 
     private var headerTitle: String {
         switch filterMode {
-        case .todayAndOverdue, .todayOnly: "Today"
-        case .overdueOnly: "Overdue"
+        case .todayAndOverdue, .todayOnly: String(localized: "Today")
+        case .overdueOnly: String(localized: "Overdue")
         }
     }
 

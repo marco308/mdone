@@ -14,7 +14,20 @@ actor APIClient {
     private(set) var isRetrying: Bool = false
 
     private let maxRetries = 3
-    private let baseRetryDelay: UInt64 = 1_000_000_000 // 1 second in nanoseconds
+    /// Base of the exponential backoff, in nanoseconds: 1s, then 2s, then 4s.
+    /// Injectable so tests can exercise the retry paths without spending seven
+    /// real seconds per request, which also kept requests in flight long after
+    /// the test that started them had finished.
+    private let baseRetryDelay: UInt64
+
+    /// Total nanoseconds this client has actually spent in retry backoff.
+    ///
+    /// Read by the backoff test so it can assert the injected delay was honoured
+    /// instead of timing the run: an absolute wall-clock bound only measures how
+    /// busy the machine is, and failed on a loaded CI runner. Cumulative and
+    /// monotonic, so it stays meaningful with several requests in flight.
+    private(set) var retryBackoffApplied: UInt64 = 0
+
     private static let refreshCookieName = "vikunja_refresh_token"
 
     /// Per-request timeout, in seconds. URLSession's 60s default is far too
@@ -39,10 +52,29 @@ actor APIClient {
     /// racing each other with the now-invalidated cookie.
     private var inFlightRefresh: Task<Void, Error>?
 
+    /// Single-flight for `probeAPITokenLiveness()`, same reasoning as
+    /// `inFlightRefresh`: several requests can 401 at once right after launch
+    /// and one probe answers for all of them.
+    private var inFlightTokenProbe: Task<Bool, Error>?
+
+    /// How many callers are currently parked on `inFlightTokenProbe` waiting
+    /// for someone else's probe to answer. Read by the single-flight test so it
+    /// can release a held probe only once the second 401 has actually joined
+    /// it, instead of sleeping and hoping.
+    private(set) var tokenProbeWaiterCount = 0
+
+    /// The route used to tell a revoked API token from one that merely lacks a
+    /// permission. Login proves a token by fetching projects, so no token that
+    /// cannot read projects ever gets past the login screen. A 401 here means
+    /// the token itself is dead; a 200 here after a 401 elsewhere means the
+    /// token is alive and the other route was simply not granted (#178).
+    private static let tokenLivenessEndpoint = Endpoint.projects(page: 1, perPage: 1)
+
     static let shared = APIClient()
 
-    init(session: URLSession = .shared) {
+    init(session: URLSession = .shared, baseRetryDelay: UInt64 = 1_000_000_000) {
         self.session = session
+        self.baseRetryDelay = baseRetryDelay
 
         decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -202,6 +234,7 @@ actor APIClient {
                         "[mDone] Retrying request (attempt \(attempt + 1)/\(maxRetries)) after \(delay / 1_000_000_000)s — HTTP \(httpResponse.statusCode)"
                     )
                     #endif
+                    retryBackoffApplied += delay
                     try await Task.sleep(nanoseconds: delay)
                     continue
                 }
@@ -222,6 +255,7 @@ actor APIClient {
                         "[mDone] Retrying request (attempt \(attempt + 1)/\(maxRetries)) after \(delay / 1_000_000_000)s — \(error.localizedDescription)"
                     )
                     #endif
+                    retryBackoffApplied += delay
                     try await Task.sleep(nanoseconds: delay)
                     lastError = error
                     continue
@@ -267,7 +301,7 @@ actor APIClient {
             throw NetworkError.rateLimited
         default:
             let apiError = try? decoder.decode(APIError.self, from: data)
-            throw NetworkError.serverError(statusCode: httpResponse.statusCode, message: apiError?.message)
+            throw NetworkError.fromResponse(statusCode: httpResponse.statusCode, apiError: apiError)
         }
     }
 
@@ -287,8 +321,26 @@ actor APIClient {
             return (data, httpResponse)
         }
 
-        // 401 with no refresh capability — let the caller see it.
-        guard isJWTSession, refreshToken != nil else {
+        // API-token session. Vikunja answers 401 both for a revoked token and
+        // for a route the token was never granted, so the status alone cannot
+        // say whether the session is over. Ask a route every token has before
+        // logging the user out: a token created without, say, the
+        // notifications permission used to be kicked to the login screen by
+        // the first notification fetch after launch (#178).
+        guard isJWTSession else {
+            if request.url?.path == Self.tokenLivenessPath {
+                notifySessionExpired()
+                return (data, httpResponse)
+            }
+            if try await probeAPITokenLiveness() {
+                throw NetworkError.missingPermission
+            }
+            notifySessionExpired()
+            return (data, httpResponse)
+        }
+
+        // JWT with no refresh capability — let the caller see it.
+        guard refreshToken != nil else {
             notifySessionExpired()
             return (data, httpResponse)
         }
@@ -329,6 +381,37 @@ actor APIClient {
             notifySessionExpired()
         }
         return (retryData, retryResponse)
+    }
+
+    /// Path of `tokenLivenessEndpoint`, for recognising the probe route when it
+    /// is the request that 401'd in the first place.
+    private static let tokenLivenessPath = tokenLivenessEndpoint.path
+
+    /// Whether the current API token is still accepted by the server.
+    ///
+    /// Returns `true` when the liveness route answers 2xx and `false` when it
+    /// answers 401. Any other outcome (transport failure, 5xx, rate limit)
+    /// throws the matching `NetworkError` rather than guessing, because a
+    /// wrong "dead" verdict clears the Keychain, which is far worse than
+    /// showing a connectivity error and letting the caller retry.
+    private func probeAPITokenLiveness() async throws -> Bool {
+        if let inFlightTokenProbe {
+            tokenProbeWaiterCount += 1
+            defer { tokenProbeWaiterCount -= 1 }
+            return try await inFlightTokenProbe.value
+        }
+        let task = Task<Bool, Error> { [self] in
+            defer { self.inFlightTokenProbe = nil }
+            let request = try buildRequest(for: Self.tokenLivenessEndpoint)
+            let (data, response) = try await performRequest(request)
+            if response.statusCode == 401 {
+                return false
+            }
+            _ = try handleResponse(data: data, httpResponse: response)
+            return true
+        }
+        inFlightTokenProbe = task
+        return try await task.value
     }
 
     /// Single-flight wrapper around `performRefresh()`. Concurrent callers
@@ -475,32 +558,56 @@ actor APIClient {
     }
 
     /// Fetches all pages of a paginated endpoint and returns the combined results.
-    func fetchAllPages<T: Decodable>(
+    ///
+    /// The first page says how many there are; the rest are then read a few
+    /// at a time instead of one after another. Vikunja caps a page at 50
+    /// tasks whatever `perPage` asks for, so a long list is many pages, and
+    /// waiting for each in turn made a refresh slow on a distant server
+    /// (#276). Results keep page order.
+    func fetchAllPages<T: Decodable & Sendable>(
         _ endpointBuilder: (Int, Int) -> Endpoint,
         perPage: Int = 100
     ) async throws -> [T] {
-        var allItems: [T] = []
-        var page = 1
+        let (firstItems, totalPages) = try await fetchPage(endpointBuilder(1, perPage)) as ([T], Int)
+        guard totalPages > 1, !firstItems.isEmpty else { return firstItems }
 
-        while true {
-            let endpoint = endpointBuilder(page, perPage)
-            let (data, httpResponse) = try await executeWithRefresh { try self.buildRequest(for: endpoint) }
-            let responseData = try handleResponse(data: data, httpResponse: httpResponse)
-
-            let items: [T]
-            do {
-                items = try decoder.decode([T].self, from: responseData)
-            } catch {
-                throw NetworkError.decodingError(error)
+        let endpoints = (2 ... totalPages).map { endpointBuilder($0, perPage) }
+        var pages = [[T]](repeating: [], count: endpoints.count)
+        try await withThrowingTaskGroup(of: (Int, [T]).self) { group in
+            var next = 0
+            func addNext() {
+                guard next < endpoints.count else { return }
+                let index = next
+                let endpoint = endpoints[index]
+                group.addTask { try await (index, self.fetchPage(endpoint).0) }
+                next += 1
             }
-            allItems.append(contentsOf: items)
-
-            let totalPages = Int(httpResponse.value(forHTTPHeaderField: "x-pagination-total-pages") ?? "1") ?? 1
-            if page >= totalPages || items.isEmpty {
-                return allItems
+            for _ in 0 ..< Self.maxConcurrentPages {
+                addNext()
             }
-            page += 1
+            while let (index, items) = try await group.next() {
+                pages[index] = items
+                addNext()
+            }
         }
+        return firstItems + pages.flatMap { $0 }
+    }
+
+    /// How many pages `fetchAllPages` reads at once. Enough to hide the
+    /// round trips without hammering a small self-hosted server.
+    static let maxConcurrentPages = 4
+
+    private func fetchPage<T: Decodable>(_ endpoint: Endpoint) async throws -> ([T], Int) {
+        let (data, httpResponse) = try await executeWithRefresh { try self.buildRequest(for: endpoint) }
+        let responseData = try handleResponse(data: data, httpResponse: httpResponse)
+        let items: [T]
+        do {
+            items = try decoder.decode([T].self, from: responseData)
+        } catch {
+            throw NetworkError.decodingError(error)
+        }
+        let totalPages = Int(httpResponse.value(forHTTPHeaderField: "x-pagination-total-pages") ?? "1") ?? 1
+        return (items, totalPages)
     }
 
     func send<R: Decodable>(_ endpoint: Endpoint, body: some Encodable) async throws -> R {

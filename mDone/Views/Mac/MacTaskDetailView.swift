@@ -14,9 +14,15 @@ struct MacTaskDetailView: View {
     @State private var repeatInterval: Int64
     @State private var reminders: [TaskReminder]
     @State private var showDeleteConfirm = false
-    @State private var isShowingDescriptionPreview: Bool
+    /// The description editor's state while it is open; `nil` shows the
+    /// preview. `descriptionText` stays the stored text (HTML for web-app
+    /// descriptions) until the editor closes (#277).
+    @State private var descriptionEdit: DescriptionEditSession?
     @State private var estimateSeconds: TimeInterval?
     @State private var percentDone: Double
+    /// The description a checklist tap just sent, so the resulting task
+    /// change is recognised as ours in `onChange(of: task)`.
+    @State private var checklistSaveInFlight: String?
 
     init(task: VTask) {
         self.task = task
@@ -30,7 +36,7 @@ struct MacTaskDetailView: View {
         _selectedProjectId = State(initialValue: task.projectId)
         _repeatInterval = State(initialValue: task.repeatAfter ?? 0)
         _reminders = State(initialValue: task.reminders ?? [])
-        _isShowingDescriptionPreview = State(initialValue: !initialDescription.isEmpty)
+        _descriptionEdit = State(initialValue: initialDescription.isEmpty ? DescriptionEditSession(stored: "") : nil)
         _estimateSeconds = State(initialValue: task.estimatedSeconds)
         _percentDone = State(initialValue: task.percentDone ?? 0)
     }
@@ -39,6 +45,21 @@ struct MacTaskDetailView: View {
     /// changes made while the detail view is open.
     private var isCurrentNow: Bool {
         appState.isCurrent(appState.tasks.first(where: { $0.id == task.id }) ?? task)
+    }
+
+    private var isShowingDescriptionPreview: Bool {
+        descriptionEdit == nil
+    }
+
+    /// Opens the editor on the stored description, or closes it and keeps
+    /// what was typed, converted back to the stored form.
+    private func toggleDescriptionEditing() {
+        if let descriptionEdit {
+            descriptionText = descriptionEdit.storedDescription
+            self.descriptionEdit = nil
+        } else {
+            descriptionEdit = DescriptionEditSession(stored: descriptionText)
+        }
     }
 
     var body: some View {
@@ -57,7 +78,7 @@ struct MacTaskDetailView: View {
                             .foregroundStyle(.secondary)
                         Spacer()
                         Button {
-                            isShowingDescriptionPreview.toggle()
+                            toggleDescriptionEditing()
                         } label: {
                             Image(systemName: isShowingDescriptionPreview ? "pencil" : "eye")
                                 .font(.caption)
@@ -75,19 +96,26 @@ struct MacTaskDetailView: View {
                                 .italic()
                                 .frame(minHeight: 100, alignment: .topLeading)
                         } else {
+                            if let checklist = DescriptionChecklist.parse(descriptionText) {
+                                ChecklistSummaryView(checklist: checklist)
+                            }
                             ScrollView {
-                                Text(RichTextRenderer.render(descriptionText))
-                                    .font(.body)
-                                    .textSelection(.enabled)
+                                RichDescriptionView(html: descriptionText, onToggle: toggleChecklistItem)
                                     .frame(maxWidth: .infinity, alignment: .topLeading)
                             }
                             .frame(minHeight: 100, maxHeight: 200)
                         }
                     } else {
-                        TextEditor(text: $descriptionText)
-                            .font(.body)
-                            .frame(minHeight: 100, maxHeight: 200)
-                            .scrollContentBackground(.hidden)
+                        TextEditor(text: Binding(
+                            get: { descriptionEdit?.text ?? "" },
+                            set: { descriptionEdit?.text = $0 }
+                        ))
+                        .font(.body)
+                        .frame(minHeight: 100, maxHeight: 200)
+                        .scrollContentBackground(.hidden)
+                        if let mode = descriptionEdit?.mode {
+                            DescriptionEditHint(mode: mode)
+                        }
                     }
                 }
             }
@@ -168,15 +196,9 @@ struct MacTaskDetailView: View {
                 }
             }
 
-            if let labels = task.labels, !labels.isEmpty {
-                Section("Labels") {
-                    FlowLayout(spacing: 8) {
-                        ForEach(labels) { label in
-                            LabelChip(label: label)
-                        }
-                    }
-                }
-            }
+            TaskLabelsSection(task: task)
+
+            TaskAssigneesSection(task: task)
 
             FocusHistoryGate(taskId: task.id) {
                 Section("Focus") {
@@ -210,6 +232,9 @@ struct MacTaskDetailView: View {
         .navigationTitle(task.title)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
+                TaskShareMenu(task: task)
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button("Save") { saveTask() }
                     .keyboardShortcut("s", modifiers: .command)
                     .disabled(
@@ -229,6 +254,15 @@ struct MacTaskDetailView: View {
             Text("This action cannot be undone.")
         }
         .onChange(of: task) { _, newTask in
+            // The task coming back from a checklist tap is our own save: the
+            // draft already holds that description, and the other fields
+            // must keep whatever the user has typed. Anything else is an
+            // outside refresh and reloads the form as before.
+            if let saved = checklistSaveInFlight, newTask.userVisibleDescription == saved {
+                checklistSaveInFlight = nil
+                return
+            }
+            checklistSaveInFlight = nil
             title = newTask.title
             let newDescription = newTask.userVisibleDescription ?? ""
             descriptionText = newDescription
@@ -239,14 +273,47 @@ struct MacTaskDetailView: View {
             selectedProjectId = newTask.projectId
             repeatInterval = newTask.repeatAfter ?? 0
             reminders = newTask.reminders ?? []
-            isShowingDescriptionPreview = !newDescription.isEmpty
+            descriptionEdit = newDescription.isEmpty ? DescriptionEditSession(stored: "") : nil
             estimateSeconds = newTask.estimatedSeconds
             percentDone = newTask.percentDone ?? 0
         }
     }
 
+    /// Ticks or unticks one checklist item and saves the description straight
+    /// away, the way the web app does. Only the description is sent; the
+    /// rest of the form waits for Save.
+    private func toggleChecklistItem(_ index: Int) {
+        guard let updated = DescriptionChecklist.toggling(itemAt: index, in: descriptionText) else { return }
+        descriptionText = updated
+        checklistSaveInFlight = updated
+        // The task's committed estimate, not the form's draft: the estimate
+        // picker waits for Save like every other field.
+        let committedEstimate = (appState.tasks.first(where: { $0.id == task.id }) ?? task).estimatedSeconds
+        let composed = EstimateMarker.apply(committedEstimate, to: updated) ?? ""
+        Task { @MainActor in
+            let saved = await appState.updateTask(id: task.id, request: TaskUpdateRequest(description: composed))
+            // The tick was shown before it was saved. If the server refused
+            // it, put the boxes back the way Vikunja still has them, unless
+            // the description has moved on since, and forget the in-flight
+            // marker so the next outside refresh reloads the form. The task
+            // in AppState is the authority, not the text this tap started
+            // from: after two quick taps that both fail, the first tap's
+            // text was never saved either (#204).
+            if !saved {
+                if checklistSaveInFlight == updated {
+                    checklistSaveInFlight = nil
+                }
+                if descriptionText == updated {
+                    descriptionText = (appState.tasks.first(where: { $0.id == task.id }) ?? task)
+                        .userVisibleDescription ?? ""
+                }
+            }
+        }
+    }
+
     private func saveTask() {
-        let body = descriptionText.isEmpty ? nil : descriptionText
+        let current = descriptionEdit?.storedDescription ?? descriptionText
+        let body = current.isEmpty ? nil : current
         // Empty string, not nil: preservingExistingValues treats nil as "keep
         // the old text", so a cleared description must be sent explicitly.
         let composedDescription = EstimateMarker.apply(estimateSeconds, to: body) ?? ""

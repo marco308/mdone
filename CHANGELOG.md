@@ -6,6 +6,106 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Repeating tasks now show on the calendar on every day they are due, not only on their next one. A daily task appears on each remaining day of the month and a weekly task on each week it falls in, so you can see what is coming. These future occurrences are drawn in a lighter shade with a dashed circle and cannot be ticked off, edited or deleted, because Vikunja keeps a single copy of a repeating task and moves it forward when you complete the real one (#35).
+- Monthly repeating tasks are now recognised as repeating. Vikunja records a monthly repeat without an interval, which the app read as "does not repeat", so those tasks showed no repeat marker anywhere (#35).
+
+## [1.22.0] - 2026-11-01
+
+### Added
+- Share a task as a link. Long-press a task (right-click on the Mac) or use the share button in its details to share or copy a link to it on your Vikunja server, ready to hand to an agent or open in the Vikunja web app.
+
+### Changed
+- Refreshing is quicker, most of all with a lot of tasks or a server far away. mDone now asks the server for your tasks, projects and labels at the same time instead of one after another, and the spinner goes away as soon as your lists are up to date (#276).
+
+### Fixed
+- On the Mac, saved filters and My Open Tasks show their tasks again. They used to open as an empty list, although the same filter worked on iPhone and iPad (#278).
+- Editing a description written in the Vikunja web app no longer shows raw HTML. The editor now shows readable text with simple formatting: **bold**, *italic*, [links](https://example.com), bullets, numbered lists and `- [ ]` checklists, and saving keeps them as formatting and checkboxes in the web app. A description with formatting mDone cannot edit, such as a table or an image, still opens as HTML so nothing in it is lost (#277).
+
+## [1.21.0] - 2026-10-23
+
+### Added
+- Team features, off by default: turn them on in Settings > Teams if you share Vikunja projects with other people. Each task shows who it is assigned to, you can assign people when adding a task or from a task's details, and the advanced filter gains Assigned to me. With the setting off, mDone looks and works exactly as before (#272).
+- Widgets on the Mac. Add Today's Tasks, Upcoming and Quick Add to your desktop or Notification Centre, in the same sizes as on iPhone and iPad. Tick tasks off right from the widget, and Add Task opens the new task sheet in mDone (#240).
+
+### Fixed
+- Completing, rescheduling or editing a task in mDone no longer unassigns everyone from it. Vikunja drops any assignee a task update leaves out, so changes made in mDone used to quietly remove assignees set in the web app.
+
+## [1.20.0] - 2026-10-16
+
+### Added
+- Focus Run on iPhone and iPad: long-press a task in the Inbox (or any list) and choose Start Focus Run, or pick Focus Run from Here in the task's details. When you tick the task off, the next task in the list comes up in focus straight away, until the list runs out or you end the run. Skip moves on without completing, the focus screen shows what is up next and how many are left, and a finished run tells you how many tasks you got through. Plain Start Focus still focuses on a single task.
+- On iPhone and iPad, an open list now keeps itself up to date. Tasks added, edited, completed or deleted in another Vikunja app, or by server automation, show up in the Inbox, a project or a saved filter within about 15 seconds, without pulling to refresh or leaving the list. It pauses while you are editing a task, typing, or offline (#241).
+
+### Fixed
+- The Inbox's advanced filter now behaves. Filtering by Status: Done shows your completed tasks instead of "All done!", reopening the filter shows what you applied, Reset brings back every task (it used to leave some out until the next refresh), and a filter stays in place when the list refreshes instead of quietly switching off while the icon still showed it on. Opening the filter and tapping Apply without changing anything no longer counts as filtering.
+- Clearing a search in the Inbox brings your full list back straight away; it used to keep showing only the search results until the next refresh. Search now also matches task descriptions and works offline.
+- On the Mac, the filter chips, search and advanced filter now narrow the Inbox too. The Inbox used to show the same sections whatever was selected.
+- Completing a repeating task you are focusing on now ends that focus session. Vikunja moves a repeating task to its next date instead of marking it done, so focus used to carry on as if nothing had happened.
+- A task you add to a project sorted Manually now appears at the top of the list straight away, where the Vikunja web app shows it. It used to appear at the bottom and then jump to the top on the next refresh (#232).
+- Kanban boards now show completed tasks, so a Done column holds the same cards as in the Vikunja web app instead of saying "No tasks". Completed cards are struck through with a green tick, and each column's count includes them (#238).
+- A reminder set for a specific time now stays at that time. After saving, it used to show as "At time of due date" and notify you at the due time instead, so a custom reminder looked like it had been replaced. Reminders set relative to a task's start or end date now also notify at the right time (#242).
+
+## [1.19.0] - 2026-09-24
+
+### Added
+- Smart parsing in the quick-add bar, off by default: turn it on in Settings > Tasks. Type "Buy milk tomorrow at 5pm +Home !2 *shopping" and mDone adds "Buy milk" to Home, due tomorrow at 5:00 PM, priority 2, labelled shopping. Each part shows as a chip under the field before you add the task; tap its X to keep those words in the title instead (#215).
+- Smart parsing now also works in the Mac's New Task window, where it fills the project, due date and priority controls as you type, and in Siri and Shortcuts, where it reads a date, project, priority and labels out of what you say. A date you set explicitly in the Shortcuts action is never overridden (#215).
+- Smart parsing understands Chinese dates: 今天, 明天, 后天, 今晚, 下周, 下个月, 周一 to 周日, and times like 明天下午3点 (#215).
+
+## [1.18.0] - 2026-09-20
+
+### Added
+- Simplified Chinese (简体中文) translation of the app, widgets and system permission prompts, contributed by somnus0917 (#163)
+- Settings > Tasks > "Default project" picks where a task goes when you add it from the Inbox, through Siri, or with the Mac's New Task window. "Inbox adds tasks due" sets whether a task typed into the Inbox is due today, tomorrow or not at all (#210).
+
+### Fixed
+- Projects with no color assigned now show a hollow marker in the Projects tab and the Mac sidebar, instead of a filled blue dot that made them indistinguishable from projects you had deliberately colored blue. A color the server sends in a format mDone cannot read is treated the same way, rather than drawn as a gray dot (#211).
+- Tasks added from the Inbox now go to your project named Inbox, not whichever project happened to be listed first. If you have no project by that name they still go to the first one, and the new "Default project" setting overrides both (#210).
+- The calendar month view now shows each event dot in its own calendar's color instead of the same green for every calendar, so days with events from different calendars are easy to tell apart at a glance (#212)
+- A saved filter opened from the Projects tab now shows its matching tasks in the standard list view, not just on its board. The list view was checking each task's real project instead of the filter's results, so it always came back empty (#209).
+
+## [1.17.0] - 2026-09-13
+
+### Added
+- Checklists written inside a task's description now work in mDone. Vikunja's web editor lets you put a list of checkboxes in a description, for the steps of a task that is not one and done. Those used to show up as plain bullets with no sign of what was ticked. The description preview now shows each item with a checkbox you can tap to tick or untick, saved straight away as in the web app, with a "2 of 3 done" line and progress bar above it. Task rows and Kanban cards carry a matching count. Works on iPhone, iPad and Mac. Checkboxes in a repeating task still reset when the task is marked done, since that is the server's doing (#200).
+
+### Fixed
+- Ticking a checklist item that the server then refuses to save no longer leaves the box ticked. The checkbox and the "n of m done" line go back to how they were, and the usual error message explains why, so a tick you can see is a tick that was saved (#204).
+
+## [1.16.0] - 2026-09-11
+
+### Added
+- Labels can now be added to and removed from a task. The task's Labels section has an "Add Labels" button ("Edit Labels" once it has some) that opens a picker listing every label on your server: tap one to put it on the task, tap again to take it off, and each change is saved as you make it. Type a name that does not exist yet to create it, pick a colour, and it goes straight onto the task. Works in the task sheet on iPhone, the side panel on iPad and the detail view on Mac (#4).
+- Projects now open in the view you left them in. Switching a project to its board used to last only until you left the screen, so anyone who works on a board had to switch again on every visit. The choice is now remembered per project, and Settings > Projects > "Projects open in" sets what a project you have never switched opens in (#184).
+- Sort a project by "Manual" to put its tasks in whatever order you like. Drag the handle on a row to move it, on iPhone, iPad and Mac. The order is the same one Vikunja's web app shows, so a list you arrange in one place looks the same in the other, and it does not touch due dates: a task due tomorrow can sit below one due next month if that is how you want it. The sort you pick is remembered per project, and the Inbox keeps its date sections (#183).
+- Drag cards up and down a Kanban column, or into another column, to reorder them. Drop a card on the top half of another card to put it above, on the bottom half to put it below, or on empty space in a column to add it at the end. "Move to" in a card's menu still reaches columns that are off screen. Boards whose columns are filled by filters cannot be rearranged, as in the web app (#183).
+- You can now sign in with a username and password on an account that has two-factor authentication turned on. If your server supports two-factor, the login screen shows a "Two-factor code" field beside the password; leave it empty if your account does not use one. If a sign-in is refused because a code is needed, the field appears and tells you so, and a wrong or expired code says that rather than a generic error. Previously such accounts could only use an API token or single sign-on (#179).
+
+### Changed
+- The sort menu remembers your choice for each project and for the Inbox, instead of going back to "Due Date" every time you open the list (#183).
+- The login screen's note about API tokens no longer claims they cannot reorder tasks. A token created with every permission can do everything mDone does. The note now explains the real difference: a token can be revoked on its own without changing your password, and needs every permission when you create it (#179).
+- A wrong username or password now says so, instead of "Something went wrong with that request" (#179).
+- On iPad, tapping a task now opens it in a panel beside the list instead of a sheet, so you can work through tasks without covering the list. The panel appears whenever the window is wide enough, including in Split View and Stage Manager, and hands back to the sheet when it is not. Escape cancels and Cmd-S saves from a hardware keyboard, and Kanban cards lift under a trackpad pointer (#34).
+
+### Fixed
+- Moving a task to another project now shows it in that project's manual order straight away. It used to sit at the bottom of the list until you left the project and came back (#185).
+- Dragging a task to a new place in a project list no longer snaps back. The move was saved on the server but the list kept sorting by due date, so it never showed. Drag handles now appear only when the list is sorted by "Manual", where the order you make is the order you see. The Inbox's date sections, which span every project, no longer offer a drag that could not be shown (#183).
+- Signing in with single sign-on on a Mac no longer crashes the app the moment your identity provider hands back to it. macOS delivers the sign-in result on a background thread, and mDone insisted it was on the main one, which brought the app down on macOS 26 before the account could be added. The result is now passed to the main thread first (#182).
+- Signing in with an API token that was created without some permissions no longer throws you back to the login screen. Vikunja answers a missing permission with the same status it uses for a revoked token, and mDone used to take it as a revoked token, so a token without the notifications permission was logged out the moment the app opened. The app now checks whether the token still works before ending the session, keeps you signed in, and tells you which action the token cannot do so you can create one with more permissions (#178).
+
+## [1.15.0] - 2026-09-03
+
+### Added
+- Groundwork for translating mDone. All of the app's text now lives in string catalogs, so a language can be added without any code changes. No translations ship yet; Simplified Chinese is next (#163).
+- Add tasks by voice with Siri, hands-free. Say "Add a task in mDone" and Siri asks what the task is, adds it, and reads back where it went, all without opening the app. It works wherever Siri does, including in the car over CarPlay, on AirPods and on Apple Watch. Name a project with "Add a task to Home in mDone". If you have no connection the task is kept and sent when you reconnect. The phrase that used to open the app with the quick-add bar is now "Quick add a task in mDone". Tasks added this way are due today at your default due time (6:00 PM unless you have changed it), and Siri reads the due date back to you. Settings > Tasks > "Siri adds tasks due" switches that to tomorrow or to no due date.
+
+### Fixed
+- Notifications you have already read stay read. Every restart used to bring back the unread badge and mark every notification unread again, because the app looked for a "read" field that Vikunja does not send. It now reads the state from the server's read timestamp, and marking a notification read in mDone sends the flag the server needs to record it (#165).
+- A damaged local database no longer crashes the app on every launch. mDone used to stop dead if its offline database could not be opened, for instance after a failed upgrade, and the only fix was deleting and reinstalling the app, which threw away any edits you had made offline. It now rescues your unsynced changes and focus history, rebuilds the cached copy of your tasks from the server, and tells you it has done so (#155).
+
+## [1.14.0] - 2026-08-21
+
 ### Added
 - On iPad the tab bar can now expand into a sidebar, making better use of the larger screen (#34).
 - Hardware keyboard shortcuts on iPhone and iPad: Cmd-N new task, Cmd-R refresh, and Cmd-1 to Cmd-4 to switch sections. Hold Cmd to see them listed (#34).
@@ -18,9 +118,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - Actions that genuinely need a connection, such as creating a task or a project, now say so immediately instead of spending several seconds retrying first (#146).
 - Completing a task now preserves its colour and favourite status too. 1.12.2 stopped the description, priority and progress being cleared; Vikunja resets these two the same way, so every task update now carries them as well (#147).
-- A damaged local database no longer crashes the app on every launch. mDone used to stop dead if its offline database could not be opened, for instance after a failed upgrade, and the only fix was deleting and reinstalling the app, which threw away any edits you had made offline. It now rescues your unsynced changes and focus history, rebuilds the cached copy of your tasks from the server, and tells you it has done so (#155).
-- Repeating tasks now show on the calendar on every day they are due, not only on their next one. A daily task appears on each remaining day of the month and a weekly task on each week it falls in, so you can see what is coming. These future occurrences are drawn in a lighter shade with a dashed circle and cannot be ticked off, edited or deleted, because Vikunja keeps a single copy of a repeating task and moves it forward when you complete the real one (#35).
-- Monthly repeating tasks are now recognised as repeating. Vikunja records a monthly repeat without an interval, which the app read as "does not repeat", so those tasks showed no repeat marker anywhere (#35).
 
 ## [1.12.2] - 2026-08-12
 

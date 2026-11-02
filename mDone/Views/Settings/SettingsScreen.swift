@@ -8,15 +8,26 @@ struct SettingsScreen: View {
     @AppStorage(WeekStartPreference.storageKey) private var firstWeekday = WeekStartPreference.system.rawValue
     @AppStorage(DefaultDueTimePreference.storageKey) private var defaultDueTime = DefaultDueTimePreference
         .defaultRawValue
+    @AppStorage(NewTaskDueDatePreference.siriStorageKey) private var siriDueDate = NewTaskDueDatePreference
+        .defaultValue.rawValue
+    @AppStorage(NewTaskDueDatePreference.inboxStorageKey) private var inboxDueDate = NewTaskDueDatePreference
+        .defaultValue.rawValue
+    @AppStorage(DefaultProjectPreference.storageKey) private var defaultProjectId = DefaultProjectPreference.automatic
+    @AppStorage(SmartParsingPreference.storageKey) private var smartParsing = SmartParsingPreference.defaultValue
+    @AppStorage(TeamFeaturesPreference.storageKey) private var teamFeatures = TeamFeaturesPreference.defaultValue
     @AppStorage("calmMode") private var calmMode = false
     @AppStorage(AllDayEventPreference.storageKey) private var hideAllDayEvents = false
     @AppStorage("currentStallDays") private var currentStallDays = 7
     @AppStorage(TaskListDensity.storageKey) private var taskListDensity = TaskListDensity.standard.rawValue
+    #if os(iOS)
+    @AppStorage(ProjectViewPreference.defaultStorageKey) private var defaultProjectView = ProjectViewPreference
+        .fallback.rawValue
+    #endif
     @State private var showLogoutConfirm = false
     @State private var showAbout = false
 
     private var serverURL: String {
-        AuthService.shared.getServerURL() ?? "Not configured"
+        AuthService.shared.getServerURL() ?? String(localized: "Not configured")
     }
 
     var body: some View {
@@ -55,17 +66,63 @@ struct SettingsScreen: View {
                 )
             }
 
+            #if os(iOS)
             Section {
+                Picker("Projects open in", selection: defaultProjectViewBinding) {
+                    ForEach(ProjectViewMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+            } header: {
+                Text("Projects")
+            } footer: {
+                Text(
+                    "The view a project opens in. Boards are only offered for projects that have Kanban columns on the server. Switching one project with the button in its toolbar is remembered for that project and overrides this."
+                )
+            }
+            #endif
+
+            Section {
+                Picker("Default project", selection: defaultProjectBinding) {
+                    Text("Automatic").tag(DefaultProjectPreference.automatic)
+                    ForEach(DefaultProjectPreference.selectable(from: appState.projects)) { project in
+                        Text(project.title).tag(Int(project.id))
+                    }
+                }
+                Picker("Inbox adds tasks due", selection: $inboxDueDate) {
+                    ForEach(NewTaskDueDatePreference.allCases) { preference in
+                        Text(preference.label).tag(preference.rawValue)
+                    }
+                }
                 Picker("Default due time", selection: $defaultDueTime) {
                     ForEach(DefaultDueTimePreference.allCases) { preference in
                         Text(preference.label).tag(preference.rawValue)
                     }
                 }
+                Picker("Siri adds tasks due", selection: $siriDueDate) {
+                    ForEach(NewTaskDueDatePreference.allCases) { preference in
+                        Text(preference.label).tag(preference.rawValue)
+                    }
+                }
+                Toggle("Smart parsing in quick add", isOn: $smartParsing)
             } header: {
                 Text("Tasks")
             } footer: {
                 Text(
-                    "Time of day applied to tasks you add to Today without picking a time. Pick a time later in the day to avoid the task showing as overdue right away."
+                    "Tasks you add from the Inbox or through Siri go to the default project. Automatic uses your project named Inbox, or your first project if there is none. Default due time applies when those tasks get a due date: pick a time later in the day so a new task does not show as overdue right away. Smart parsing reads dates, +project, !priority and *label from what you type in the quick-add bar and shows each one as a chip you can remove before adding."
+                )
+            }
+
+            Section {
+                Toggle("Team features", isOn: $teamFeatures)
+                    .onChange(of: teamFeatures) { _, newValue in
+                        Task { await appState.teamFeaturesDidChange(enabled: newValue) }
+                    }
+            } header: {
+                Text("Teams")
+            } footer: {
+                Text(
+                    "For projects you share with other people in Vikunja. Shows who each task is assigned to, lets you assign people when adding or editing a task, and adds an Assigned to me filter. Leave it off if you use mDone on your own."
                 )
             }
 
@@ -77,13 +134,13 @@ struct SettingsScreen: View {
                     }
             } footer: {
                 Text(
-                    "Overdue tasks appear like any other — no red, no separate Overdue list or counts. They still show in your lists and widgets."
+                    "Overdue tasks appear like any other: no red, no separate Overdue list or counts. They still show in your lists and widgets."
                 )
             }
 
             Section {
                 Stepper(
-                    "Idle badge after \(currentStallDays) day\(currentStallDays == 1 ? "" : "s")",
+                    "Idle badge after \(currentStallDays) days",
                     value: $currentStallDays,
                     in: 1 ... 60
                 )
@@ -207,10 +264,37 @@ struct SettingsScreen: View {
         )
     }
 
+    /// Shows Automatic when the stored project has since been deleted or
+    /// archived, matching what `DefaultProjectPreference.resolve` falls back to.
+    private var defaultProjectBinding: Binding<Int> {
+        Binding(
+            get: {
+                DefaultProjectPreference.selectable(from: appState.projects)
+                    .contains(where: { Int($0.id) == defaultProjectId })
+                    ? defaultProjectId
+                    : DefaultProjectPreference.automatic
+            },
+            set: { defaultProjectId = $0 }
+        )
+    }
+
+    #if os(iOS)
+    /// Storage keeps the raw string, but the picker selects a `ProjectViewMode`,
+    /// so a stored value this build does not know (a downgrade after a future
+    /// version adds a mode) still matches one of the tags instead of leaving
+    /// the picker with no selection.
+    private var defaultProjectViewBinding: Binding<ProjectViewMode> {
+        Binding(
+            get: { ProjectViewMode(rawValue: defaultProjectView) ?? ProjectViewPreference.fallback },
+            set: { defaultProjectView = $0.rawValue }
+        )
+    }
+    #endif
+
     private static var versionString: String {
         let info = Bundle.main.infoDictionary
         let short = info?["CFBundleShortVersionString"] as? String ?? "—"
         let build = info?["CFBundleVersion"] as? String ?? "—"
-        return "Version \(short) (\(build))"
+        return String(localized: "Version \(short) (\(build))")
     }
 }

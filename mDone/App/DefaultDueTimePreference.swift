@@ -25,12 +25,12 @@ enum DefaultDueTimePreference: Int, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .nineAM: "9:00 AM"
-        case .noon: "12:00 PM"
-        case .fivePM: "5:00 PM"
-        case .sixPM: "6:00 PM"
-        case .ninePM: "9:00 PM"
-        case .endOfDay: "End of day"
+        case .nineAM: String(localized: "9:00 AM")
+        case .noon: String(localized: "12:00 PM")
+        case .fivePM: String(localized: "5:00 PM")
+        case .sixPM: String(localized: "6:00 PM")
+        case .ninePM: String(localized: "9:00 PM")
+        case .endOfDay: String(localized: "End of day")
         }
     }
 

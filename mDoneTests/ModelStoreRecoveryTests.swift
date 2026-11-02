@@ -208,9 +208,17 @@ final class ModelStoreRecoveryTests: XCTestCase {
     func testRebuiltMessageMentionsRecoveredWork() throws {
         let message = try XCTUnwrap(StoreRecovery.cacheRebuilt(pendingOperations: 2, focusRecords: 1).userMessage)
 
-        XCTAssertTrue(message.contains("2 unsynced changes"))
-        XCTAssertTrue(message.contains("1 focus session"))
+        // Exercises the per-argument plural substitutions in the string catalog.
+        XCTAssertTrue(message.hasSuffix("2 unsynced changes and 1 focus session were recovered."), message)
         XCTAssertFalse(message.contains("\u{2014}"), "repo style: no em-dashes in user-facing copy")
+    }
+
+    func testRecoveredSentenceUsesSingularForOneItem() throws {
+        let changes = try XCTUnwrap(StoreRecovery.cacheRebuilt(pendingOperations: 1, focusRecords: 0).userMessage)
+        XCTAssertTrue(changes.hasSuffix("1 unsynced change was recovered."), changes)
+
+        let sessions = try XCTUnwrap(StoreRecovery.cacheRebuilt(pendingOperations: 0, focusRecords: 3).userMessage)
+        XCTAssertTrue(sessions.hasSuffix("3 focus sessions were recovered."), sessions)
     }
 
     func testRebuiltMessageOmitsCountsWhenNothingWasRecovered() throws {

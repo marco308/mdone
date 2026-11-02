@@ -4,6 +4,10 @@ struct TaskRow: View {
     @Environment(AppState.self) private var appState
     #if os(iOS)
     @Environment(FocusManager.self) private var focusManager
+    /// Present only while the hosting screen shows an inline detail pane
+    /// (iPad, regular width). Absent, a tap opens the sheet as on iPhone.
+    @Environment(InlineTaskSelection.self) private var inlineSelection: InlineTaskSelection?
+    @Environment(\.focusRunOrder) private var focusRunOrder
     #endif
     let task: VTask
     /// When true, the row is display-only: no completion toggle, swipe actions,
@@ -27,6 +31,12 @@ struct TaskRow: View {
     @AppStorage("calmMode") private var calmMode = false
     @AppStorage("currentStallDays") private var stallDays = 7
     @AppStorage(TaskListDensity.storageKey) private var densityRaw = TaskListDensity.standard.rawValue
+    @AppStorage(TeamFeaturesPreference.storageKey) private var teamFeatures = TeamFeaturesPreference.defaultValue
+
+    /// Assignees to badge on the row: none while Team features is off.
+    private var visibleAssignees: [User] {
+        teamFeatures ? task.assignees ?? [] : []
+    }
 
     /// The user's chosen row size. Falls back to `.standard` if the stored
     /// value is ever unrecognised.
@@ -50,6 +60,21 @@ struct TaskRow: View {
     private var isFocused: Bool {
         focusManager.focusedTaskId == task.id
     }
+
+    /// True while this task is the one open in the inline detail pane.
+    private var isSelectedInline: Bool {
+        inlineSelection?.task?.id == task.id
+    }
+
+    private var rowBackground: Color? {
+        if isFocused {
+            return Color.orange.opacity(0.08)
+        }
+        if isSelectedInline {
+            return Color.accentColor.opacity(0.12)
+        }
+        return nil
+    }
     #endif
 
     var body: some View {
@@ -57,11 +82,14 @@ struct TaskRow: View {
         #if os(iOS)
         .contentShape(Rectangle())
         .onTapGesture {
-            if !isDisplayOnly {
+            guard !isDisplayOnly else { return }
+            if let inlineSelection {
+                inlineSelection.task = task
+            } else {
                 showDetail = true
             }
         }
-        .listRowBackground(isFocused ? Color.orange.opacity(0.08) : nil)
+        .listRowBackground(rowBackground)
         #endif
         .swipeActions(edge: .leading) {
             if !isDisplayOnly {
@@ -79,7 +107,8 @@ struct TaskRow: View {
                     if isFocused {
                         focusManager.endFocus()
                     } else {
-                        let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
+                        let projectName = appState.projects
+                            .first(where: { $0.id == task.projectId })?.title ?? String(localized: "Inbox")
                         focusManager.switchFocus(task: task, projectName: projectName)
                     }
                 } label: {
@@ -131,10 +160,22 @@ struct TaskRow: View {
                     }
                 } else {
                     Button {
-                        let projectName = appState.projects.first(where: { $0.id == task.projectId })?.title ?? "Inbox"
+                        let projectName = appState.projects
+                            .first(where: { $0.id == task.projectId })?.title ?? String(localized: "Inbox")
                         focusManager.switchFocus(task: task, projectName: projectName)
                     } label: {
                         Label("Start Focus", systemImage: "scope")
+                    }
+                }
+                if !task.done, FocusRun.canStart(at: task.id, in: focusRunOrder) {
+                    Button {
+                        focusManager.startFocusRun(
+                            task: task,
+                            projectName: appState.focusProjectName(for: task),
+                            order: focusRunOrder
+                        )
+                    } label: {
+                        Label("Start Focus Run", systemImage: "forward.end.circle")
                     }
                 }
                 #endif
@@ -160,6 +201,10 @@ struct TaskRow: View {
                     }
                 }
             }
+
+            // Sharing only reads, so read-only rows get it too.
+            Divider()
+            TaskShareButtons(task: task)
         }
         #if os(iOS)
         .sheet(isPresented: $showDetail) {
@@ -283,6 +328,11 @@ struct TaskRow: View {
                         .foregroundStyle(counts.done == counts.total ? Color.green : Color.secondary)
                     }
 
+                    if let counts = task.checklistCounts {
+                        ChecklistCountBadge(done: counts.done, total: counts.total)
+                            .font(density.metadataFont)
+                    }
+
                     if let labels = task.labels, !labels.isEmpty {
                         HStack(spacing: 4) {
                             ForEach(labels.prefix(3)) { label in
@@ -298,6 +348,10 @@ struct TaskRow: View {
             }
 
             Spacer()
+
+            if !visibleAssignees.isEmpty {
+                AssigneeStack(users: visibleAssignees)
+            }
 
             if task.priority > 0 {
                 PriorityBadge(priority: task.priorityLevel)
@@ -334,8 +388,14 @@ struct TaskRow: View {
         if let counts = task.subtaskCounts {
             parts.append("\(counts.done) of \(counts.total) subtasks done")
         }
+        if let counts = task.checklistCounts {
+            parts.append("\(counts.done) of \(counts.total) checklist items done")
+        }
         if task.priority > 0 {
             parts.append("priority \(task.priorityLevel.label)")
+        }
+        if !visibleAssignees.isEmpty {
+            parts.append("assigned to \(visibleAssignees.map(\.displayName).joined(separator: ", "))")
         }
         if let dateRangeMetadata {
             parts.append(dateRangeMetadata.accessibilityText)

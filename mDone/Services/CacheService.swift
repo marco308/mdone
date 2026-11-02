@@ -19,6 +19,9 @@ final class CachedTask {
     var created: Date?
     var updated: Date?
     var labelsData: Data?
+    /// Added for team features (#272). Optional, so SwiftData migrates an
+    /// existing store without a schema version bump.
+    var assigneesData: Data?
 
     init(from task: VTask) {
         id = task.id
@@ -37,11 +40,17 @@ final class CachedTask {
         created = task.created
         updated = task.updated
         labelsData = try? JSONEncoder().encode(task.labels)
+        assigneesData = try? JSONEncoder().encode(task.assignees)
     }
 
     func toVTask() -> VTask {
         let labels: [VLabel]? = if let labelsData {
             try? JSONDecoder().decode([VLabel].self, from: labelsData)
+        } else {
+            nil
+        }
+        let assignees: [User]? = if let assigneesData {
+            try? JSONDecoder().decode([User].self, from: assigneesData)
         } else {
             nil
         }
@@ -60,6 +69,7 @@ final class CachedTask {
             hexColor: hexColor,
             percentDone: percentDone,
             isFavorite: isFavorite,
+            assignees: assignees,
             labels: labels,
             created: created,
             updated: updated
@@ -82,6 +92,7 @@ final class CachedTask {
         created = task.created
         updated = task.updated
         labelsData = try? JSONEncoder().encode(task.labels)
+        assigneesData = try? JSONEncoder().encode(task.assignees)
     }
 }
 

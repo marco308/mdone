@@ -1,0 +1,204 @@
+name: Vikunja Integration
+
+# Nightly check that the v1 API mDone speaks hasn't moved under us.
+#
+# The unit suite mocks every response, so it stays green no matter what a
+# Vikunja release does to the wire format. These tests drive the real services
+# against a real server instead, which is the only way we find out about a
+# breaking change before a user does.
+#
+# Deliberately not on `pull_request`: it tests a moving upstream target, so it
+# must never be able to block a merge. Note that GitHub disables scheduled
+# workflows after 60 days with no repository activity.
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: vikunja-integration
+  cancel-in-progress: false
+
+jobs:
+  integration:
+    name: Vikunja ${{ matrix.vikunja }}
+    runs-on: macos-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        # `latest` is the canary: a failure there means upstream changed
+        # something. The pinned release is the version
+        # docs/vikunja-api-inventory.md was verified against, so a failure
+        # there means *we* changed something. Bump it whenever that doc gets
+        # re-verified. Values are GitHub release tags of go-vikunja/vikunja.
+        vikunja: ["latest", "v2.5.0"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download Vikunja ${{ matrix.vikunja }}
+        # Every Vikunja release ships a native darwin binary, so the server
+        # runs straight on the runner. No Docker on purpose: the hosted arm64
+        # macOS runners are VMs without nested virtualisation, so Colima (or
+        # anything else that has to boot a Linux guest) dies before the daemon
+        # is up.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag='${{ matrix.vikunja }}'
+          if [ "$tag" = latest ]; then
+            tag=$(gh release view --repo go-vikunja/vikunja --json tagName --jq .tagName)
+          fi
+          arch=$(uname -m)
+          if [ "$arch" = x86_64 ]; then arch=amd64; fi
+          mkdir -p vikunja-server
+          gh release download "$tag" --repo go-vikunja/vikunja \
+            --pattern "vikunja-${tag}-darwin-*-${arch}-full.zip" --dir vikunja-server
+          cd vikunja-server
+          unzip -q vikunja-*.zip
+          shasum -a 256 -c vikunja-*.sha256
+          binary=$(find . -maxdepth 1 -type f -name "vikunja-${tag}-darwin-*" ! -name '*.zip' ! -name '*.sha256')
+          chmod +x "$binary"
+          mv "$binary" vikunja
+          echo "VIKUNJA_RELEASE_TAG=$tag" >> "$GITHUB_ENV"
+
+      - name: Start Vikunja ${{ matrix.vikunja }}
+        # Fresh SQLite database in a scratch directory: CI wants an empty
+        # server every night. The process outlives the step because it is
+        # detached with nohup; "Server logs" below reads what it wrote.
+        working-directory: vikunja-server
+        env:
+          VIKUNJA_SERVICE_PUBLICURL: http://localhost:3456
+          VIKUNJA_SERVICE_INTERFACE: ":3456"
+          VIKUNJA_SERVICE_SECRET: ci-only-not-a-real-secret
+          VIKUNJA_SERVICE_ENABLEREGISTRATION: "true"
+          VIKUNJA_DATABASE_TYPE: sqlite
+          VIKUNJA_DATABASE_PATH: ${{ github.workspace }}/vikunja-server/data/vikunja.db
+          VIKUNJA_FILES_BASEPATH: ${{ github.workspace }}/vikunja-server/data/files
+        run: |
+          mkdir -p data
+          nohup ./vikunja > vikunja.log 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -fsS --max-time 2 http://localhost:3456/api/v1/info >/dev/null 2>&1 && break
+            sleep 2
+          done
+
+      - name: Record the server version
+        # Also the gate on the server actually being up: everything downstream
+        # would otherwise skip itself and report a green nightly that tested
+        # nothing.
+        run: |
+          version=$(curl -fsS --max-time 5 http://localhost:3456/api/v1/info | jq -r .version)
+          echo "VIKUNJA_SERVER_VERSION=$version" >> "$GITHUB_ENV"
+          echo "Matrix entry \`${{ matrix.vikunja }}\` resolved to release \`$VIKUNJA_RELEASE_TAG\`, server reports \`$version\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Seed a user and sample data
+        run: ./scripts/seed-dev-vikunja.sh
+
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Wait for the iPhone 17 simulator
+        # Now and then a runner comes up with no iOS simulator runtime at all,
+        # only the "Any iOS Simulator Device" placeholder, and xcodebuild dies
+        # with exit 70 before a single test runs (#213). Give CoreSimulator a
+        # few minutes to finish, and fail here with a clear message if it
+        # never does, so the tracking issue says "runner" rather than "API".
+        # The name must match the destination in the next step.
+        id: simulator
+        run: |
+          for attempt in $(seq 1 18); do
+            if xcrun simctl list devices available | grep -qE '^[[:space:]]+iPhone 17 \('; then
+              echo "iPhone 17 simulator available (attempt $attempt)."
+              exit 0
+            fi
+            echo "iPhone 17 simulator not available yet (attempt $attempt), waiting 10s."
+            sleep 10
+          done
+          xcrun simctl list runtimes
+          xcrun simctl list devices available
+          echo "::error::This runner has no iPhone 17 simulator, so no tests ran. This is a runner problem, not an API change; re-run the job."
+          exit 1
+
+      - name: Run integration tests
+        id: tests
+        # Same simulator CI pins in ios-tests.yml; keep the two in step.
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project mDone.xcodeproj \
+            -scheme mDone \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -only-testing:mDoneIntegrationTests \
+            -resultBundlePath integration.xcresult \
+            test | tee integration.log
+
+      - name: Fail if the suite skipped itself
+        # The tests skip when they can't reach a server, which is right on a dev
+        # machine and worthless here: it would look like a pass.
+        run: |
+          if grep -q "Test skipped - No Vikunja reachable" integration.log; then
+            echo "::error::Tests skipped themselves, the simulator could not reach the server. Nothing was verified."
+            exit 1
+          fi
+
+      - name: Upload the result bundle
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: xcresult-${{ matrix.vikunja }}
+          path: integration.xcresult
+          retention-days: 14
+
+      - name: Server logs
+        if: failure()
+        run: tail -100 vikunja-server/vikunja.log
+
+      - name: Open or update the tracking issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Nightly integration failed against Vikunja ${{ matrix.vikunja }}"
+          SIMULATOR_OUTCOME: ${{ steps.simulator.outcome }}
+          TESTS_OUTCOME: ${{ steps.tests.outcome }}
+        run: |
+          gh label create vikunja-nightly \
+            --color B60205 \
+            --description "Raised by the nightly Vikunja integration run" 2>/dev/null || true
+
+          # Only a failed test step means the API contract may have moved.
+          # Anything else failed around the tests, not in them.
+          if [ "$SIMULATOR_OUTCOME" = failure ]; then
+            next_step="No tests ran: the runner never had an iPhone 17 simulator. This is a runner flake, not an API change. Re-run the job, and close this issue once a run passes."
+          elif [ "$TESTS_OUTCOME" = failure ]; then
+            next_step="Start with the failing test names: each one states the API assumption it checks, so the name says which part of the contract moved. The result bundle is attached to the run as an artifact."
+          else
+            next_step="No integration test failed: a setup step (server download or startup, seeding, project generation) or the skipped-suite check failed instead. Open the run and start from the first failed step."
+          fi
+
+          body=$(cat <<EOF
+          The nightly run failed against Vikunja release \`${VIKUNJA_RELEASE_TAG:-unknown}\` (matrix entry \`${{ matrix.vikunja }}\`), which reported version \`${VIKUNJA_SERVER_VERSION:-unknown}\`.
+
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          $next_step
+          EOF
+          )
+
+          existing=$(gh issue list --label vikunja-nightly --state open --json number,title \
+            --jq "[.[] | select(.title == \"$TITLE\")] | .[0].number // empty")
+
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$TITLE" --label vikunja-nightly --body "$body"
+          fi

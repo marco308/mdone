@@ -11,9 +11,14 @@ import Foundation
 struct ServerInfo: Decodable, Equatable {
     var version: String?
     var auth: AuthInfo
+    /// Whether the instance lets accounts turn on two-factor authentication
+    /// (`totp_enabled`). This is an instance setting, not a statement about
+    /// any one account, so it can only say when a passcode field is worth
+    /// offering, never that one is needed (issue #179).
+    var totpEnabled: Bool
 
     enum CodingKeys: String, CodingKey {
-        case version, auth
+        case version, auth, totpEnabled
     }
 
     init(from decoder: Decoder) throws {
@@ -22,11 +27,13 @@ struct ServerInfo: Decodable, Equatable {
         // A server old enough to have no `auth` block predates both OIDC and
         // LDAP, so username and password is the only way in.
         auth = try container.decodeIfPresent(AuthInfo.self, forKey: .auth) ?? .localOnly
+        totpEnabled = try container.decodeIfPresent(Bool.self, forKey: .totpEnabled) ?? false
     }
 
-    init(version: String? = nil, auth: AuthInfo) {
+    init(version: String? = nil, auth: AuthInfo, totpEnabled: Bool = false) {
         self.version = version
         self.auth = auth
+        self.totpEnabled = totpEnabled
     }
 
     struct AuthInfo: Decodable, Equatable {

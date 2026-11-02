@@ -34,7 +34,7 @@ final class ServerInfoServiceTests: XCTestCase {
     """
 
     private func service() -> ServerInfoService {
-        ServerInfoService(apiClient: APIClient(session: MockURLProtocol.mockSession()))
+        ServerInfoService(apiClient: MockURLProtocol.mockClient())
     }
 
     func testFetchesTheInfoEndpoint() async throws {

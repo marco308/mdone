@@ -13,7 +13,7 @@ final class ProjectServiceTests: XCTestCase {
     }
 
     private func makeTestService() -> (ProjectService, APIClient) {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         let service = ProjectService(apiClient: client)
         return (service, client)
     }

@@ -158,9 +158,9 @@ struct MainTabView: View {
 
     private var undoPromptTitle: String {
         if let title = appState.undoableCompletionTitle {
-            return "Undo completing \u{201C}\(title)\u{201D}?"
+            return String(localized: "Undo completing \u{201C}\(title)\u{201D}?")
         }
-        return "Undo completion?"
+        return String(localized: "Undo completion?")
     }
     #endif
 
@@ -184,8 +184,8 @@ struct MainTabView: View {
                 }
             }
         }
-        .accessibilityLabel(appState
-            .unreadNotificationCount > 0 ? "Notifications, \(appState.unreadNotificationCount) unread" :
-            "Notifications")
+        .accessibilityLabel(appState.unreadNotificationCount > 0
+            ? String(localized: "Notifications, \(appState.unreadNotificationCount) unread")
+            : String(localized: "Notifications"))
     }
 }

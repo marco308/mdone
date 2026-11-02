@@ -33,7 +33,7 @@ final class OfflineCacheTests: XCTestCase {
     }
 
     private func makeSyncService(container: ModelContainer) async -> SyncService {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         return SyncService(
             taskService: TaskService(apiClient: client),
@@ -45,7 +45,7 @@ final class OfflineCacheTests: XCTestCase {
     /// An `AppState` whose task/project/label services all talk to
     /// `MockURLProtocol`, wired to `sync` and a monitor pinned to `connected`.
     private func makeAppState(sync: SyncService, connected: Bool) async -> AppState {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         let state = AppState(
             taskService: TaskService(apiClient: client),

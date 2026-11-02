@@ -217,10 +217,9 @@ struct MacSidebarView: View {
             Button("Cancel", role: .cancel) {}
         } message: { project in
             let count = appState.tasksForProject(project.id).count
-            Text(
-                "This permanently deletes the project and all \(count) task\(count == 1 ? "" : "s") in it, "
-                    + "including any sub-projects. This can't be undone."
-            )
+            Text(String(
+                localized: "This permanently deletes the project and all \(count) tasks in it, including any sub-projects. This can't be undone."
+            ))
         }
     }
 
@@ -289,11 +288,6 @@ struct MacSidebarView: View {
         }
     }
 
-    private func projectColor(_ project: Project) -> Color {
-        guard let hex = project.hexColor, !hex.isEmpty else { return Color.accentColor }
-        return Color(hex: hex)
-    }
-
     @ViewBuilder
     private func projectSidebarRow(_ row: ProjectTreeRow) -> some View {
         let project = row.project
@@ -311,10 +305,7 @@ struct MacSidebarView: View {
                     }
                 }
             } icon: {
-                Circle()
-                    .fill(projectColor(project))
-                    .frame(width: 10, height: 10)
-                    .accessibilityHidden(true)
+                ProjectColorDot(project: project, size: 10)
             }
         }
         .padding(.leading, CGFloat(row.depth) * 14)

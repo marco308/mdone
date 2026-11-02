@@ -32,7 +32,7 @@ final class OfflineEditQueueTests: XCTestCase {
     }
 
     private func makeSyncService(container: ModelContainer) async -> SyncService {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         return SyncService(
             taskService: TaskService(apiClient: client),
@@ -43,7 +43,7 @@ final class OfflineEditQueueTests: XCTestCase {
     }
 
     private func makeAppState(sync: SyncService, connected: Bool) async -> AppState {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         let state = AppState(
             taskService: TaskService(apiClient: client),
@@ -289,9 +289,15 @@ final class OfflineEditQueueTests: XCTestCase {
         await state.toggleTaskDone(state.tasks[1])
         XCTAssertEqual(sync.pendingOperationCount(), 2)
 
-        var requestCount = 0
+        var replayCount = 0
         MockURLProtocol.requestHandler = { request in
-            requestCount += 1
+            // "test-token" is not a JWT, so on a 401 APIClient asks the projects
+            // route once to tell a revoked token from a missing permission
+            // (#178). That probe is not an operation replay.
+            let isLivenessProbe = request.url?.path.hasSuffix("/projects") ?? false
+            if !isLivenessProbe {
+                replayCount += 1
+            }
             return (MockURLProtocol.makeResponse(statusCode: 401, url: request.url), Data())
         }
 
@@ -299,7 +305,7 @@ final class OfflineEditQueueTests: XCTestCase {
 
         XCTAssertEqual(sync.pendingOperationCount(), 2, "nothing may be dropped for an expired session")
         XCTAssertTrue(sync.failedOperations().isEmpty)
-        XCTAssertEqual(requestCount, 1, "should stop after the first 401, not retry every operation")
+        XCTAssertEqual(replayCount, 1, "should stop after the first 401, not retry every operation")
     }
 
     // MARK: - Things that genuinely can't be done offline
@@ -345,5 +351,21 @@ final class OfflineEditQueueTests: XCTestCase {
 
         XCTAssertFalse(MockURLProtocol.capturedRequests.isEmpty)
         XCTAssertEqual(sync.pendingOperationCount(), 0, "online edits are never queued")
+    }
+
+    /// A queued edit counts as saved: the replay will land it, so a view
+    /// that showed the change first must not undo it (#204).
+    func testUpdateTaskReturnsTrueWhenQueuedOffline() async throws {
+        let container = try makeContainer()
+        let sync = await makeSyncService(container: container)
+        let state = await makeAppState(sync: sync, connected: false)
+        state.tasks = [sampleTask()]
+
+        let saved = await state.updateTask(id: 1, request: TaskUpdateRequest(description: "Queued while away"))
+
+        XCTAssertTrue(saved)
+        XCTAssertEqual(sync.pendingOperationCount(), 1)
+        XCTAssertEqual(state.tasks.first?.description, "Queued while away")
+        XCTAssertTrue(MockURLProtocol.capturedRequests.isEmpty, "nothing goes to the server while offline")
     }
 }

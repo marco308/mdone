@@ -1,3 +1,6 @@
+// Lock screen accessory widgets are iOS-only; the macOS extension (#240)
+// offers the home screen widgets alone.
+#if os(iOS)
 import SwiftUI
 import WidgetKit
 
@@ -233,3 +236,4 @@ struct LockScreenInlineWidget: Widget {
         .supportedFamilies([.accessoryInline])
     }
 }
+#endif

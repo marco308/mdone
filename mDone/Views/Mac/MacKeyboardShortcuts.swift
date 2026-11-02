@@ -9,10 +9,13 @@ struct MacKeyboardShortcuts: ViewModifier {
             .sheet(isPresented: $showingQuickAdd) {
                 MacQuickAddSheet()
             }
-            .onChange(of: appState.quickAddTrigger) { _, newValue in
+            .task(id: appState.quickAddTrigger) {
                 // Set by QuickAddIntent when the "Quick Add Task" Shortcuts
-                // action runs. Consume it so a later trigger fires again.
-                guard newValue != nil else { return }
+                // action runs, and by the widgets' mdone://create link. A
+                // task rather than onChange so a trigger set before this view
+                // appeared (a cold launch from a widget) still opens the
+                // sheet. Consume it so a later trigger fires again.
+                guard appState.quickAddTrigger != nil else { return }
                 appState.quickAddTrigger = nil
                 showingQuickAdd = true
             }
@@ -46,6 +49,25 @@ struct MacQuickAddSheet: View {
     @State private var priority: Int64 = 0
     @FocusState private var titleFocused: Bool
 
+    /// Smart parsing (#215). Off by default. When on, typing fills the
+    /// pickers below rather than adding controls of its own, so the user
+    /// sees the result before pressing Add.
+    @AppStorage(SmartParsingPreference.storageKey) private var smartParsing = SmartParsingPreference.defaultValue
+    @State private var parse: SmartTaskParse?
+    @State private var parseTask: Task<Void, Never>?
+    /// The values the last parse wrote. A control that no longer holds what
+    /// the parser put there was changed by the user, and later parses leave
+    /// it alone.
+    @State private var appliedProjectId: Int64?
+    @State private var appliedDueDate: Date?
+    @State private var appliedPriority: Int64?
+
+    /// Team features (#272). Off by default; with it off the sheet has no
+    /// assignee row.
+    @AppStorage(TeamFeaturesPreference.storageKey) private var teamFeatures = TeamFeaturesPreference.defaultValue
+    @State private var assignees: [User] = []
+    @State private var isPickingAssignees = false
+
     var body: some View {
         VStack(spacing: 16) {
             Text("New Task")
@@ -58,6 +80,12 @@ struct MacQuickAddSheet: View {
                     if !title.isEmpty {
                         addTask()
                     }
+                }
+                .onChange(of: title) { _, newValue in
+                    scheduleParse(for: newValue)
+                }
+                .onChange(of: smartParsing) { _, _ in
+                    scheduleParse(for: title)
                 }
 
             if !appState.projects.isEmpty {
@@ -87,6 +115,26 @@ struct MacQuickAddSheet: View {
                 }
             }
 
+            if teamFeatures, selectedProjectId > 0 {
+                HStack {
+                    Text("Assignees")
+                    Spacer()
+                    if !assignees.isEmpty {
+                        AssigneeStack(users: assignees)
+                    }
+                    Button(assignees.isEmpty ? "Assign" : "Change") {
+                        isPickingAssignees = true
+                    }
+                }
+                .sheet(isPresented: $isPickingAssignees) {
+                    AssigneePickerSheet(projectId: selectedProjectId, target: .draft($assignees))
+                }
+                // People picked for one project may not see another.
+                .onChange(of: selectedProjectId) { _, _ in
+                    assignees = []
+                }
+            }
+
             HStack {
                 Button("Cancel") { dismiss() }
                     .keyboardShortcut(.cancelAction)
@@ -101,20 +149,82 @@ struct MacQuickAddSheet: View {
         .padding(20)
         .frame(width: 350)
         .onAppear {
-            selectedProjectId = appState.projects.first?.id ?? 0
+            selectedProjectId = appState.defaultProject?.id ?? 0
             titleFocused = true
         }
     }
 
+    /// Debounced like the iOS bar, then applied to the controls.
+    private func scheduleParse(for rawTitle: String) {
+        parseTask?.cancel()
+        guard smartParsing, !rawTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            parse = nil
+            return
+        }
+        parseTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(250))
+            if Task.isCancelled {
+                return
+            }
+            let result = makeParser().parse(rawTitle)
+            parse = result
+            apply(result)
+        }
+    }
+
+    private func makeParser() -> SmartTaskParser {
+        SmartTaskParser(projects: appState.projects, labels: appState.labels)
+    }
+
+    /// Writes the parse into the controls and answers what the task would be
+    /// created with. A field the user has changed by hand is left as they set
+    /// it: their choice beats every later parse.
+    @discardableResult
+    private func apply(_ parse: SmartTaskParse) -> (projectId: Int64, dueDate: Date?, priority: Int64) {
+        if let due = parse.dueDate, appliedDueDate == nil || (hasDueDate && dueDate == appliedDueDate) {
+            hasDueDate = true
+            dueDate = due
+            appliedDueDate = due
+        }
+        if let projectId = parse.projectId,
+           appState.projects.contains(where: { $0.id == projectId && $0.id > 0 }),
+           appliedProjectId == nil || selectedProjectId == appliedProjectId
+        {
+            selectedProjectId = projectId
+            appliedProjectId = projectId
+        }
+        if let parsed = parse.priority.map(Int64.init), appliedPriority == nil || priority == appliedPriority {
+            priority = parsed
+            appliedPriority = parsed
+        }
+        return (selectedProjectId, hasDueDate ? dueDate : nil, priority)
+    }
+
     private func addTask() {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, selectedProjectId > 0 else { return }
+        // Parse what is in the field right now rather than trusting the
+        // debounce, so pressing Add mid-keystroke still strips the magic text
+        // and keeps the labels, as the iOS bar does.
+        var currentParse: SmartTaskParse?
+        var values = (projectId: selectedProjectId, dueDate: hasDueDate ? dueDate : nil, priority: priority)
+        if smartParsing, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let fresh = parse?.text == title ? parse : makeParser().parse(title)
+            currentParse = fresh
+            if let fresh {
+                values = apply(fresh)
+            }
+        }
+        let trimmed = (currentParse?.title ?? title).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, values.projectId > 0 else { return }
+        parseTask?.cancel()
+        parseTask = nil
         Task {
             await appState.createTask(
                 title: trimmed,
-                projectId: selectedProjectId,
-                dueDate: hasDueDate ? dueDate : nil,
-                priority: priority
+                projectId: values.projectId,
+                dueDate: values.dueDate,
+                priority: values.priority,
+                labelIds: currentParse?.labelIds ?? [],
+                assignees: teamFeatures ? assignees : []
             )
             dismiss()
         }

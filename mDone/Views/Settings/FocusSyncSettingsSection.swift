@@ -67,10 +67,10 @@ struct FocusSyncSettingsSection: View {
             }
 
             Button("Sync now") {
-                lastSyncMessage = "Syncing…"
+                lastSyncMessage = String(localized: "Syncing…")
                 Task {
                     await outbox.drain()
-                    lastSyncMessage = "Sync triggered — check pending count"
+                    lastSyncMessage = String(localized: "Sync triggered, check pending count")
                 }
             }
             .disabled(!FocusSyncConfig.isConfigured() || pending.isEmpty)
@@ -103,9 +103,13 @@ struct FocusSyncSettingsSection: View {
 
     private var footerText: String {
         if !FocusSyncConfig.isConfigured() {
-            return "Leave blank to keep focus history on-device only. When both fields are set, completed focus sessions are sent to your focus-service so they can be analysed across tasks (mdone#62)."
+            return String(
+                localized: "Leave blank to keep focus history on-device only. When both fields are set, completed focus sessions are sent to your focus-service so they can be analysed across tasks (mdone#62)."
+            )
         }
-        return "Focus sessions sync automatically when you complete a task. The server uses each session's client_id for idempotent retry — re-sending the same session never creates duplicates."
+        return String(
+            localized: "Focus sessions sync automatically when you complete a task. The server uses each session's client_id for idempotent retry, so re-sending the same session never creates duplicates."
+        )
     }
 
     private func persist() {

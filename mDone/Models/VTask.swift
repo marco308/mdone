@@ -86,14 +86,7 @@ struct VTask: Codable, Identifiable, Hashable {
     /// default styling instead of rendering a stray gray. The leading `#`, if
     /// present, is stripped.
     var normalizedHexColor: String? {
-        guard let hexColor else { return nil }
-        let trimmed = hexColor
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        guard [3, 6, 8].contains(trimmed.count),
-              trimmed.allSatisfy(\.isHexDigit)
-        else { return nil }
-        return trimmed
+        HexColor.normalized(hexColor)
     }
 
     /// `description` with the mDone estimate marker stripped — what the user
@@ -245,6 +238,29 @@ struct TaskReminder: Codable, Hashable {
     var reminder: Date?
     var relativePeriod: Int64?
     var relativeTo: String?
+
+    /// Vikunja echoes a fixed-time reminder back as `relative_period: 0` and
+    /// `relative_to: ""` rather than leaving them out, so a non-nil
+    /// `relativePeriod` does not make a reminder relative. Only `relativeTo`
+    /// says so. Reading the period alone showed a 12 PM reminder as
+    /// "At time of due date" and fired it at the due time (#242).
+    var isRelative: Bool {
+        !(relativeTo ?? "").isEmpty
+    }
+
+    /// When this reminder should fire for `task`. A relative reminder is
+    /// worked out from the task's own date, since the `reminder` Vikunja
+    /// computes for it goes stale as soon as that date is edited locally.
+    /// Nil when the date it hangs off is unset.
+    func fireDate(for task: VTask) -> Date? {
+        guard isRelative else { return reminder }
+        let anchor: Date? = switch relativeTo {
+        case "start_date": task.effectiveStartDate
+        case "end_date": task.effectiveEndDate
+        default: task.effectiveDueDate
+        }
+        return anchor?.addingTimeInterval(TimeInterval(relativePeriod ?? 0))
+    }
 }
 
 enum PriorityLevel: Int, CaseIterable {
@@ -257,12 +273,12 @@ enum PriorityLevel: Int, CaseIterable {
 
     var label: String {
         switch self {
-        case .none: "None"
-        case .low: "Low"
-        case .medium: "Medium"
-        case .high: "High"
-        case .urgent: "Urgent"
-        case .critical: "Critical"
+        case .none: String(localized: "None")
+        case .low: String(localized: "Low")
+        case .medium: String(localized: "Medium")
+        case .high: String(localized: "High")
+        case .urgent: String(localized: "Urgent")
+        case .critical: String(localized: "Critical")
         }
     }
 }
@@ -300,6 +316,10 @@ struct TaskUpdateRequest: Encodable {
     /// Same as `hexColor`: carried so completing a task in mDone doesn't drop
     /// it from favorites lists in other clients.
     var isFavorite: Bool?
+    /// Who the task is assigned to. Vikunja's update **does** replace these:
+    /// leave them out and every assignee is removed, so completing a task
+    /// in mDone used to unassign it for the whole team. Encoded as ids only.
+    var assignees: [User]?
     var clearDueDate: Bool?
     var clearStartDate: Bool?
     var clearEndDate: Bool?
@@ -310,7 +330,7 @@ struct TaskUpdateRequest: Encodable {
 
     private enum CodingKeys: String, CodingKey {
         case title, description, done, dueDate, startDate, endDate, priority, projectId, labels
-        case repeatAfter, repeatMode, reminders, percentDone, hexColor, isFavorite
+        case repeatAfter, repeatMode, reminders, percentDone, hexColor, isFavorite, assignees
     }
 
     func encode(to encoder: Encoder) throws {
@@ -342,6 +362,7 @@ struct TaskUpdateRequest: Encodable {
         try container.encodeIfPresent(percentDone, forKey: .percentDone)
         try container.encodeIfPresent(hexColor, forKey: .hexColor)
         try container.encodeIfPresent(isFavorite, forKey: .isFavorite)
+        try container.encodeIfPresent(assignees?.map { UserRef(id: $0.id) }, forKey: .assignees)
     }
 
     /// Carries every field this request doesn't set forward from `task`.
@@ -394,6 +415,9 @@ struct TaskUpdateRequest: Encodable {
         }
         if request.reminders == nil {
             request.reminders = task.reminders
+        }
+        if request.assignees == nil {
+            request.assignees = task.assignees
         }
         return request
     }

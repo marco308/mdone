@@ -33,8 +33,14 @@ struct TaskDateRangeMetadata: Equatable {
             // Reversed ranges can arrive from imports the editor would reject;
             // describe them neutrally rather than claiming the start comes first.
             let accessibilityText = start <= end
-                ? "starts \(start.formatted(spokenStyle)), ends \(end.formatted(spokenStyle))"
-                : "date range \(lowerBound.formatted(spokenStyle)) to \(upperBound.formatted(spokenStyle))"
+                ? String(
+                    localized: "starts \(start.formatted(spokenStyle)), ends \(end.formatted(spokenStyle))",
+                    locale: locale
+                )
+                : String(
+                    localized: "date range \(lowerBound.formatted(spokenStyle)) to \(upperBound.formatted(spokenStyle))",
+                    locale: locale
+                )
             return TaskDateRangeMetadata(
                 compactText: (lowerBound ..< upperBound).formatted(intervalStyle),
                 accessibilityText: accessibilityText
@@ -42,14 +48,14 @@ struct TaskDateRangeMetadata: Equatable {
 
         case let (start?, nil):
             return TaskDateRangeMetadata(
-                compactText: "Starts \(start.formatted(dayStyle))",
-                accessibilityText: "starts \(start.formatted(spokenStyle))"
+                compactText: String(localized: "Starts \(start.formatted(dayStyle))", locale: locale),
+                accessibilityText: String(localized: "starts \(start.formatted(spokenStyle))", locale: locale)
             )
 
         case let (nil, end?):
             return TaskDateRangeMetadata(
-                compactText: "Ends \(end.formatted(dayStyle))",
-                accessibilityText: "ends \(end.formatted(spokenStyle))"
+                compactText: String(localized: "Ends \(end.formatted(dayStyle))", locale: locale),
+                accessibilityText: String(localized: "ends \(end.formatted(spokenStyle))", locale: locale)
             )
 
         case (nil, nil):

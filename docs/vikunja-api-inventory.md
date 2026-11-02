@@ -167,6 +167,8 @@ Relations are bidirectional: creating subtask(A->B) also creates parenttask(B->A
 
 Positions are per-view. When sorting by position, you must be within a view context.
 
+The same endpoint orders cards inside a kanban bucket: send the kanban view's id. A task with no position row reads back as `0` and sorts last. The server does not reject any value, but from v1.0 it repairs collisions and anything under `0.01` by redistributing the whole view, and it can also settle on a different number than the one sent (observed on v2.4.0 for a drop at the top of a list view). Read the view back after a write rather than trusting the number that went out. `TaskPositioning` in the app produces the same numbers as the web app's `calculateItemPosition`: midpoint between neighbours, half the first position at the top, last position plus 2^16 at the bottom.
+
 ### 1.8 Task Bucket Assignment (Kanban)
 
 | Method | Path | Description |
@@ -255,7 +257,7 @@ Query params for listing: `page`, `per_page`, `s` (search), `is_archived` (bool)
 | PUT | `/projects/:project/users` | Share project with a user |
 | POST | `/projects/:project/users/:user` | Update user permission |
 | DELETE | `/projects/:project/users/:user` | Remove user access |
-| GET | `/projects/:project/projectusers` | List users (without emails, for autocomplete) |
+| GET | `/projects/:project/projectusers` | List users (without emails, for autocomplete). Includes the owner and team members, not paginated. mDone's assignee picker reads it (#272). |
 
 **ProjectUser fields:** `id`, `user_id`, `project_id`, `permission` (0=Read, 1=Read&Write, 2=Admin), `created`, `updated`
 
@@ -436,13 +438,17 @@ Saved filters appear as virtual projects with negative IDs (calculated as `-(fil
 
 **User settings include:** `email_reminders_enabled`, `discoverable_by_name`, `discoverable_by_email`, `overdue_tasks_reminders_enabled`, `overdue_tasks_reminders_time`, `default_project_id`, `week_start`, `timezone`, `language`, `frontend_settings` (JSON blob for UI preferences)
 
+`frontend_settings` is where the web client keeps its own preferences, including `quickAddMagicMode` (which
+prefix its quick add magic uses). It is `null` for a user who has never used the web UI, and mDone's smart
+parsing accepts `+` and `#` either way, so mDone deliberately does not read it (#226).
+
 **Avatar providers:** `gravatar`, `upload`, `initials`, `marble`
 
 ### 6.2 Authentication
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/login` | Login with username/password, returns JWT |
+| POST | `/login` | Login with username/password, returns JWT. Body also takes `totp_passcode`, required when the account has TOTP on; a missing, empty or wrong passcode is 412 with code 1017, a wrong password 403 with code 1011. mDone sends it when the user fills in the two-factor field (#179). |
 | POST | `/user/token` | Renew JWT token |
 | POST | `/user/token/refresh` | Refresh token (uses cookie, unauthenticated) |
 | POST | `/user/logout` | Logout / invalidate session |
@@ -542,7 +548,12 @@ Machine accounts owned by a user, for automation that should not use the owner's
 
 Query params: `page`, `per_page`
 
-**DatabaseNotification fields:** `id`, `name` (event name), `notification` (payload), `read`, `read_at`, `created`
+**DatabaseNotification fields:** `id`, `name` (event name), `notification` (payload), `read_at`, `created`
+
+There is no `read` field in the response. Read state is carried by `read_at` alone, which holds the
+zero date (`0001-01-01T00:00:00Z`) while the notification is unread. The mark-as-read request does
+take a `read` boolean in its body, and the server writes `read_at` from it, so a request with an empty
+body marks the notification *unread*.
 
 ---
 
@@ -709,6 +720,12 @@ Internal events: `task.reminder.fired` (used for notifications)
 | POST | `/tasks/:projecttask/assignees/bulk` | Bulk set assignees |
 
 Bulk assignee body: `{"assignees": [{"id": 1}, {"id": 2}]}` -- replaces all assignees.
+mDone uses the bulk endpoint for every assignee change (#272). It answers 7003 when a user cannot see
+the project, and echoes the ids back with blank names.
+
+**`POST /tasks/{id}` replaces assignees too.** A task update whose body has no `assignees` removes every
+assignee (verified on v2.4.0), so mDone carries the task's assignees in every update. A create with an
+inaccessible assignee fails as a whole (7003), which is why mDone assigns after creating.
 
 ---
 
@@ -912,7 +929,7 @@ Reaction body: `{"value": "emoji_string"}` -- the emoji character or shortcode.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/info` | Get instance info (version, features, auth methods, motd) |
+| GET | `/info` | Get instance info (version, features, auth methods, motd). Top-level `totp_enabled` says whether accounts may enrol in TOTP; mDone uses it to offer the two-factor field on the login screen (#179). |
 | GET | `/routes` | List all available API routes (for API token permission scoping) |
 | GET | `/user/timezones` | List available timezones |
 | GET | `/docs.json` | OpenAPI/Swagger specification (JSON) |

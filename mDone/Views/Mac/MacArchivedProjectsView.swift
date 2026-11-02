@@ -18,9 +18,7 @@ struct MacArchivedProjectsView: View {
                 List {
                     ForEach(appState.archivedProjects) { project in
                         HStack(spacing: 10) {
-                            Circle()
-                                .fill(projectColor(project))
-                                .frame(width: 10, height: 10)
+                            ProjectColorDot(project: project, size: 10)
                             Text(project.title)
                             Spacer()
                             Button("Unarchive") {
@@ -75,10 +73,5 @@ struct MacArchivedProjectsView: View {
                 "This permanently deletes the project and all of its tasks, including any sub-projects. This can't be undone."
             )
         }
-    }
-
-    private func projectColor(_ project: Project) -> Color {
-        guard let hex = project.hexColor, !hex.isEmpty else { return Color.accentColor }
-        return Color(hex: hex)
     }
 }

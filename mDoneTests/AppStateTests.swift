@@ -16,7 +16,7 @@ final class AppStateTests: XCTestCase {
     /// Builds an `AppState` whose `TaskService` talks to `MockURLProtocol`,
     /// so tests can drive `undoLastCompletion()`'s network path deterministically.
     private func makeMockedAppState() async -> AppState {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         return AppState(taskService: TaskService(apiClient: client))
     }
@@ -24,7 +24,7 @@ final class AppStateTests: XCTestCase {
     /// Builds an `AppState` whose `ProjectService` talks to `MockURLProtocol`,
     /// so project create/edit/archive/delete paths can be driven deterministically.
     private func makeProjectMockedAppState() async -> AppState {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         return AppState(projectService: ProjectService(apiClient: client))
     }
@@ -367,6 +367,128 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(appState.tasksForProject(projectId).map(\.id), [1])
     }
 
+    // MARK: - tasksForProject with virtual projects / saved filters (issue #209)
+
+    /// Saved filters are exposed as virtual projects with negative IDs; the tasks they
+    /// match keep their real, positive home project's `projectId`. Before the fix,
+    /// `tasksForProject` filtered by `projectId == filterId`, which never matched, so
+    /// the standard list view always showed nothing for a saved filter even though the
+    /// view fetch had populated the cache correctly.
+    func testTasksForProjectUsesCacheForVirtualProject() {
+        let filterId: Int64 = -5
+        let appState = AppState()
+
+        appState.tasks = [
+            VTask(id: 1, title: "Labeled A", done: false, priority: 0, projectId: 10),
+            VTask(id: 2, title: "Labeled B", done: false, priority: 0, projectId: 20),
+            VTask(id: 3, title: "Unrelated", done: false, priority: 0, projectId: 30),
+        ]
+        appState.projectTaskCache[filterId] = [
+            VTask(id: 1, title: "Labeled A", done: false, priority: 0, projectId: 10),
+            VTask(id: 2, title: "Labeled B", done: false, priority: 0, projectId: 20),
+        ]
+
+        XCTAssertEqual(appState.tasksForProject(filterId).map(\.id), [1, 2])
+    }
+
+    func testTasksForProjectVirtualProjectExcludesDoneAndUsesLatestData() {
+        let filterId: Int64 = -1
+        let appState = AppState()
+
+        appState.tasks = [
+            VTask(id: 1, title: "Still open", done: false, priority: 0, projectId: 10),
+            VTask(id: 2, title: "Now done", done: true, priority: 0, projectId: 20),
+        ]
+        appState.projectTaskCache[filterId] = [
+            VTask(id: 1, title: "Stale title", done: false, priority: 0, projectId: 10),
+            VTask(id: 2, title: "Stale title", done: false, priority: 0, projectId: 20),
+        ]
+
+        let result = appState.tasksForProject(filterId)
+        XCTAssertEqual(result.map(\.id), [1])
+        XCTAssertEqual(result.first?.title, "Still open")
+    }
+
+    func testTasksForProjectVirtualProjectWithNoCacheReturnsEmpty() {
+        let appState = AppState()
+        appState.tasks = [VTask(id: 1, title: "A", done: false, priority: 0, projectId: 10)]
+
+        XCTAssertEqual(appState.tasksForProject(-2), [])
+    }
+
+    /// `deleteTask` removes the task from `tasks` but does not touch `projectTaskCache`.
+    /// For a virtual project, falling back to the stale cached entry would keep a
+    /// deleted task visible until the next view refetch, unlike normal projects (where
+    /// removal from `tasks` alone drops it). Deleted ids must be dropped instead.
+    func testTasksForProjectVirtualProjectDropsDeletedTask() {
+        let filterId: Int64 = -3
+        let appState = AppState()
+
+        appState.tasks = [
+            VTask(id: 1, title: "Still exists", done: false, priority: 0, projectId: 10),
+        ]
+        appState.projectTaskCache[filterId] = [
+            VTask(id: 1, title: "Still exists", done: false, priority: 0, projectId: 10),
+            VTask(id: 2, title: "Deleted elsewhere", done: false, priority: 0, projectId: 20),
+        ]
+
+        XCTAssertEqual(appState.tasksForProject(filterId).map(\.id), [1])
+    }
+
+    /// The Mac list reads a saved filter's view when it is selected and then
+    /// relies on `refreshAll` (toolbar, Command-R, app activation) to keep it
+    /// current (#278). The filter's matches change on the server between the
+    /// two reads.
+    func testRefreshAllKeepsAnOpenedSavedFilterCurrent() async throws {
+        let client = MockURLProtocol.mockClient()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+        let appState = AppState(
+            taskService: TaskService(apiClient: client),
+            projectService: ProjectService(apiClient: client),
+            labelService: LabelService(apiClient: client)
+        )
+        func json(_ value: Any) throws -> Data {
+            try JSONSerialization.data(withJSONObject: value)
+        }
+        func tasks(_ ids: [Int64]) throws -> Data {
+            try json(ids.map { ["id": $0, "title": "Task \($0)", "done": false, "priority": 0, "project_id": 4] })
+        }
+        let projects = try json([
+            ["id": 4, "title": "Errands", "views": [["id": 13, "title": "List", "project_id": 4, "view_kind": "list"]]],
+            [
+                "id": -3,
+                "title": "High priority",
+                "views": [["id": 21, "title": "List", "project_id": -3, "view_kind": "list"]],
+            ],
+        ])
+        let all = try tasks([1, 2, 3, 14])
+        let empty = try json([])
+        var matches = try tasks([1, 3])
+        MockURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
+            if path.hasSuffix("/projects/-3/views/21/tasks") {
+                return (response, matches)
+            }
+            if path.hasSuffix("/projects") {
+                return (response, projects)
+            }
+            if path.hasSuffix("/labels") {
+                return (response, empty)
+            }
+            return (response, all)
+        }
+
+        await appState.refreshAll()
+        let filter = try XCTUnwrap(appState.projects.first { $0.id == -3 })
+        await appState.fetchProjectTasks(project: filter)
+        XCTAssertEqual(appState.tasksForProject(-3).map(\.id), [1, 3])
+
+        matches = try tasks([3, 14])
+        await appState.refreshAll()
+        XCTAssertEqual(appState.tasksForProject(-3).map(\.id), [3, 14])
+    }
+
     // MARK: - Session expiry vs logout (issue #80)
 
     func testExpireSessionKeepsServerURL() async {
@@ -693,6 +815,36 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(updated.endDate, end)
         XCTAssertEqual(updated.repeatAfter, 86400)
         XCTAssertEqual(updated.repeatMode, 1)
+    }
+
+    /// Vikunja answers "done" on a repeating task with the task undone and
+    /// its next date. The completion hook must still fire, or a Focus Run
+    /// would sit on that task instead of moving to the next one.
+    func testCompletingARepeatingTaskStillReportsCompletion() async throws {
+        let appState = await makeMockedAppState()
+        let task = VTask(
+            id: 85,
+            title: "Water plants",
+            done: false,
+            dueDate: Date(timeIntervalSince1970: 1_800_000_000),
+            priority: 0,
+            projectId: 1,
+            repeatAfter: 86400,
+            repeatMode: 0
+        )
+        appState.tasks = [task]
+        var completed: [Int64] = []
+        appState.onTaskCompleted = { completed.append($0) }
+        MockURLProtocol.requestHandler = { request in
+            let json = #"{"id":85,"title":"Water plants","done":false,"priority":0,"project_id":1}"#
+                .data(using: .utf8)!
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), json)
+        }
+
+        await appState.toggleTaskDone(task)
+
+        XCTAssertEqual(completed, [85])
+        XCTAssertEqual(appState.tasks.first?.done, false)
     }
 
     func testUpdateTaskPreservesRequestedScheduleWithoutTopLevelTask() async throws {
@@ -1065,5 +1217,47 @@ final class AppStateTests: XCTestCase {
         SharedKeys.sharedDefaults.set(true, forKey: SharedKeys.calmModeKey)
         XCTAssertTrue(SharedKeys.sharedDefaults.bool(forKey: SharedKeys.calmModeKey))
         SharedKeys.sharedDefaults.removeObject(forKey: SharedKeys.calmModeKey)
+    }
+
+    // MARK: - updateTask result (#204)
+
+    /// Views that show a change before saving it (checklist ticks) rely on
+    /// the result to know whether to put the old state back.
+    func testUpdateTaskReturnsTrueWhenServerSaves() async {
+        let appState = await makeMockedAppState()
+        let task = VTask(id: 60, title: "Pack", description: "old", done: false, priority: 0, projectId: 2)
+        appState.tasks = [task]
+
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url!)
+            let json = """
+            {"id": 60, "title": "Pack", "description": "new", "done": false, "priority": 0, "project_id": 2}
+            """
+            return (response, Data(json.utf8))
+        }
+
+        let saved = await appState.updateTask(id: 60, request: TaskUpdateRequest(description: "new"))
+
+        XCTAssertTrue(saved)
+        XCTAssertEqual(appState.tasks.first?.description, "new")
+        XCTAssertNil(appState.errorMessage)
+    }
+
+    func testUpdateTaskReturnsFalseAndKeepsLocalTaskWhenServerRefuses() async {
+        let appState = await makeMockedAppState()
+        let task = VTask(id: 61, title: "Pack", description: "old", done: false, priority: 0, projectId: 2)
+        appState.tasks = [task]
+
+        // 400 (not 5xx) so APIClient fails fast instead of retrying with backoff.
+        MockURLProtocol.requestHandler = { request in
+            let response = MockURLProtocol.makeResponse(statusCode: 400, url: request.url!)
+            return (response, Data("{\"message\": \"bad request\"}".utf8))
+        }
+
+        let saved = await appState.updateTask(id: 61, request: TaskUpdateRequest(description: "new"))
+
+        XCTAssertFalse(saved, "A refused update must report failure so the caller can revert")
+        XCTAssertEqual(appState.tasks.first?.description, "old", "The local task keeps what the server still has")
+        XCTAssertNotNil(appState.errorMessage, "The usual error banner still explains what went wrong")
     }
 }

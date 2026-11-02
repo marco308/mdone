@@ -5,6 +5,8 @@ struct VNotification: Codable, Identifiable {
     let id: Int64
     var name: String?
     var notification: NotificationPayload?
+    /// Client-side only. Vikunja never sends this back, it only accepts it on the
+    /// mark-as-read request body, so it must never be used to decide read state.
     var read: Bool?
     var readAt: Date?
     var created: Date?
@@ -16,27 +18,32 @@ struct VNotification: Codable, Identifiable {
         var comment: TaskComment?
     }
 
+    /// Vikunja reports read state through `read_at` alone: an unread notification
+    /// carries the zero date, which `APIClient` decodes to `Date.distantPast`.
+    /// There is no `read` field in the response, so keying off it marked every
+    /// notification unread again on each launch (#165).
     var isUnread: Bool {
-        read != true
+        guard let readAt else { return true }
+        return readAt <= Date.distantPast
     }
 
     var descriptionText: String {
-        guard let notification else { return name ?? "Notification" }
+        guard let notification else { return name ?? String(localized: "Notification") }
 
-        let doerName = notification.doer?.displayName ?? "Someone"
+        let doerName = notification.doer?.displayName ?? String(localized: "Someone")
 
         if let task = notification.task {
             if notification.comment != nil {
-                return "\(doerName) commented on \"\(task.title)\""
+                return String(localized: "\(doerName) commented on \"\(task.title)\"")
             }
-            return "\(doerName) updated \"\(task.title)\""
+            return String(localized: "\(doerName) updated \"\(task.title)\"")
         }
 
         if let project = notification.project {
-            return "\(doerName) updated project \"\(project.title)\""
+            return String(localized: "\(doerName) updated project \"\(project.title)\"")
         }
 
-        return name ?? "Notification"
+        return name ?? String(localized: "Notification")
     }
 
     var iconName: String {
@@ -75,6 +82,12 @@ struct VNotification: Codable, Identifiable {
         formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: created, relativeTo: Date())
     }
+}
+
+/// Body for `POST /notifications` and `POST /notifications/{id}`. Vikunja takes the
+/// read state from this flag and writes `read_at` from it, so it has to be sent.
+struct MarkNotificationReadRequest: Encodable {
+    let read: Bool
 }
 
 struct TaskComment: Codable {

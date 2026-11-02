@@ -18,11 +18,11 @@ enum QuickSchedule: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .today: "Today"
-        case .tomorrow: "Tomorrow"
-        case .laterThisWeek: "Later This Week"
-        case .nextWeek: "Next Week"
-        case .nextMonth: "Next Month"
+        case .today: String(localized: "Today")
+        case .tomorrow: String(localized: "Tomorrow")
+        case .laterThisWeek: String(localized: "Later This Week")
+        case .nextWeek: String(localized: "Next Week")
+        case .nextMonth: String(localized: "Next Month")
         }
     }
 

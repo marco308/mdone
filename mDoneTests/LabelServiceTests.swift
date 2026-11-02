@@ -13,7 +13,7 @@ final class LabelServiceTests: XCTestCase {
     }
 
     private func makeService() async -> LabelService {
-        let client = APIClient(session: MockURLProtocol.mockSession())
+        let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         return LabelService(apiClient: client)
     }

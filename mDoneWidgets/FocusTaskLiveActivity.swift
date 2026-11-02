@@ -1,3 +1,5 @@
+// Live Activities (ActivityKit) only exist on iOS.
+#if os(iOS)
 import ActivityKit
 import SwiftUI
 import WidgetKit
@@ -137,3 +139,4 @@ private func formatWidgetElapsed(_ interval: TimeInterval) -> String {
         return String(format: "%02d:%02d", minutes, seconds)
     }
 }
+#endif

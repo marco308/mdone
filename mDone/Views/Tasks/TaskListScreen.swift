@@ -1,8 +1,12 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 struct TaskListScreen: View {
     @Environment(AppState.self) private var appState
     @Environment(NetworkMonitor.self) private var networkMonitor
+    @Environment(\.scenePhase) private var scenePhase
     #if os(iOS)
     @Environment(FocusManager.self) private var focusManager
     #endif
@@ -10,11 +14,19 @@ struct TaskListScreen: View {
     /// When true, hides the quick-add bar — used for archived (read-only) projects.
     var readOnly: Bool = false
     @State private var showAdvancedFilter = false
-    @State private var sortOrder: SortOrder = .dueDate
-    @State private var sortAscending: Bool = true
     @AppStorage("calmMode") private var calmMode = false
     #if os(iOS)
-    @State private var showBoard = false
+    /// `nil` until the board toggle is tapped: until then the screen shows
+    /// whatever `ProjectViewPreference` remembers for this project (#184).
+    @State private var boardOverride: Bool?
+    /// On iPad, a task opens in a pane beside the list when there is room;
+    /// see `InlineTaskSelection`. Held here so Inbox and each project screen
+    /// keep their own selection.
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var inlineSelection = InlineTaskSelection()
+    /// Live refresh pauses while the keyboard is up, so rows do not move
+    /// under someone typing.
+    @State private var keyboardPresented = false
     #endif
 
     /// A board (Kanban) view is offered only for real, editable projects that
@@ -27,54 +39,178 @@ struct TaskListScreen: View {
     /// sort controls only affect the list, so they're hidden in board mode.
     private var boardActive: Bool {
         #if os(iOS)
-        return showBoard && projectFilter != nil
+        return boardVisible
         #else
         return false
         #endif
     }
 
-    enum SortOrder: String, CaseIterable {
-        case dueDate = "Due Date"
-        case priority = "Priority"
-        case title = "Title"
+    #if os(iOS)
+    /// Whether the board is on screen: this visit's choice once the toggle has
+    /// been tapped, else the view remembered for this project, else the
+    /// default from Settings. A project with no Kanban view always shows the
+    /// list, whatever is stored.
+    private var boardVisible: Bool {
+        guard boardAvailable, let projectFilter else { return false }
+        return boardOverride ?? (ProjectViewPreference.mode(for: projectFilter.id) == .board)
+    }
+
+    /// Switches view and remembers the choice for this project, so the next
+    /// visit opens the same way (#184).
+    private func setBoardVisible(_ visible: Bool) {
+        boardOverride = visible
+        if let projectFilter {
+            ProjectViewPreference.save(visible ? .board : .list, for: projectFilter.id)
+        }
+    }
+    #endif
+
+    private var sortScope: TaskSortScope {
+        projectFilter.map { .project($0.id) } ?? .inbox
+    }
+
+    private var sortPreference: TaskSortPreference {
+        appState.sortPreference(for: sortScope)
+    }
+
+    /// Rows can only be dragged when the list shows the server's order;
+    /// under any other sort the drop would be sorted straight back. A virtual
+    /// project (saved filter, negative id) is excluded: `moveTask` positions
+    /// by the task's real home project, so dragging here would write the
+    /// position into that project's list view instead of the filter's (#209).
+    private var manualOrderActive: Bool {
+        guard let projectFilter else { return false }
+        return projectFilter.id >= 0 && sortPreference.order == .manual
+    }
+
+    /// Whether this list should keep itself up to date with changes made
+    /// elsewhere (#241). Only an on-screen, editable list in the foreground
+    /// polls, and never while the user is busy with a task on this screen.
+    /// Changing this restarts or stops the polling task below.
+    private var liveRefreshActive: Bool {
+        guard scenePhase == .active, appState.isAuthenticated, networkMonitor.isConnected,
+              !readOnly, !boardActive, !showAdvancedFilter else { return false }
+        #if os(iOS)
+        guard !keyboardPresented, inlineSelection.task == nil else { return false }
+        #endif
+        return true
+    }
+
+    /// Checked on every tick, for the one case SwiftUI does not tell this
+    /// screen about: a row's task detail sheet belongs to the row, so only
+    /// UIKit knows it is up. Refreshing under it could drop the row being
+    /// edited and the sheet with it. Alerts and the focus screen pause it too.
+    private static var nothingPresented: Bool {
+        #if os(iOS)
+        let keyWindow = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)
+        return keyWindow?.rootViewController?.presentedViewController == nil
+        #else
+        return true
+        #endif
     }
 
     var body: some View {
         @Bindable var bindableAppState = appState
-        content
+        adaptiveContent
             .task(id: projectFilter?.id) {
                 if let projectFilter {
                     await appState.fetchProjectTasks(project: projectFilter)
+                }
+            }
+            .task(id: LiveRefreshKey(projectId: projectFilter?.id, isActive: liveRefreshActive)) {
+                guard liveRefreshActive else { return }
+                await LiveListRefresh.poll {
+                    await appState.refreshVisibleList(project: projectFilter) { Self.nothingPresented }
                 }
             }
             .task {
                 await appState.requestCalendarAccess()
             }
             .searchable(text: $bindableAppState.searchQuery, prompt: "Search tasks")
-            .onSubmit(of: .search) {
-                Task { await appState.searchTasks(query: appState.searchQuery) }
-            }
-            .navigationTitle(projectFilter?.title ?? "Inbox")
+            .navigationTitle(projectFilter?.title ?? String(localized: "Inbox"))
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+                keyboardPresented = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                keyboardPresented = false
+            }
+            .onChange(of: projectFilter?.id) { _, _ in
+                boardOverride = nil
+            }
             #endif
-                .toolbar { toolbarContent }
-                .sheet(isPresented: $showAdvancedFilter) {
-                    TaskFilterSheet { filterString in
-                        Task { await appState.applyAdvancedFilter(filterString) }
-                    }
+            .toolbar { toolbarContent }
+            .sheet(isPresented: $showAdvancedFilter) {
+                TaskFilterSheet(filter: appState.advancedFilter) { filter in
+                    appState.advancedFilter = filter
                 }
-                .overlay {
-                    if appState.isLoading, appState.tasks.isEmpty {
-                        LoadingOverlay()
-                    }
+            }
+            .overlay {
+                if appState.isLoading, appState.tasks.isEmpty {
+                    LoadingOverlay()
                 }
+            }
     }
+
+    private struct LiveRefreshKey: Equatable {
+        let projectId: Int64?
+        let isActive: Bool
+    }
+
+    /// The list (or board) alone on iPhone; on iPad with room, the same beside
+    /// the selected task's detail pane. The size is read here, not at the
+    /// row, because Split View and Stage Manager can resize the window with
+    /// the list on screen: the pane then gives way and taps go back to
+    /// opening a sheet (issue #34).
+    @ViewBuilder
+    private var adaptiveContent: some View {
+        #if os(iOS)
+        GeometryReader { geometry in
+            let showsPane = InlineTaskDetailLayout.showsPane(
+                isRegularWidth: horizontalSizeClass == .regular,
+                containerWidth: geometry.size.width
+            )
+            HStack(spacing: 0) {
+                content
+                    .environment(showsPane ? inlineSelection : nil)
+
+                if showsPane, let task = inlineTask {
+                    Divider()
+                    TaskDetailSheet(task: task, presentation: .inline { inlineSelection.task = nil })
+                        // Fresh editing state per task; without this the
+                        // pane would keep the previous task's edits.
+                        .id(task.id)
+                        .frame(width: InlineTaskDetailLayout.paneWidth(for: geometry.size.width))
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
+            }
+            .animation(.snappy, value: showsPane && inlineTask != nil)
+        }
+        .environment(\.focusRunOrder, readOnly ? [] : focusRunOrder)
+        #else
+        content
+        #endif
+    }
+
+    #if os(iOS)
+    /// The task to show in the pane: the live copy from `AppState` when it
+    /// has one, so edits made from the row are reflected, else the snapshot
+    /// the row was tapped with (board cards can carry tasks the main list
+    /// does not hold).
+    private var inlineTask: VTask? {
+        guard let selected = inlineSelection.task else { return nil }
+        return appState.tasks.first(where: { $0.id == selected.id }) ?? selected
+    }
+    #endif
 
     @ViewBuilder
     private var content: some View {
         #if os(iOS)
-        if showBoard, let projectFilter {
+        if boardVisible, let projectFilter {
             ProjectBoardView(project: projectFilter)
         } else {
             listBody
@@ -93,8 +229,15 @@ struct TaskListScreen: View {
                 List {
                     #if os(iOS)
                     if let session = focusManager.currentSession {
-                        FocusBanner(session: session) {
+                        FocusBanner(
+                            session: session,
+                            runRemaining: focusManager.isRunActive ? focusManager.runRemainingCount : nil
+                        ) {
                             focusManager.showFocusView = true
+                        }
+                    } else if let summary = focusManager.finishedRun, !focusManager.showFocusView {
+                        FocusRunFinishedBanner(summary: summary) {
+                            focusManager.dismissRunSummary()
                         }
                     }
                     #endif
@@ -111,8 +254,8 @@ struct TaskListScreen: View {
                             Section {
                                 EmptyStateView(
                                     icon: "checkmark.circle",
-                                    title: "No tasks",
-                                    subtitle: "Add a task to get started"
+                                    title: String(localized: "No tasks"),
+                                    subtitle: String(localized: "Add a task to get started")
                                 )
                             }
                         } else {
@@ -123,12 +266,12 @@ struct TaskListScreen: View {
                                 // row identity survives the list gaining/losing
                                 // nesting (else a presented detail sheet gets
                                 // dismissed when the first subtask is linked).
-                                // Reorder is flat-only; when flat, `rows`
-                                // preserves `projectTasks`' order so the move
-                                // indices line up.
+                                // Reorder is flat-only and manual-sort-only;
+                                // when flat, `rows` preserves `projectTasks`'
+                                // order so the move indices line up.
                                 ForEach(rows) { row in
                                     TaskRow(task: row.task, readOnly: readOnly, indentLevel: row.depth)
-                                        .moveDisabled(readOnly || hasNesting)
+                                        .moveDisabled(readOnly || hasNesting || !manualOrderActive)
                                 }
                                 .onMove { source, destination in
                                     handleMove(tasks: projectTasks, from: source, to: destination)
@@ -145,7 +288,10 @@ struct TaskListScreen: View {
                 .contentMargins(.bottom, 72, for: .scrollContent)
                 .refreshable {
                     await appState.refreshAll()
-                    if let projectFilter {
+                    // `refreshAll` already re-reads every project opened this
+                    // session, this one included; reading it again made the
+                    // pull wait for a second round trip (#276).
+                    if let projectFilter, appState.projectTaskCache[projectFilter.id] == nil {
                         await appState.fetchProjectTasks(project: projectFilter)
                     }
                 }
@@ -154,7 +300,9 @@ struct TaskListScreen: View {
             if !readOnly {
                 QuickAddBar(
                     projectId: projectFilter?.id ?? defaultProjectId,
-                    defaultDueDate: projectFilter == nil ? DefaultDueTimePreference.apply(to: Date()) : nil
+                    defaultDueDate: projectFilter == nil
+                        ? NewTaskDueDatePreference.dueDate(forKey: NewTaskDueDatePreference.inboxStorageKey)
+                        : nil
                 )
             }
         }
@@ -166,11 +314,11 @@ struct TaskListScreen: View {
         if boardAvailable {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    showBoard.toggle()
+                    setBoardVisible(!boardVisible)
                 } label: {
-                    Image(systemName: showBoard ? "list.bullet" : "rectangle.split.3x1")
+                    Image(systemName: boardVisible ? "list.bullet" : "rectangle.split.3x1")
                 }
-                .accessibilityLabel(showBoard ? "Show list" : "Show board")
+                .accessibilityLabel(boardVisible ? "Show list" : "Show board")
             }
         }
         #endif
@@ -180,60 +328,59 @@ struct TaskListScreen: View {
                 Button {
                     showAdvancedFilter = true
                 } label: {
-                    Image(systemName: appState
-                        .advancedFilterString != nil ? "line.3.horizontal.decrease.circle.fill" :
-                        "line.3.horizontal.decrease.circle")
+                    Image(systemName: appState.advancedFilter.isActive
+                        ? "line.3.horizontal.decrease.circle.fill"
+                        : "line.3.horizontal.decrease.circle")
                 }
-                .accessibilityLabel(appState
-                    .advancedFilterString != nil ? "Advanced filter active" : "Advanced filter")
+                .accessibilityLabel(appState.advancedFilter.isActive ? "Advanced filter active" : "Advanced filter")
             }
 
             ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    ForEach(SortOrder.allCases, id: \.self) { order in
-                        Button {
-                            if sortOrder == order {
-                                sortAscending.toggle()
-                            } else {
-                                sortOrder = order
-                                sortAscending = true
-                            }
-                        } label: {
-                            HStack {
-                                Text(order.rawValue)
-                                if sortOrder == order {
-                                    Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    Image(systemName: "arrow.up.arrow.down")
-                }
-                .accessibilityLabel("Sort by \(sortOrder.rawValue), \(sortAscending ? "ascending" : "descending")")
+                TaskSortMenu(scope: sortScope)
             }
         }
     }
 
     private var isFiltering: Bool {
-        !appState.searchQuery.isEmpty || appState.activeFilter != nil
+        appState.isFiltering
     }
 
-    @ViewBuilder
-    private var filteredTaskSection: some View {
+    /// Search or filter results in display order.
+    private var filteredTasks: [VTask] {
         let allFiltered = appState.filteredTasks
         let filtered = if let projectFilter {
             allFiltered.filter { $0.projectId == projectFilter.id }
         } else {
             allFiltered
         }
-        let tasks = sorted(filtered)
+        return sorted(filtered)
+    }
+
+    #if os(iOS)
+    /// The ids of the tasks on screen, top to bottom, which a Focus Run works
+    /// through. Mirrors the list body's branches; the board has no single
+    /// order, so it offers no run.
+    private var focusRunOrder: [Int64] {
+        if boardVisible { return [] }
+        if isFiltering { return filteredTasks.map(\.id) }
+        if let projectFilter {
+            return TaskNesting.rows(for: sorted(appState.tasksForProject(projectFilter.id))).map(\.task.id)
+        }
+        let sections = inboxSections
+        return (sections.beforeEvents + sections.afterEvents)
+            .flatMap { TaskNesting.rows(for: $0.tasks).map(\.task.id) }
+    }
+    #endif
+
+    @ViewBuilder
+    private var filteredTaskSection: some View {
+        let tasks = filteredTasks
         if tasks.isEmpty {
             Section {
                 EmptyStateView(
                     icon: "magnifyingglass",
-                    title: "No results",
-                    subtitle: "Try a different search or filter"
+                    title: String(localized: "No results"),
+                    subtitle: String(localized: "Try a different search or filter")
                 )
             }
         } else {
@@ -246,51 +393,98 @@ struct TaskListScreen: View {
     }
 
     private var defaultProjectId: Int64 {
-        appState.projects.first?.id ?? 1
+        appState.defaultProject?.id ?? 1
+    }
+
+    /// One dated block of the Inbox. Built once as data so the rendered
+    /// sections and a Focus Run's order cannot drift apart.
+    private struct InboxSection: Identifiable {
+        let id: String
+        let title: String
+        let tasks: [VTask]
+        let accentColor: Color
+        var showsProgress: Bool = false
+    }
+
+    /// The Inbox's sections, split where Today's calendar events sit between
+    /// them. Empty sections are left out.
+    private var inboxSections: (beforeEvents: [InboxSection], afterEvents: [InboxSection]) {
+        let currentTasks = appState.currentTasks
+        let currentIds = Set(currentTasks.map(\.id))
+        var before: [InboxSection] = [
+            InboxSection(
+                id: "current",
+                title: String(localized: "Current"),
+                tasks: currentTasks,
+                accentColor: Color.accentColor,
+                showsProgress: true
+            ),
+        ]
+
+        if calmMode {
+            // Calm Mode: overdue tasks aren't singled out, they fold into Today.
+            before.append(InboxSection(
+                id: "today",
+                title: String(localized: "Today"),
+                tasks: sorted(excludingCurrent(appState.calmModeTodayTasks, currentIds: currentIds)),
+                accentColor: Color.accentColor
+            ))
+        } else {
+            before.append(InboxSection(
+                id: "overdue",
+                title: String(localized: "Overdue"),
+                tasks: sorted(excludingCurrent(appState.overdueTasks, currentIds: currentIds)),
+                accentColor: .red
+            ))
+            before.append(InboxSection(
+                id: "today",
+                title: String(localized: "Today"),
+                tasks: sorted(excludingCurrent(appState.todayTasks, currentIds: currentIds)),
+                accentColor: Color.accentColor
+            ))
+        }
+
+        let after: [InboxSection] = [
+            InboxSection(
+                id: "tomorrow",
+                title: String(localized: "Tomorrow"),
+                tasks: sorted(excludingCurrent(appState.tomorrowTasks, currentIds: currentIds)),
+                accentColor: .orange
+            ),
+            InboxSection(
+                id: "thisWeek",
+                title: String(localized: "This Week"),
+                tasks: sorted(excludingCurrent(appState.thisWeekTasks, currentIds: currentIds)),
+                accentColor: .blue
+            ),
+            InboxSection(
+                id: "upcoming",
+                title: String(localized: "Upcoming"),
+                tasks: sorted(excludingCurrent(appState.upcomingTasks, currentIds: currentIds)),
+                accentColor: .purple
+            ),
+            InboxSection(
+                id: "noDate",
+                title: String(localized: "No Date"),
+                tasks: sorted(excludingCurrent(appState.noDateTasks, currentIds: currentIds)),
+                accentColor: .secondary
+            ),
+        ]
+
+        return (before.filter { !$0.tasks.isEmpty }, after.filter { !$0.tasks.isEmpty })
     }
 
     @ViewBuilder
     private var smartListSections: some View {
-        let currentTasks = appState.currentTasks
-        let currentIds = Set(currentTasks.map(\.id))
+        let sections = inboxSections
 
-        if !currentTasks.isEmpty {
+        ForEach(sections.beforeEvents) { section in
             SmartListSection(
-                title: "Current",
-                tasks: currentTasks,
-                accentColor: Color.accentColor,
-                showsProgress: true
+                title: section.title,
+                tasks: section.tasks,
+                accentColor: section.accentColor,
+                showsProgress: section.showsProgress
             )
-        }
-
-        if calmMode {
-            // Calm Mode: overdue tasks aren't singled out, they fold into Today.
-            let todayAndOverdue = excludingCurrent(appState.calmModeTodayTasks, currentIds: currentIds)
-            if !todayAndOverdue.isEmpty {
-                SmartListSection(
-                    title: "Today",
-                    tasks: sorted(todayAndOverdue),
-                    accentColor: Color.accentColor
-                )
-            }
-        } else {
-            let overdue = excludingCurrent(appState.overdueTasks, currentIds: currentIds)
-            if !overdue.isEmpty {
-                SmartListSection(
-                    title: "Overdue",
-                    tasks: sorted(overdue),
-                    accentColor: .red
-                )
-            }
-
-            let today = excludingCurrent(appState.todayTasks, currentIds: currentIds)
-            if !today.isEmpty {
-                SmartListSection(
-                    title: "Today",
-                    tasks: sorted(today),
-                    accentColor: Color.accentColor
-                )
-            }
         }
 
         if appState.calendarAccessGranted, !appState.todayCalendarEvents.isEmpty {
@@ -316,39 +510,12 @@ struct TaskListScreen: View {
             }
         }
 
-        let tomorrow = excludingCurrent(appState.tomorrowTasks, currentIds: currentIds)
-        if !tomorrow.isEmpty {
+        ForEach(sections.afterEvents) { section in
             SmartListSection(
-                title: "Tomorrow",
-                tasks: sorted(tomorrow),
-                accentColor: .orange
-            )
-        }
-
-        let thisWeek = excludingCurrent(appState.thisWeekTasks, currentIds: currentIds)
-        if !thisWeek.isEmpty {
-            SmartListSection(
-                title: "This Week",
-                tasks: sorted(thisWeek),
-                accentColor: .blue
-            )
-        }
-
-        let upcoming = excludingCurrent(appState.upcomingTasks, currentIds: currentIds)
-        if !upcoming.isEmpty {
-            SmartListSection(
-                title: "Upcoming",
-                tasks: sorted(upcoming),
-                accentColor: .purple
-            )
-        }
-
-        let noDate = excludingCurrent(appState.noDateTasks, currentIds: currentIds)
-        if !noDate.isEmpty {
-            SmartListSection(
-                title: "No Date",
-                tasks: sorted(noDate),
-                accentColor: .secondary
+                title: section.title,
+                tasks: section.tasks,
+                accentColor: section.accentColor,
+                showsProgress: section.showsProgress
             )
         }
 
@@ -360,14 +527,14 @@ struct TaskListScreen: View {
                 if isOffline {
                     EmptyStateView(
                         icon: "wifi.slash",
-                        title: "No cached tasks",
-                        subtitle: "Connect to your server to load your tasks"
+                        title: String(localized: "No cached tasks"),
+                        subtitle: String(localized: "Connect to your server to load your tasks")
                     )
                 } else {
                     EmptyStateView(
                         icon: "checkmark.circle",
-                        title: "All done!",
-                        subtitle: "No pending tasks"
+                        title: String(localized: "All done!"),
+                        subtitle: String(localized: "No pending tasks")
                     )
                 }
             }
@@ -381,46 +548,13 @@ struct TaskListScreen: View {
     }
 
     private func sorted(_ tasks: [VTask]) -> [VTask] {
-        tasks.sorted { a, b in
-            let result: Bool = switch sortOrder {
-            case .dueDate:
-                (a.effectiveDueDate ?? .distantFuture) < (b.effectiveDueDate ?? .distantFuture)
-            case .priority:
-                a.priority > b.priority
-            case .title:
-                a.title.localizedCompare(b.title) == .orderedAscending
-            }
-            return sortAscending ? result : !result
-        }
+        sortPreference.apply(to: tasks)
     }
 
     private func handleMove(tasks: [VTask], from source: IndexSet, to destination: Int) {
-        var reordered = tasks
-        reordered.move(fromOffsets: source, toOffset: destination)
-
-        guard let movedIndex = source.first else { return }
-        let task = tasks[movedIndex]
-
-        // Calculate the new position as midpoint between neighbors
-        let actualDestination = movedIndex < destination ? destination - 1 : destination
-        let newPosition: Double
-        if reordered.count <= 1 {
-            newPosition = 0
-        } else if actualDestination == 0 {
-            newPosition = (reordered[1].position ?? 1) - 1
-        } else if actualDestination >= reordered.count - 1 {
-            newPosition = (reordered[reordered.count - 2].position ?? Double(reordered.count - 2)) + 1
-        } else {
-            let before = reordered[actualDestination - 1].position ?? Double(actualDestination - 1)
-            let after = reordered[actualDestination + 1].position ?? Double(actualDestination + 1)
-            newPosition = (before + after) / 2
-        }
-
-        // Default view ID; ideally this would come from the project's default view
-        let viewId: Int64 = 0
-
+        guard let move = TaskPositioning.move(tasks, fromOffsets: source, toOffset: destination) else { return }
         Task {
-            await appState.moveTask(task, toPosition: newPosition, viewId: viewId)
+            await appState.moveTask(move.task, toPosition: move.position, newOrder: move.reordered)
         }
     }
 
@@ -449,10 +583,11 @@ struct TaskListScreen: View {
     private var offlineBannerText: String {
         let pending = appState.pendingOperationsCount
         guard pending > 0 else {
-            return "You're offline. Showing your last synced tasks."
+            return String(localized: "You're offline. Showing your last synced tasks.")
         }
-        return pending == 1
-            ? "You're offline. 1 change will sync when you reconnect."
-            : "You're offline. \(pending) changes will sync when you reconnect."
+        // One key with a plural variation in the catalog rather than a
+        // hand-rolled singular/plural ternary: languages vary in how many
+        // plural forms they have, and only the catalog can express that.
+        return String(localized: "You're offline. \(pending) changes will sync when you reconnect.")
     }
 }
