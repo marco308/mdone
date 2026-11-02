@@ -20,9 +20,11 @@ enum TaskRecurrence: Equatable {
     case interval(seconds: Int64)
 
     /// `repeat_mode = 1`. Completing the task advances the due date by one
-    /// calendar month, keeping the day of month. `repeat_after` is ignored in
-    /// this mode and is legitimately 0, which is why recurrence cannot be
-    /// derived from `repeat_after` alone.
+    /// calendar month, once, even when the result is still overdue. A day that
+    /// does not exist in the next month rolls forward rather than clamping, so
+    /// Jan 31 becomes Mar 3. `repeat_after` is ignored in this mode and is
+    /// legitimately 0, which is why recurrence cannot be derived from
+    /// `repeat_after` alone.
     case monthly
 
     /// `repeat_mode = 2`. The new due date is the moment of completion plus
@@ -99,18 +101,17 @@ enum TaskRecurrence: Equatable {
             return dueDate.addingTimeInterval(step * TimeInterval(steps))
 
         case .monthly:
-            // Always k months from the original due date, never k iterations of
-            // "add one month". Iterating loses the day of month permanently:
-            // Jan 31 would give Feb 28 and then Mar 28, where the user means
-            // Feb 28 and then Mar 31.
-            let elapsedMonths = calendar.dateComponents([.month], from: dueDate, to: date).month ?? 0
-            var months = max(1, elapsedMonths)
-            while months <= elapsedMonths + Self.monthlyProbeLimit {
-                guard let candidate = calendar.date(byAdding: .month, value: months, to: dueDate) else {
-                    return nil
-                }
-                if candidate > date { return candidate }
-                months += 1
+            // Vikunja advances a monthly task with Go's `AddDate(0, 1, 0)`, one
+            // month per completion and counted from the stored due date, not the
+            // original one. Probed on v2.4.0 and v2.6.0: Jan 31 gives Mar 3, then
+            // Apr 3, then May 3, and an overdue task moves a single month even if
+            // that is still in the past. Following that chain shows the dates the
+            // task will really have, including the ones that look odd.
+            var current = dueDate
+            for _ in 0 ..< Self.maxMonthlySteps {
+                guard let next = Self.addingOneMonth(to: current, calendar: calendar) else { return nil }
+                if next > date { return next }
+                current = next
             }
             return nil
         }
@@ -156,9 +157,23 @@ enum TaskRecurrence: Equatable {
     /// is better than walking forever.
     private static let maxProjectedDays = 366
 
-    /// A monthly repeat needs at most one probe past the elapsed month count,
-    /// and a second only when clamping a month end moves the candidate back.
-    private static let monthlyProbeLimit = 2
+    /// How far a monthly chain is followed before giving up: a century, so
+    /// only a corrupt date reaches it.
+    private static let maxMonthlySteps = 1200
+
+    /// One month later with the same wall-clock day and time, letting a day the
+    /// month lacks overflow into the next, as Go's `time.AddDate` does.
+    /// `Calendar.date(byAdding:)` clamps instead (Jan 31 to Feb 28), which is
+    /// why the components are built by hand.
+    private static func addingOneMonth(to date: Date, calendar: Calendar) -> Date? {
+        var components = calendar.dateComponents(
+            [.era, .year, .month, .day, .hour, .minute, .second, .nanosecond],
+            from: date
+        )
+        guard let month = components.month else { return nil }
+        components.month = month + 1
+        return calendar.date(from: components)
+    }
 
     /// A ceiling on the closed-form step count, so a corrupt date cannot trap
     /// the `Int` conversion. Far above any real schedule.

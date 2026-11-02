@@ -157,40 +157,52 @@ final class TaskRecurrenceTests: XCTestCase {
 
     // MARK: - Monthly mode (repeat_mode 1)
 
-    func testMonthlyClampsIntoAShorterMonth() throws {
+    /// Vikunja uses Go's `AddDate`, which rolls a missing day forward instead
+    /// of clamping it to the month's last day. Probed on v2.4.0 and v2.6.0.
+    func testMonthlyRollsAMissingDayForwardIntoTheNextMonth() throws {
         let due = try date(2027, 1, 31)
         XCTAssertEqual(
             TaskRecurrence.monthly.nextOccurrence(dueDate: due, after: due, calendar: calendar),
-            try date(2027, 2, 28)
+            try date(2027, 3, 3)
         )
     }
 
-    /// Counting months from the original due date, rather than iterating "add
-    /// one month" to the last result, is what lets the 31st come back. Iterating
-    /// would settle on the 28th permanently after the first short month.
-    func testMonthlyReturnsToTheOriginalDayOfMonth() throws {
+    /// Each step counts from the last result, as the server does, so once the
+    /// 31st has rolled over to the 3rd it stays on the 3rd.
+    func testMonthlyKeepsTheRolledOverDay() throws {
         let due = try date(2027, 1, 31)
-        let afterFebruary = try date(2027, 2, 28, 12)
+        let afterMarch3 = try date(2027, 3, 3, 12)
         XCTAssertEqual(
-            TaskRecurrence.monthly.nextOccurrence(dueDate: due, after: afterFebruary, calendar: calendar),
-            try date(2027, 3, 31)
+            TaskRecurrence.monthly.nextOccurrence(dueDate: due, after: afterMarch3, calendar: calendar),
+            try date(2027, 4, 3)
         )
     }
 
-    func testMonthlyLandsOnTheLeapDay() throws {
+    func testMonthlyOverflowCountsTheLeapDay() throws {
         let due = try date(2028, 1, 31)
         XCTAssertEqual(
             TaskRecurrence.monthly.nextOccurrence(dueDate: due, after: due, calendar: calendar),
-            try date(2028, 2, 29)
+            try date(2028, 3, 2)
         )
     }
 
-    func testAnOverdueMonthlySkipsForwardToTheNextMonthEnd() throws {
-        let due = try date(2026, 1, 15)
+    /// The server moves an overdue monthly task one month per completion, so
+    /// the chain from Jan 31 runs Mar 3, Apr 3, May 3 rather than jumping to
+    /// the end of the current month.
+    func testAnOverdueMonthlyFollowsTheChainOneMonthAtATime() throws {
+        let due = try date(2026, 1, 31)
         let now = try date(2026, 4, 20)
         XCTAssertEqual(
             TaskRecurrence.monthly.nextOccurrence(dueDate: due, after: now, calendar: calendar),
-            try date(2026, 5, 15)
+            try date(2026, 5, 3)
+        )
+    }
+
+    func testMonthlyKeepsItsDayInAnOrdinaryMonth() throws {
+        let due = try date(2026, 1, 15)
+        XCTAssertEqual(
+            TaskRecurrence.monthly.nextOccurrence(dueDate: due, after: due, calendar: calendar),
+            try date(2026, 2, 15)
         )
     }
 
@@ -247,10 +259,14 @@ final class TaskRecurrenceTests: XCTestCase {
 
     func testMonthlyProjectsOnceIntoALaterMonth() throws {
         let due = try date(2026, 1, 31)
-        let dates = TaskRecurrence.monthly
+        let february = TaskRecurrence.monthly
             .occurrences(dueDate: due, in: try monthWindow(2026, 2), calendar: calendar)
+        let march = TaskRecurrence.monthly
+            .occurrences(dueDate: due, in: try monthWindow(2026, 3), calendar: calendar)
 
-        XCTAssertEqual(dates, [try date(2026, 2, 28)])
+        // Jan 31 rolls past February entirely and lands on Mar 3.
+        XCTAssertEqual(february, [])
+        XCTAssertEqual(march, [try date(2026, 3, 3)])
     }
 
     func testAWindowEntirelyAfterTheDueDateIsFullyPopulated() throws {

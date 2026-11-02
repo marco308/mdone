@@ -122,14 +122,14 @@ final class CalendarOccurrenceTests: XCTestCase {
 
     func testAMonthlyTaskWithNoIntervalIsStillProjected() throws {
         let appState = AppState()
-        let due = try date(2026, 1, 31)
+        let due = try date(2026, 1, 15)
         appState.tasks = [repeatingTask(due: due, repeatAfter: 0, repeatMode: 1)]
 
-        let february = try appState.occurrencesByDay(in: date(2026, 2, 15))
-        let monthEndKey = try calendar.startOfDay(for: date(2026, 2, 28))
+        let february = try appState.occurrencesByDay(in: date(2026, 2, 1))
+        let nextKey = try calendar.startOfDay(for: date(2026, 2, 15))
 
         XCTAssertEqual(february.count, 1)
-        XCTAssertEqual(february[monthEndKey]?.map(\.isProjected), [true])
+        XCTAssertEqual(february[nextKey]?.map(\.isProjected), [true])
     }
 
     // MARK: - What is deliberately not projected
