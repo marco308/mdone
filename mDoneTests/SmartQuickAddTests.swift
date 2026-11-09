@@ -170,7 +170,10 @@ final class SmartQuickAddTests: XCTestCase {
 
         let created = await state.createTask(title: "Buy gift", projectId: 1, priority: 2, labelIds: [Self.shopping])
 
-        XCTAssertEqual(paths, ["PUT /api/v1/projects/1/tasks", "PUT /api/v1/tasks/99/labels"])
+        XCTAssertEqual(paths, [
+            "PUT \(VikunjaAPI.path("/projects/1/tasks"))",
+            "PUT \(VikunjaAPI.path("/tasks/99/labels"))",
+        ])
         XCTAssertEqual(created?.labels?.map(\.id), [Self.shopping])
         XCTAssertEqual(state.tasks.first { $0.id == 99 }?.labels?.map(\.id), [Self.shopping])
     }

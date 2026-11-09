@@ -83,7 +83,7 @@ final class AddTaskIntentTests: XCTestCase {
         XCTAssertEqual(outcome, .created(taskTitle: "Buy milk", projectTitle: "Home", dueDate: nil))
         let request = try XCTUnwrap(MockURLProtocol.capturedRequests.first)
         XCTAssertEqual(request.httpMethod, "PUT")
-        XCTAssertEqual(request.url?.path, "/api/v1/projects/8/tasks")
+        XCTAssertEqual(request.url?.path, VikunjaAPI.path("/projects/8/tasks"))
         let body = try XCTUnwrap(MockURLProtocol.bodyData(from: request))
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
         XCTAssertEqual(json["title"] as? String, "Buy milk")
@@ -102,7 +102,7 @@ final class AddTaskIntentTests: XCTestCase {
         let outcome = try await state.createTaskFromIntent(title: "  Call the dentist \n", projectId: nil, dueDate: nil)
 
         XCTAssertEqual(outcome, .created(taskTitle: "Call the dentist", projectTitle: "Inbox", dueDate: nil))
-        XCTAssertEqual(MockURLProtocol.capturedRequests.first?.url?.path, "/api/v1/projects/7/tasks")
+        XCTAssertEqual(MockURLProtocol.capturedRequests.first?.url?.path, VikunjaAPI.path("/projects/7/tasks"))
     }
 
     func testFetchesProjectsWhenNothingIsLoaded() async throws {
@@ -110,7 +110,7 @@ final class AddTaskIntentTests: XCTestCase {
         let (state, _) = try await makeAppState()
         state.projects = []
         MockURLProtocol.requestHandler = { request in
-            if request.url?.path == "/api/v1/projects" {
+            if request.url?.path == VikunjaAPI.path("/projects") {
                 let json = #"[{"id": 3, "title": "Work", "is_archived": false, "is_favorite": false}]"#
                 return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), json.data(using: .utf8)!)
             }
@@ -124,7 +124,7 @@ final class AddTaskIntentTests: XCTestCase {
 
         XCTAssertEqual(outcome, .created(taskTitle: "Send invoice", projectTitle: "Work", dueDate: nil))
         XCTAssertEqual(state.projects.map(\.id), [3])
-        XCTAssertEqual(MockURLProtocol.capturedRequests.last?.url?.path, "/api/v1/projects/3/tasks")
+        XCTAssertEqual(MockURLProtocol.capturedRequests.last?.url?.path, VikunjaAPI.path("/projects/3/tasks"))
     }
 
     func testServerRejectionIsReportedNotQueued() async throws {
@@ -157,7 +157,7 @@ final class AddTaskIntentTests: XCTestCase {
         let queued = try pendingOperations(in: container)
         XCTAssertEqual(queued.count, 1)
         XCTAssertEqual(queued.first?.method, "PUT")
-        XCTAssertEqual(queued.first?.endpointPath, "/api/v1/projects/8/tasks")
+        XCTAssertEqual(queued.first?.endpointPath, VikunjaAPI.path("/projects/8/tasks"))
         let body = try XCTUnwrap(queued.first?.bodyData)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
         XCTAssertEqual(json["title"] as? String, "Buy milk")
@@ -199,7 +199,7 @@ final class AddTaskIntentTests: XCTestCase {
         XCTAssertTrue(try pendingOperations(in: container).isEmpty, "the replayed create leaves the queue")
         let replay = try XCTUnwrap(MockURLProtocol.capturedRequests.first)
         XCTAssertEqual(replay.httpMethod, "PUT")
-        XCTAssertEqual(replay.url?.path, "/api/v1/projects/8/tasks")
+        XCTAssertEqual(replay.url?.path, VikunjaAPI.path("/projects/8/tasks"))
     }
 
     // MARK: - Refusals
@@ -263,7 +263,7 @@ final class AddTaskIntentTests: XCTestCase {
         intent.project = ProjectEntity(project: Project(id: 8, title: "Home"))
         _ = try await intent.perform()
 
-        XCTAssertEqual(MockURLProtocol.capturedRequests.first?.url?.path, "/api/v1/projects/8/tasks")
+        XCTAssertEqual(MockURLProtocol.capturedRequests.first?.url?.path, VikunjaAPI.path("/projects/8/tasks"))
         XCTAssertEqual(state.tasks.map(\.id), [104])
     }
 

@@ -92,7 +92,7 @@ final class TaskReorderTests: XCTestCase {
 
         XCTAssertTrue(ok)
         let post = try XCTUnwrap(MockURLProtocol.capturedRequests.first { $0.httpMethod == "POST" })
-        XCTAssertEqual(post.url?.path, "/api/v1/tasks/3/position")
+        XCTAssertEqual(post.url?.path, VikunjaAPI.path("/tasks/3/position"))
         let body = try Self.body(of: post)
         XCTAssertEqual(body["position"] as? Double, 50)
         XCTAssertEqual(body["project_view_id"] as? Int, 100, "positions belong to the list view")
@@ -118,7 +118,7 @@ final class TaskReorderTests: XCTestCase {
         XCTAssertEqual(state.tasksForProject(7).map(\.id), [1, 3, 2])
         XCTAssertEqual(
             MockURLProtocol.capturedRequests.filter { $0.httpMethod == "GET" }.first?.url?.path,
-            "/api/v1/projects/7/views/100/tasks"
+            VikunjaAPI.path("/projects/7/views/100/tasks")
         )
     }
 
@@ -219,7 +219,7 @@ final class TaskReorderTests: XCTestCase {
         await state.updateTask(id: 1, request: TaskUpdateRequest(projectId: 8))
 
         let refetch = MockURLProtocol.capturedRequests.first { $0.httpMethod == "GET" }
-        XCTAssertEqual(refetch?.url?.path, "/api/v1/projects/8/views/300/tasks", "destination list view read back")
+        XCTAssertEqual(refetch?.url?.path, VikunjaAPI.path("/projects/8/views/300/tasks"), "destination list view read back")
         XCTAssertEqual(state.tasksForProject(8).map(\.id), [1, 9])
         XCTAssertEqual(state.tasksForProject(7).map(\.id), [2, 3], "the task left its old project")
     }
@@ -319,7 +319,7 @@ final class TaskReorderTests: XCTestCase {
 
         XCTAssertEqual(created?.id, 4)
         let refetch = MockURLProtocol.capturedRequests.first { $0.httpMethod == "GET" }
-        XCTAssertEqual(refetch?.url?.path, "/api/v1/projects/7/views/100/tasks", "list view read back")
+        XCTAssertEqual(refetch?.url?.path, VikunjaAPI.path("/projects/7/views/100/tasks"), "list view read back")
         XCTAssertEqual(state.tasksForProject(7).map(\.id), [4, 1, 2, 3], "new task at the top, as on the web")
     }
 
@@ -352,7 +352,7 @@ final class TaskReorderTests: XCTestCase {
         let ok = await state.placeTask(card, inBucket: 5, at: 250, in: project)
 
         XCTAssertTrue(ok)
-        XCTAssertEqual(MockURLProtocol.capturedRequests.map { $0.url?.path }, ["/api/v1/tasks/1/position"])
+        XCTAssertEqual(MockURLProtocol.capturedRequests.map { $0.url?.path }, [VikunjaAPI.path("/tasks/1/position")])
         let body = try Self.body(of: MockURLProtocol.capturedRequests[0])
         XCTAssertEqual(body["position"] as? Double, 250)
         XCTAssertEqual(body["project_view_id"] as? Int, 200, "board positions belong to the kanban view")
@@ -372,7 +372,7 @@ final class TaskReorderTests: XCTestCase {
         XCTAssertTrue(ok)
         XCTAssertEqual(
             MockURLProtocol.capturedRequests.map { $0.url?.path },
-            ["/api/v1/projects/7/views/200/buckets/6/tasks", "/api/v1/tasks/1/position"]
+            [VikunjaAPI.path("/projects/7/views/200/buckets/6/tasks"), VikunjaAPI.path("/tasks/1/position")]
         )
         XCTAssertEqual(state.tasks.first?.bucketId, 6)
     }
