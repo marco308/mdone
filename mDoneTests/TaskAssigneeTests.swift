@@ -78,7 +78,7 @@ final class TaskAssigneeTests: XCTestCase {
         await appState.loadCurrentUserIfNeeded()
 
         XCTAssertEqual(appState.currentUser?.id, 4)
-        XCTAssertEqual(MockURLProtocol.capturedRequests.map(\.url?.path), ["/api/v1/user"])
+        XCTAssertEqual(MockURLProtocol.capturedRequests.map(\.url?.path), [VikunjaAPI.path("/user")])
     }
 
     func testTurningTeamFeaturesOffClearsTheAssigneeFilter() async {
@@ -184,7 +184,7 @@ final class TaskAssigneeTests: XCTestCase {
 
         XCTAssertTrue(saved)
         let request = MockURLProtocol.capturedRequests.last
-        XCTAssertEqual(request?.url?.path, "/api/v1/tasks/1/assignees/bulk")
+        XCTAssertEqual(request?.url?.path, VikunjaAPI.path("/tasks/1/assignees/bulk"))
         XCTAssertEqual(request?.httpMethod, "POST")
         XCTAssertEqual(try assigneeIds(in: jsonBody(of: request)), [3])
         XCTAssertEqual(appState.tasks[0].assignees, [alice])
@@ -213,7 +213,7 @@ final class TaskAssigneeTests: XCTestCase {
     func testCreateAssignsAfterTheTaskExists() async throws {
         let appState = await makeAppState()
         MockURLProtocol.requestHandler = { request in
-            let body = request.url?.path == "/api/v1/projects/1/tasks"
+            let body = request.url?.path == VikunjaAPI.path("/projects/1/tasks")
                 ? #"{"id": 9, "title": "New", "done": false, "priority": 0, "project_id": 1}"#
                 : #"{"assignees": [{"id": 3}]}"#
             return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), body.data(using: .utf8)!)
@@ -222,7 +222,7 @@ final class TaskAssigneeTests: XCTestCase {
         let created = await appState.createTask(title: "New", projectId: 1, assignees: [alice])
 
         let requests = MockURLProtocol.capturedRequests
-        XCTAssertEqual(requests.map(\.url?.path), ["/api/v1/projects/1/tasks", "/api/v1/tasks/9/assignees/bulk"])
+        XCTAssertEqual(requests.map(\.url?.path), [VikunjaAPI.path("/projects/1/tasks"), VikunjaAPI.path("/tasks/9/assignees/bulk")])
         XCTAssertNil(try jsonBody(of: requests.first)["assignees"], "One inaccessible user would refuse the create")
         XCTAssertEqual(try assigneeIds(in: jsonBody(of: requests.last)), [3])
         XCTAssertEqual(created?.assignees, [alice])
@@ -240,7 +240,7 @@ final class TaskAssigneeTests: XCTestCase {
 
         await appState.createTask(title: "New", projectId: 1)
 
-        XCTAssertEqual(MockURLProtocol.capturedRequests.map(\.url?.path), ["/api/v1/projects/1/tasks"])
+        XCTAssertEqual(MockURLProtocol.capturedRequests.map(\.url?.path), [VikunjaAPI.path("/projects/1/tasks")])
     }
 
     func testAssignableUsersComeFromTheProjectUsersEndpointSortedByName() async {
@@ -255,7 +255,7 @@ final class TaskAssigneeTests: XCTestCase {
 
         let users = await appState.loadAssignableUsers(projectId: 12)
 
-        XCTAssertEqual(MockURLProtocol.capturedRequests.last?.url?.path, "/api/v1/projects/12/projectusers")
+        XCTAssertEqual(MockURLProtocol.capturedRequests.last?.url?.path, VikunjaAPI.path("/projects/12/projectusers"))
         XCTAssertEqual(users.map(\.displayName), ["Amy", "zed"])
         XCTAssertEqual(appState.assignableUsers[12]?.map(\.id), [3, 4])
     }

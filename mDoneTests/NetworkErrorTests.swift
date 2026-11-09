@@ -169,38 +169,38 @@ final class NetworkErrorTests: XCTestCase {
 
     func testLoginEndpoint() {
         let endpoint = Endpoint.login
-        XCTAssertEqual(endpoint.path, "/api/v1/login")
+        XCTAssertEqual(endpoint.path, VikunjaAPI.path("/login"))
         XCTAssertEqual(endpoint.method, .POST)
     }
 
     func testLabelsEndpoint() {
         let endpoint = Endpoint.labels()
-        XCTAssertEqual(endpoint.path, "/api/v1/labels")
+        XCTAssertEqual(endpoint.path, VikunjaAPI.path("/labels"))
         XCTAssertEqual(endpoint.method, .GET)
         XCTAssertNotNil(endpoint.queryItems)
     }
 
     func testNotificationsEndpoint() {
         let endpoint = Endpoint.notifications()
-        XCTAssertEqual(endpoint.path, "/api/v1/notifications")
+        XCTAssertEqual(endpoint.path, VikunjaAPI.path("/notifications"))
         XCTAssertEqual(endpoint.method, .GET)
     }
 
     func testMarkNotificationReadEndpoint() {
         let endpoint = Endpoint.markNotificationRead(id: 42)
-        XCTAssertEqual(endpoint.path, "/api/v1/notifications/42")
+        XCTAssertEqual(endpoint.path, VikunjaAPI.path("/notifications/42"))
         XCTAssertEqual(endpoint.method, .POST)
     }
 
     func testMarkAllNotificationsReadEndpoint() {
         let endpoint = Endpoint.markAllNotificationsRead
-        XCTAssertEqual(endpoint.path, "/api/v1/notifications")
+        XCTAssertEqual(endpoint.path, VikunjaAPI.path("/notifications"))
         XCTAssertEqual(endpoint.method, .POST)
     }
 
     func testAllTasksEndpointWithFilter() {
         let endpoint = Endpoint.allTasks(filter: "done = false", sortBy: "due_date", orderBy: "asc")
-        XCTAssertEqual(endpoint.path, "/api/v1/tasks")
+        XCTAssertEqual(endpoint.path, VikunjaAPI.path("/tasks"))
 
         let queryNames = endpoint.queryItems?.map(\.name) ?? []
         XCTAssertTrue(queryNames.contains("filter"))
@@ -219,7 +219,7 @@ final class NetworkErrorTests: XCTestCase {
 
     func testProjectTasksEndpoint() {
         let endpoint = Endpoint.projectTasks(projectId: 3, viewId: 7, page: 2, perPage: 25)
-        XCTAssertEqual(endpoint.path, "/api/v1/projects/3/views/7/tasks")
+        XCTAssertEqual(endpoint.path, VikunjaAPI.path("/projects/3/views/7/tasks"))
         XCTAssertEqual(endpoint.method, .GET)
 
         let pageValue = endpoint.queryItems?.first(where: { $0.name == "page" })?.value
@@ -231,19 +231,19 @@ final class NetworkErrorTests: XCTestCase {
 
     func testProjectViewsEndpoint() {
         let endpoint = Endpoint.projectViews(projectId: 10)
-        XCTAssertEqual(endpoint.path, "/api/v1/projects/10/views")
+        XCTAssertEqual(endpoint.path, VikunjaAPI.path("/projects/10/views"))
         XCTAssertEqual(endpoint.method, .GET)
     }
 
     func testUpdateTaskPositionEndpoint() {
         let endpoint = Endpoint.updateTaskPosition(taskId: 5)
-        XCTAssertEqual(endpoint.path, "/api/v1/tasks/5/position")
+        XCTAssertEqual(endpoint.path, VikunjaAPI.path("/tasks/5/position"))
         XCTAssertEqual(endpoint.method, .POST)
     }
 
     func testTaskEndpoint() {
         let endpoint = Endpoint.task(id: 99)
-        XCTAssertEqual(endpoint.path, "/api/v1/tasks/99")
+        XCTAssertEqual(endpoint.path, VikunjaAPI.path("/tasks/99"))
         XCTAssertEqual(endpoint.method, .GET)
     }
 

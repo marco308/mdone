@@ -36,7 +36,7 @@ final class LabelServiceTests: XCTestCase {
         XCTAssertEqual(labels.count, 2)
         XCTAssertEqual(labels.first?.title, "Label 1")
         let request = try XCTUnwrap(MockURLProtocol.capturedRequests.first)
-        XCTAssertEqual(request.url?.path, "/api/v1/labels")
+        XCTAssertEqual(request.url?.path, VikunjaAPI.path("/labels"))
         XCTAssertEqual(request.httpMethod, "GET")
     }
 
@@ -74,7 +74,7 @@ final class LabelServiceTests: XCTestCase {
         XCTAssertEqual(label.id, 7)
         XCTAssertEqual(label.title, "Current")
         let request = try XCTUnwrap(MockURLProtocol.capturedRequests.first)
-        XCTAssertEqual(request.url?.path, "/api/v1/labels")
+        XCTAssertEqual(request.url?.path, VikunjaAPI.path("/labels"))
         XCTAssertEqual(request.httpMethod, "PUT")
     }
 
@@ -87,7 +87,7 @@ final class LabelServiceTests: XCTestCase {
         try await service.addLabel(taskId: 42, labelId: 7)
 
         let request = try XCTUnwrap(MockURLProtocol.capturedRequests.first)
-        XCTAssertEqual(request.url?.path, "/api/v1/tasks/42/labels")
+        XCTAssertEqual(request.url?.path, VikunjaAPI.path("/tasks/42/labels"))
         XCTAssertEqual(request.httpMethod, "PUT")
     }
 
@@ -100,7 +100,7 @@ final class LabelServiceTests: XCTestCase {
         try await service.removeLabel(taskId: 42, labelId: 7)
 
         let request = try XCTUnwrap(MockURLProtocol.capturedRequests.first)
-        XCTAssertEqual(request.url?.path, "/api/v1/tasks/42/labels/7")
+        XCTAssertEqual(request.url?.path, VikunjaAPI.path("/tasks/42/labels/7"))
         XCTAssertEqual(request.httpMethod, "DELETE")
     }
 }

@@ -148,12 +148,14 @@ final class AppState {
         taskService: TaskService = TaskService(),
         projectService: ProjectService = ProjectService(),
         labelService: LabelService = LabelService(),
-        userService: UserService = UserService()
+        userService: UserService = UserService(),
+        serverInfoService: ServerInfoService = ServerInfoService()
     ) {
         self.taskService = taskService
         self.projectService = projectService
         self.labelService = labelService
         self.userService = userService
+        self.serverInfoService = serverInfoService
         AppState.shared = self
     }
 
@@ -161,6 +163,21 @@ final class AppState {
     private let projectService: ProjectService
     private let labelService: LabelService
     private let userService: UserService
+    private let serverInfoService: ServerInfoService
+
+    /// The signed-in server's Vikunja version. Nil until `/info` has answered,
+    /// and when its version string has no number in it.
+    private(set) var serverVersion: VikunjaVersion?
+    /// Drives the one-time "update your server" alert.
+    var showServerUpdateNotice = false
+
+    /// Whether the server predates Vikunja's v2 API. An unknown version is
+    /// never treated as old.
+    var serverNeedsUpdate: Bool {
+        serverVersion.map { $0 < .firstWithAPIv2 } ?? false
+    }
+
+    private static let serverUpdateNoticeSeenKey = "serverUpdateNoticeSeen"
     private let authService = AuthService.shared
     private let notificationService = NotificationService.shared
 
@@ -543,6 +560,8 @@ final class AppState {
         print("[mDone] logout() called")
         #endif
         authService.clearAll()
+        // The next server signed in to may be a different one, and just as old.
+        UserDefaults.standard.removeObject(forKey: Self.serverUpdateNoticeSeenKey)
         await tearDownSession(clearingCache: true)
     }
 
@@ -571,6 +590,8 @@ final class AppState {
         notifications = []
         currentUser = nil
         assignableUsers = [:]
+        serverVersion = nil
+        showServerUpdateNotice = false
         isAuthenticated = false
         isShowingCachedData = false
 
@@ -1205,6 +1226,35 @@ final class AppState {
             print("[mDone] loadCurrentUserIfNeeded failed: \(error)")
             #endif
         }
+    }
+
+    // MARK: - Server version (#290)
+
+    /// Reads the signed-in server's Vikunja version, once per session, and
+    /// raises the update notice the first time it turns out to be older than
+    /// the v2 API. mDone still works against such a server today; this is
+    /// notice that a later release will not (#289).
+    ///
+    /// Fails quietly. `/info` is public, but a proxy in front of the server can
+    /// still refuse it, and not knowing the version is not worth an error.
+    @MainActor
+    func loadServerVersionIfNeeded() async {
+        guard isAuthenticated, serverVersion == nil, !isOffline,
+              let serverURL = authService.getServerURL().flatMap(URL.init(string:)),
+              let info = try? await serverInfoService.fetch(from: serverURL)
+        else { return }
+        serverVersion = info.version.flatMap(VikunjaVersion.init)
+        if serverNeedsUpdate, !UserDefaults.standard.bool(forKey: Self.serverUpdateNoticeSeenKey) {
+            showServerUpdateNotice = true
+        }
+    }
+
+    /// Records that the user has seen the update notice, so it is shown once
+    /// per server. Settings keeps saying it for as long as it is true.
+    @MainActor
+    func acknowledgeServerUpdateNotice() {
+        UserDefaults.standard.set(true, forKey: Self.serverUpdateNoticeSeenKey)
+        showServerUpdateNotice = false
     }
 
     /// Called when the Team features setting changes. Turning it off clears

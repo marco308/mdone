@@ -61,6 +61,7 @@ struct MacContentView: View {
         .task {
             await appState.refreshAll()
             await appState.fetchNotifications()
+            await appState.loadServerVersionIfNeeded()
         }
         .errorBanner(Bindable(appState).activeError) {
             Task { await appState.refreshAll() }
@@ -81,6 +82,22 @@ struct MacContentView: View {
             Button("OK", role: .cancel) { appState.failedSyncMessages = [] }
         } message: {
             Text(appState.failedSyncMessages.joined(separator: "\n\n"))
+        }
+        // Notice, not an error: a later mDone will need Vikunja's v2 API (#289).
+        .alert(
+            "Update your Vikunja server soon",
+            isPresented: Binding(
+                get: { appState.showServerUpdateNotice },
+                set: {
+                    if !$0 {
+                        appState.acknowledgeServerUpdateNotice()
+                    }
+                }
+            )
+        ) {
+            Button("OK", role: .cancel) { appState.acknowledgeServerUpdateNotice() }
+        } message: {
+            Text(appState.serverVersion.map(ServerUpdateNotice.message) ?? "")
         }
         // A rebuilt local store must not be silent: the user's cached tasks
         // are gone until the next refresh (issue #155).

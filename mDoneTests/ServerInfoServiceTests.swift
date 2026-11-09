@@ -43,7 +43,7 @@ final class ServerInfoServiceTests: XCTestCase {
         }
         let info = try await service().fetch(from: XCTUnwrap(URL(string: "https://vikunja.example.com")))
 
-        XCTAssertEqual(MockURLProtocol.capturedRequests.first?.url?.path, "/api/v1/info")
+        XCTAssertEqual(MockURLProtocol.capturedRequests.first?.url?.path, VikunjaAPI.path("/info"))
         XCTAssertEqual(info.auth.openidConnect.providers?.first?.key, "authelia")
     }
 

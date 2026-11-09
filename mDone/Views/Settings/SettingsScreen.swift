@@ -44,6 +44,15 @@ struct SettingsScreen: View {
                             .font(.subheadline)
                     }
                 }
+                if appState.serverNeedsUpdate {
+                    Label {
+                        Text(appState.serverVersion.map(ServerUpdateNotice.message) ?? "")
+                            .font(.footnote)
+                    } icon: {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                    }
+                }
             }
 
             Section {

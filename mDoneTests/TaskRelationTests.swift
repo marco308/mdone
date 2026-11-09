@@ -153,11 +153,11 @@ final class TaskRelationTests: XCTestCase {
 
     func testRelationEndpoints() {
         let create = Endpoint.createTaskRelation(taskId: 7)
-        XCTAssertEqual(create.path, "/api/v1/tasks/7/relations")
+        XCTAssertEqual(create.path, VikunjaAPI.path("/tasks/7/relations"))
         XCTAssertEqual(create.method, .PUT)
 
         let delete = Endpoint.deleteTaskRelation(taskId: 7, relationKind: "subtask", otherTaskId: 9)
-        XCTAssertEqual(delete.path, "/api/v1/tasks/7/relations/subtask/9")
+        XCTAssertEqual(delete.path, VikunjaAPI.path("/tasks/7/relations/subtask/9"))
         XCTAssertEqual(delete.method, .DELETE)
     }
 
@@ -179,7 +179,7 @@ final class TaskRelationTests: XCTestCase {
         """.data(using: .utf8)!
 
         MockURLProtocol.requestHandler = { request in
-            XCTAssertEqual(request.url?.path, "/api/v1/tasks/1/relations")
+            XCTAssertEqual(request.url?.path, VikunjaAPI.path("/tasks/1/relations"))
             XCTAssertEqual(request.httpMethod, "PUT")
             if let body = MockURLProtocol.bodyData(from: request),
                let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any]
@@ -201,7 +201,7 @@ final class TaskRelationTests: XCTestCase {
     func testDeleteRelationCallsDeleteEndpoint() async throws {
         let service = await makeConfiguredService()
         MockURLProtocol.requestHandler = { request in
-            XCTAssertEqual(request.url?.path, "/api/v1/tasks/1/relations/subtask/2")
+            XCTAssertEqual(request.url?.path, VikunjaAPI.path("/tasks/1/relations/subtask/2"))
             XCTAssertEqual(request.httpMethod, "DELETE")
             let body = #"{"message":"Successfully deleted."}"#.data(using: .utf8)!
             return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), body)
@@ -369,7 +369,7 @@ final class TaskRelationTests: XCTestCase {
 
         let toggleResponse = try XCTUnwrap(Self.taskJSON(id: 2, title: "Child", done: true).data(using: .utf8))
         MockURLProtocol.requestHandler = { request in
-            XCTAssertEqual(request.url?.path, "/api/v1/tasks/2")
+            XCTAssertEqual(request.url?.path, VikunjaAPI.path("/tasks/2"))
             return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), toggleResponse)
         }
 
@@ -418,11 +418,11 @@ final class TaskRelationTests: XCTestCase {
         MockURLProtocol.requestHandler = { request in
             let path = request.url?.path ?? ""
             switch (request.httpMethod, path) {
-            case ("PUT", "/api/v1/tasks/1/relations"):
+            case ("PUT", VikunjaAPI.path("/tasks/1/relations")):
                 return (MockURLProtocol.makeResponse(statusCode: 201, url: request.url), relationResponse)
-            case ("GET", "/api/v1/tasks/1"):
+            case ("GET", VikunjaAPI.path("/tasks/1")):
                 return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), parentResponse)
-            case ("GET", "/api/v1/tasks/2"):
+            case ("GET", VikunjaAPI.path("/tasks/2")):
                 return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), childResponse)
             default:
                 XCTFail("Unexpected request: \(request.httpMethod ?? "?") \(path)")
@@ -451,11 +451,11 @@ final class TaskRelationTests: XCTestCase {
         MockURLProtocol.requestHandler = { request in
             let path = request.url?.path ?? ""
             switch (request.httpMethod, path) {
-            case ("DELETE", "/api/v1/tasks/1/relations/subtask/2"):
+            case ("DELETE", VikunjaAPI.path("/tasks/1/relations/subtask/2")):
                 return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), deleteResponse)
-            case ("GET", "/api/v1/tasks/1"):
+            case ("GET", VikunjaAPI.path("/tasks/1")):
                 return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), parentResponse)
-            case ("GET", "/api/v1/tasks/2"):
+            case ("GET", VikunjaAPI.path("/tasks/2")):
                 return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), childResponse)
             default:
                 XCTFail("Unexpected request: \(request.httpMethod ?? "?") \(path)")
@@ -491,9 +491,9 @@ final class TaskRelationTests: XCTestCase {
         MockURLProtocol.requestHandler = { request in
             let path = request.url?.path ?? ""
             switch (request.httpMethod, path) {
-            case ("PUT", "/api/v1/projects/5/tasks"):
+            case ("PUT", VikunjaAPI.path("/projects/5/tasks")):
                 return (MockURLProtocol.makeResponse(statusCode: 201, url: request.url), newTaskResponse)
-            case ("PUT", "/api/v1/tasks/1/relations"):
+            case ("PUT", VikunjaAPI.path("/tasks/1/relations")):
                 if let requestBody = MockURLProtocol.bodyData(from: request),
                    let json = try? JSONSerialization.jsonObject(with: requestBody) as? [String: Any]
                 {
@@ -503,9 +503,9 @@ final class TaskRelationTests: XCTestCase {
                     XCTFail("Missing relation request body")
                 }
                 return (MockURLProtocol.makeResponse(statusCode: 201, url: request.url), relationResponse)
-            case ("GET", "/api/v1/tasks/1"):
+            case ("GET", VikunjaAPI.path("/tasks/1")):
                 return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), parentResponse)
-            case ("GET", "/api/v1/tasks/99"):
+            case ("GET", VikunjaAPI.path("/tasks/99")):
                 return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), childResponse)
             default:
                 XCTFail("Unexpected request: \(request.httpMethod ?? "?") \(path)")

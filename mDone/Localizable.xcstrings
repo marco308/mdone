@@ -122,6 +122,7 @@
         }
       }
     },
+    "%@, %lld upcoming" : {},
     "%@, today" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1448,6 +1449,7 @@
         }
       }
     },
+    "Copy Link" : {},
     "Couldn't open the sign-in window. Please try again." : {
       "localizations" : {
         "zh-Hans" : {
@@ -2292,6 +2294,7 @@
         }
       }
     },
+    "Formatting: **bold**, *italic*, [link](https://example.com), - bullet, 1. numbered, - [ ] checklist" : {},
     "From" : {
       "localizations" : {
         "zh-Hans" : {
@@ -3942,6 +3945,9 @@
         }
       }
     },
+    "Share" : {},
+    "Share Link" : {},
+    "Share task link" : {},
     "Show All" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4562,6 +4568,7 @@
         }
       }
     },
+    "This description has formatting mDone cannot edit, so it is shown as HTML." : {},
     "This permanently deletes the project and all %lld tasks in it, including any sub-projects. This can't be undone." : {
       "localizations" : {
         "en" : {
@@ -4900,6 +4907,16 @@
         }
       }
     },
+    "Update your Vikunja server soon" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请尽快更新你的 Vikunja 服务器"
+          }
+        }
+      }
+    },
     "Urgent" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5114,6 +5131,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的 API 令牌没有执行此操作的权限。"
+          }
+        }
+      }
+    },
+    "Your server runs Vikunja %@. A future version of mDone will need Vikunja %@ or newer. mDone keeps working for now, but please update your server before then." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的服务器运行的是 Vikunja %@。mDone 的后续版本将需要 Vikunja %@ 或更高版本。目前 mDone 仍可正常使用，但请在此之前更新服务器。"
           }
         }
       }

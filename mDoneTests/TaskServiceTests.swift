@@ -597,7 +597,7 @@ final class TaskServiceTests: XCTestCase {
         XCTAssertEqual(MockURLProtocol.capturedRequests.count, 2)
         XCTAssertEqual(tasks.count, 60)
         XCTAssertEqual(tasks.last?.id, 60, "view order must survive to the last page")
-        XCTAssertEqual(MockURLProtocol.capturedRequests.first?.url?.path, "/api/v1/projects/7/views/3/tasks")
+        XCTAssertEqual(MockURLProtocol.capturedRequests.first?.url?.path, VikunjaAPI.path("/projects/7/views/3/tasks"))
     }
 
     func testFetchTaskReturnsTask() async throws {
@@ -609,7 +609,7 @@ final class TaskServiceTests: XCTestCase {
         """.data(using: .utf8)!
 
         MockURLProtocol.requestHandler = { request in
-            XCTAssertTrue(request.url?.path.contains("/api/v1/tasks/42") == true)
+            XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/tasks/42")) == true)
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             return (response, taskJSON)
         }
@@ -628,7 +628,7 @@ final class TaskServiceTests: XCTestCase {
         """.data(using: .utf8)!
 
         MockURLProtocol.requestHandler = { request in
-            XCTAssertTrue(request.url?.path.contains("/api/v1/projects/5/tasks") == true)
+            XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/projects/5/tasks")) == true)
             XCTAssertEqual(request.httpMethod, "PUT")
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             return (response, responseJSON)
@@ -650,7 +650,7 @@ final class TaskServiceTests: XCTestCase {
         """.data(using: .utf8)!
 
         MockURLProtocol.requestHandler = { request in
-            XCTAssertTrue(request.url?.path.contains("/api/v1/tasks/10") == true)
+            XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/tasks/10")) == true)
             XCTAssertEqual(request.httpMethod, "POST")
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             return (response, responseJSON)
@@ -687,7 +687,7 @@ final class TaskServiceTests: XCTestCase {
         """.data(using: .utf8)!
 
         MockURLProtocol.requestHandler = { request in
-            XCTAssertTrue(request.url?.path.contains("/api/v1/tasks/7") == true)
+            XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/tasks/7")) == true)
             XCTAssertEqual(request.httpMethod, "POST")
 
             // Verify the body contains done: true (toggled from false)
@@ -742,7 +742,7 @@ final class TaskServiceTests: XCTestCase {
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
         MockURLProtocol.requestHandler = { request in
-            XCTAssertTrue(request.url?.path.contains("/api/v1/tasks/42") == true)
+            XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/tasks/42")) == true)
             XCTAssertEqual(request.httpMethod, "DELETE")
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             return (response, Data())
@@ -758,7 +758,7 @@ final class TaskServiceTests: XCTestCase {
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
         MockURLProtocol.requestHandler = { request in
-            XCTAssertTrue(request.url?.path.contains("/api/v1/tasks/5/position") == true)
+            XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/tasks/5/position")) == true)
             XCTAssertEqual(request.httpMethod, "POST")
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             return (response, Data())

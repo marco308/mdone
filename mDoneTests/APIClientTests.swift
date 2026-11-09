@@ -169,23 +169,32 @@ final class APIClientTests: XCTestCase {
     }
 
     func testEndpointPaths() {
-        XCTAssertEqual(Endpoint.currentUser.path, "/api/v1/user")
+        XCTAssertEqual(Endpoint.currentUser.path, VikunjaAPI.path("/user"))
         XCTAssertEqual(Endpoint.currentUser.method, .GET)
 
         let projectsEndpoint = Endpoint.projects()
-        XCTAssertEqual(projectsEndpoint.path, "/api/v1/projects")
+        XCTAssertEqual(projectsEndpoint.path, VikunjaAPI.path("/projects"))
 
         let createTask = Endpoint.createTask(projectId: 5)
-        XCTAssertEqual(createTask.path, "/api/v1/projects/5/tasks")
+        XCTAssertEqual(createTask.path, VikunjaAPI.path("/projects/5/tasks"))
         XCTAssertEqual(createTask.method, .PUT)
 
         let updateTask = Endpoint.updateTask(id: 10)
-        XCTAssertEqual(updateTask.path, "/api/v1/tasks/10")
+        XCTAssertEqual(updateTask.path, VikunjaAPI.path("/tasks/10"))
         XCTAssertEqual(updateTask.method, .POST)
 
         let deleteTask = Endpoint.deleteTask(id: 3)
-        XCTAssertEqual(deleteTask.path, "/api/v1/tasks/3")
+        XCTAssertEqual(deleteTask.path, VikunjaAPI.path("/tasks/3"))
         XCTAssertEqual(deleteTask.method, .DELETE)
+    }
+
+    /// The one place the API version is named. Every other test builds paths
+    /// through `VikunjaAPI.path`, so this is what pins the version (#290).
+    func testAPIVersionPrefix() {
+        XCTAssertEqual(VikunjaAPI.basePath, "/api/v1")
+        XCTAssertEqual(VikunjaAPI.path("/tasks/1"), "/api/v1/tasks/1")
+        XCTAssertEqual(Endpoint(api: "/tasks/1", method: .PATCH).path, "/api/v1/tasks/1")
+        XCTAssertEqual(HTTPMethod.PATCH.rawValue, "PATCH")
     }
 
     // MARK: - APIClient Network Tests (using MockURLProtocol)

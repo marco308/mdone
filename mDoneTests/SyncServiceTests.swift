@@ -247,12 +247,12 @@ final class SyncServiceTests: XCTestCase {
 
     func testPendingOperationInitialization() {
         let operation = PendingOperation(
-            endpointPath: "/api/v1/tasks/1",
+            endpointPath: VikunjaAPI.path("/tasks/1"),
             method: "POST",
             bodyData: "{\"done\": true}".data(using: .utf8)
         )
 
-        XCTAssertEqual(operation.endpointPath, "/api/v1/tasks/1")
+        XCTAssertEqual(operation.endpointPath, VikunjaAPI.path("/tasks/1"))
         XCTAssertEqual(operation.method, "POST")
         XCTAssertNotNil(operation.bodyData)
         XCTAssertNotNil(operation.id)
@@ -262,7 +262,7 @@ final class SyncServiceTests: XCTestCase {
 
     func testPendingOperationWithoutBody() {
         let operation = PendingOperation(
-            endpointPath: "/api/v1/tasks/1",
+            endpointPath: VikunjaAPI.path("/tasks/1"),
             method: "DELETE"
         )
 
@@ -274,7 +274,7 @@ final class SyncServiceTests: XCTestCase {
 
     func testPendingOperationRetryTracking() {
         let operation = PendingOperation(
-            endpointPath: "/api/v1/tasks/1",
+            endpointPath: VikunjaAPI.path("/tasks/1"),
             method: "POST"
         )
 
