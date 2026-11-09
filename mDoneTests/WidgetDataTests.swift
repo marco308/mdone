@@ -341,4 +341,92 @@ final class WidgetDataTests: XCTestCase {
         // Clean up
         defaults.removeObject(forKey: testKey)
     }
+
+    // MARK: - WidgetDataProvider completeTask (#283)
+
+    /// A repeating task as Vikunja returns it, with fields the widget never models.
+    private static let repeatingTaskJSON = Data("""
+    {"id": 66, "title": "Water plants", "description": "<p>Back garden</p>", "done": false,
+     "due_date": "2026-11-01T09:00:00Z", "priority": 3, "repeat_after": 86400, "repeat_mode": 0,
+     "hex_color": "ff0000", "percent_done": 0.5, "project_id": 1}
+    """.utf8)
+
+    /// Points the provider at the mock server with a test token, restoring the real
+    /// credentials afterwards.
+    private func useMockServer(_ serverURL: String) {
+        let defaults = SharedKeys.sharedDefaults
+        let savedServerURL = defaults.string(forKey: SharedKeys.serverURLKey)
+        let savedApiToken = SharedTokenStore.get()
+        defaults.set(serverURL, forKey: SharedKeys.serverURLKey)
+        SharedTokenStore.save("widget-test-token")
+        MockURLProtocol.reset()
+
+        addTeardownBlock {
+            MockURLProtocol.reset()
+            if let url = savedServerURL {
+                defaults.set(url, forKey: SharedKeys.serverURLKey)
+            } else {
+                defaults.removeObject(forKey: SharedKeys.serverURLKey)
+            }
+            if let token = savedApiToken {
+                SharedTokenStore.save(token)
+            } else {
+                SharedTokenStore.delete()
+            }
+        }
+    }
+
+    func testCompletionBodyKeepsEveryFieldAndSetsDone() throws {
+        let body = try WidgetDataProvider.completionBody(from: Self.repeatingTaskJSON)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertEqual(json["done"] as? Bool, true)
+        XCTAssertEqual(json["repeat_after"] as? Int, 86400)
+        XCTAssertEqual(json["repeat_mode"] as? Int, 0)
+        XCTAssertEqual(json["description"] as? String, "<p>Back garden</p>")
+        XCTAssertEqual(json["priority"] as? Int, 3)
+        XCTAssertEqual(json["hex_color"] as? String, "ff0000")
+        XCTAssertEqual(json["due_date"] as? String, "2026-11-01T09:00:00Z")
+    }
+
+    func testCompleteTaskFetchesTaskThenPostsItBackWhole() async throws {
+        useMockServer("https://mock.vikunja.io/")
+
+        MockURLProtocol.requestHandler = { request in
+            (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), Self.repeatingTaskJSON)
+        }
+
+        let provider = WidgetDataProvider(session: MockURLProtocol.mockSession())
+        try await provider.completeTask(id: 66)
+
+        let requests = MockURLProtocol.capturedRequests
+        XCTAssertEqual(requests.map(\.httpMethod), ["GET", "POST"])
+        XCTAssertEqual(requests.map { $0.url?.absoluteString }, [
+            "https://mock.vikunja.io/api/v1/tasks/66",
+            "https://mock.vikunja.io/api/v1/tasks/66",
+        ])
+
+        let body = try XCTUnwrap(requests.last?.decodedJSONBody)
+        XCTAssertEqual(body["done"] as? Bool, true)
+        XCTAssertEqual(body["repeat_after"] as? Int, 86400, "Completing must not stop the task repeating")
+        XCTAssertEqual(body["description"] as? String, "<p>Back garden</p>")
+        XCTAssertEqual(body["priority"] as? Int, 3)
+    }
+
+    func testCompleteTaskDoesNotPostWhenFetchFails() async throws {
+        useMockServer("https://mock.vikunja.io")
+
+        MockURLProtocol.requestHandler = { request in
+            (MockURLProtocol.makeResponse(statusCode: 404, url: request.url), Data())
+        }
+
+        let provider = WidgetDataProvider(session: MockURLProtocol.mockSession())
+        do {
+            try await provider.completeTask(id: 66)
+            XCTFail("A failed fetch should throw")
+        } catch {}
+
+        // Falling back to a bare {"done": true} would be the very bug this guards against.
+        XCTAssertEqual(MockURLProtocol.capturedRequests.map(\.httpMethod), ["GET"])
+    }
 }
