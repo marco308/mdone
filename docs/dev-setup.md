@@ -49,9 +49,28 @@ The Vikunja web UI is at the same `http://localhost:3456` if you want to verify 
 
 The reset script deletes `vikunja-dev-data/` (gitignored). It does **not** touch your prod or test instances — it only operates on the `docker-compose.dev.yml` stack.
 
+## Dev builds are a separate app
+
+A Debug build is not the mDone you use. It is **mDone Dev** (`com.mdone.app.dev`), with its own
+container, keychain items, app group (`group.com.mdone.app.dev`) and widgets. That holds on the
+Simulator, on a phone and on the Mac, so you can run a build from Xcode or `xcodebuild` next to the
+App Store or TestFlight copy and neither sees the other's login or data. Release builds, which are
+what gets archived and shipped, are still `com.mdone.app`.
+
+The three values live in `project.yml` (`MDONE_BUNDLE_ID`, `MDONE_APP_GROUP`, `MDONE_DISPLAY_NAME`),
+and `StorageScope.appGroupID` in `mDoneShared/SharedConstants.swift` has to match the group.
+
+Unit tests go one step further. `StorageScope` gives the test host scratch copies of the server URL,
+the shared defaults and the keychain items, emptied at the start of every run, so a test that signs
+out or saves a fake token cannot touch even the dev app's login.
+
+Both apps register the `mdone://` URL scheme. Widgets and SSO are unaffected, because those hand the
+link straight to their own app, but `open mdone://create` from a terminal goes to whichever copy
+macOS picks.
+
 ## Switching mDone between environments
 
-The server URL is stored in `UserDefaults` ([mDone/Services/AuthService.swift:13](../mDone/Services/AuthService.swift:13)). To switch:
+The server URL is stored in `UserDefaults` ([mDone/Services/AuthService.swift](../mDone/Services/AuthService.swift)). To switch:
 
 1. Settings → Log Out
 2. Re-enter the new server URL on the login screen
@@ -191,11 +210,10 @@ callback endpoint.
 ./scripts/dev-macos-oidc.sh --cleanup  # quit it, remove every trace
 ```
 
-**Do not just build and run `mDone-macOS` for this.** It shares the bundle
-identifier `com.mdone.app` with the copy in `/Applications`, so it reads the
-same keychain and the same sandbox container. It will sign you straight into
-whatever server your real app uses and never show the setup screen, and signing
-in to a test server from it overwrites the credentials your real app depends on.
+A plain Debug build of `mDone-macOS` is already separate from the copy in
+`/Applications` (see "Dev builds are a separate app"), but it keeps whatever
+login you last gave mDone Dev, so it may never show the setup screen. The script
+goes further and uses a throwaway identity that starts signed out every time.
 
 The script overrides `PRODUCT_BUNDLE_IDENTIFIER`, which gives the build its own
 keychain access group and container, so nothing it does can reach the real app.

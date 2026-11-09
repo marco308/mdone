@@ -18,7 +18,7 @@ import Security
 /// app re-saves the token on every launch (`AppState.checkAuth`), so existing
 /// Mac users move over without signing in again.
 enum SharedTokenStore {
-    private static let account = "com.mdone.shared.apiToken"
+    private static let account = StorageScope.keychainAccount("com.mdone.shared.apiToken")
 
     private static var baseQuery: [String: Any] {
         var query: [String: Any] = [
