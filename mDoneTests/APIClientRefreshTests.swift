@@ -110,13 +110,13 @@ final class APIClientRefreshTests: XCTestCase {
 
         // Three HTTP calls in total: failing fetch → refresh → retried fetch.
         XCTAssertEqual(counter.totalCount, 3)
-        let taskCalls = counter.entries(forPath: "/api/v1/tasks/1")
+        let taskCalls = counter.entries(forPath: VikunjaAPI.path("/tasks/1"))
         XCTAssertEqual(taskCalls.count, 2, "Original endpoint should be retried exactly once")
         XCTAssertEqual(taskCalls[0].authorization, "Bearer \(originalJWT)")
         XCTAssertEqual(taskCalls[1].authorization, "Bearer \(refreshedJWT)",
                        "Retry must use the freshly refreshed JWT")
 
-        let refreshCalls = counter.entries(forPath: "/api/v1/user/token/refresh")
+        let refreshCalls = counter.entries(forPath: VikunjaAPI.path("/user/token/refresh"))
         XCTAssertEqual(refreshCalls.count, 1)
         XCTAssertEqual(refreshCalls[0].cookie, "vikunja_refresh_token=refresh-1",
                        "Refresh must send the stored refresh-token cookie")
@@ -262,7 +262,7 @@ final class APIClientRefreshTests: XCTestCase {
         }
 
         XCTAssertNil(expiredFlag.value, "A token that still reads projects is alive; the session must survive")
-        let probes = counter.entries(forPath: "/api/v1/projects")
+        let probes = counter.entries(forPath: VikunjaAPI.path("/projects"))
         XCTAssertEqual(probes.count, 1, "Exactly one liveness probe")
         XCTAssertEqual(
             probes.first?.authorization,
@@ -299,7 +299,7 @@ final class APIClientRefreshTests: XCTestCase {
         }
 
         XCTAssertEqual(expiredFlag.value, true, "A token the probe route also refuses is dead")
-        XCTAssertEqual(counter.count(forPath: "/api/v1/projects"), 1)
+        XCTAssertEqual(counter.count(forPath: VikunjaAPI.path("/projects")), 1)
     }
 
     func testAPIToken401OnTheProbeRouteItselfExpiresWithoutProbing() async {
@@ -415,7 +415,7 @@ final class APIClientRefreshTests: XCTestCase {
         }
 
         XCTAssertNil(expiredFlag.value)
-        XCTAssertEqual(counter.count(forPath: "/api/v1/projects"), 1, "Both 401s must share one probe")
+        XCTAssertEqual(counter.count(forPath: VikunjaAPI.path("/projects")), 1, "Both 401s must share one probe")
     }
 
     // MARK: - Callback contract

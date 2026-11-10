@@ -402,8 +402,8 @@ final class WidgetDataTests: XCTestCase {
         let requests = MockURLProtocol.capturedRequests
         XCTAssertEqual(requests.map(\.httpMethod), ["GET", "POST"])
         XCTAssertEqual(requests.map { $0.url?.absoluteString }, [
-            "https://mock.vikunja.io/api/v1/tasks/66",
-            "https://mock.vikunja.io/api/v1/tasks/66",
+            "https://mock.vikunja.io\(VikunjaAPI.path("/tasks/66"))",
+            "https://mock.vikunja.io\(VikunjaAPI.path("/tasks/66"))",
         ])
 
         let body = try XCTUnwrap(requests.last?.decodedJSONBody)

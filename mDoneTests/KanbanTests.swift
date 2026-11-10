@@ -114,11 +114,11 @@ final class KanbanTests: XCTestCase {
         // endpoint. `/views/{view}/buckets` returns metadata only since
         // Vikunja v0.24, which left every board column empty.
         let read = Endpoint.kanbanBuckets(projectId: 7, viewId: 3)
-        XCTAssertEqual(read.path, "/api/v1/projects/7/views/3/tasks")
+        XCTAssertEqual(read.path, VikunjaAPI.path("/projects/7/views/3/tasks"))
         XCTAssertEqual(read.method, .GET)
 
         let move = Endpoint.moveTaskToBucket(projectId: 7, viewId: 3, bucketId: 9)
-        XCTAssertEqual(move.path, "/api/v1/projects/7/views/3/buckets/9/tasks")
+        XCTAssertEqual(move.path, VikunjaAPI.path("/projects/7/views/3/buckets/9/tasks"))
         XCTAssertEqual(move.method, .POST)
     }
 
@@ -143,7 +143,7 @@ final class KanbanTests: XCTestCase {
         MockURLProtocol.requestHandler = { request in
             // Must be the view-tasks endpoint: the buckets endpoint stopped
             // embedding tasks in Vikunja v0.24 (#130).
-            XCTAssertEqual(request.url?.path, "/api/v1/projects/7/views/3/tasks")
+            XCTAssertEqual(request.url?.path, VikunjaAPI.path("/projects/7/views/3/tasks"))
             XCTAssertEqual(request.httpMethod, "GET")
             return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), bucketsJSON)
         }
@@ -316,7 +316,7 @@ final class KanbanTests: XCTestCase {
         let service = TaskService(apiClient: client)
 
         MockURLProtocol.requestHandler = { request in
-            XCTAssertEqual(request.url?.path, "/api/v1/projects/7/views/3/buckets/9/tasks")
+            XCTAssertEqual(request.url?.path, VikunjaAPI.path("/projects/7/views/3/buckets/9/tasks"))
             XCTAssertEqual(request.httpMethod, "POST")
             return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), Data())
         }
@@ -353,7 +353,7 @@ final class KanbanTests: XCTestCase {
         """.data(using: .utf8)!
 
         MockURLProtocol.requestHandler = { request in
-            XCTAssertEqual(request.url?.path, "/api/v1/projects/7/views/3/tasks")
+            XCTAssertEqual(request.url?.path, VikunjaAPI.path("/projects/7/views/3/tasks"))
             return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), bucketsJSON)
         }
 

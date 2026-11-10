@@ -131,7 +131,7 @@ final class RefreshLatencyTests: XCTestCase {
             let page = Self.page(of: request)
             var body = Self.json([])
             var pages = 1
-            if path == "/api/v1/tasks" {
+            if path == VikunjaAPI.path("/tasks") {
                 pages = 12
                 let start = Int64((page - 1) * 50)
                 body = Self.tasksJSON(Array(start + 1 ... start + 50))

@@ -103,7 +103,7 @@ final class LabelAssignmentTests: XCTestCase {
         XCTAssertTrue(appState.hasLabel(urgent, on: task))
         XCTAssertEqual(appState.tasks[0].labels?.map(\.id), [7])
         let request = MockURLProtocol.capturedRequests.last
-        XCTAssertEqual(request?.url?.path, "/api/v1/tasks/1/labels")
+        XCTAssertEqual(request?.url?.path, VikunjaAPI.path("/tasks/1/labels"))
         XCTAssertEqual(request?.httpMethod, "PUT")
         XCTAssertEqual(try jsonBody(of: request)["label_id"] as? Int, 7)
     }
@@ -121,7 +121,7 @@ final class LabelAssignmentTests: XCTestCase {
         XCTAssertTrue(stuck)
         XCTAssertFalse(appState.hasLabel(urgent, on: task))
         XCTAssertEqual(appState.tasks[0].labels, [])
-        XCTAssertEqual(MockURLProtocol.capturedRequests.last?.url?.path, "/api/v1/tasks/1/labels/7")
+        XCTAssertEqual(MockURLProtocol.capturedRequests.last?.url?.path, VikunjaAPI.path("/tasks/1/labels/7"))
         XCTAssertEqual(MockURLProtocol.capturedRequests.last?.httpMethod, "DELETE")
     }
 
@@ -202,7 +202,7 @@ final class LabelAssignmentTests: XCTestCase {
         XCTAssertEqual(created?.id, 11)
         XCTAssertEqual(appState.labels.map(\.id), [7, 11], "The new label joins the loaded list for the picker")
         let request = MockURLProtocol.capturedRequests.last
-        XCTAssertEqual(request?.url?.path, "/api/v1/labels")
+        XCTAssertEqual(request?.url?.path, VikunjaAPI.path("/labels"))
         XCTAssertEqual(request?.httpMethod, "PUT")
         let body = try jsonBody(of: request)
         XCTAssertEqual(body["title"] as? String, "Home", "The title is trimmed")

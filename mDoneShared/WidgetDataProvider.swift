@@ -143,7 +143,7 @@ final class WidgetDataProvider: @unchecked Sendable {
         guard let serverURL, let apiToken else { return }
 
         let urlString = serverURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            + "/api/v1/tasks/\(id)"
+            + VikunjaAPI.path("/tasks/\(id)")
         guard let url = URL(string: urlString) else { return }
 
         var fetch = URLRequest(url: url)
@@ -209,7 +209,7 @@ final class WidgetDataProvider: @unchecked Sendable {
 
         let baseURL = serverURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 
-        var components = URLComponents(string: baseURL + "/api/v1/tasks")
+        var components = URLComponents(string: baseURL + VikunjaAPI.path("/tasks"))
         components?.queryItems = [
             URLQueryItem(name: "filter", value: filter),
             URLQueryItem(name: "sort_by", value: sortBy),

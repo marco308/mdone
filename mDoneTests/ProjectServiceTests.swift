@@ -32,7 +32,7 @@ final class ProjectServiceTests: XCTestCase {
         """.data(using: .utf8)!
 
         MockURLProtocol.requestHandler = { request in
-            XCTAssertTrue(request.url?.path.contains("/api/v1/projects") == true)
+            XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/projects")) == true)
             XCTAssertEqual(request.httpMethod, "GET")
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             return (response, projectsJSON)
@@ -186,7 +186,7 @@ final class ProjectServiceTests: XCTestCase {
         """.data(using: .utf8)!
 
         MockURLProtocol.requestHandler = { request in
-            XCTAssertTrue(request.url?.path.contains("/api/v1/projects/5") == true)
+            XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/projects/5")) == true)
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             return (response, projectJSON)
         }
@@ -211,7 +211,7 @@ final class ProjectServiceTests: XCTestCase {
         """.data(using: .utf8)!
 
         MockURLProtocol.requestHandler = { request in
-            XCTAssertTrue(request.url?.path.contains("/api/v1/projects/5/views") == true)
+            XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/projects/5/views")) == true)
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             return (response, viewsJSON)
         }
@@ -348,7 +348,7 @@ final class ProjectServiceTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertEqual(request.httpMethod, "PUT")
-            XCTAssertTrue(request.url?.path.hasSuffix("/api/v1/projects") == true)
+            XCTAssertTrue(request.url?.path.hasSuffix(VikunjaAPI.path("/projects")) == true)
             return (MockURLProtocol.makeResponse(statusCode: 201, url: request.url), responseJSON)
         }
 
@@ -369,7 +369,7 @@ final class ProjectServiceTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertEqual(request.httpMethod, "POST")
-            XCTAssertTrue(request.url?.path.hasSuffix("/api/v1/projects/7") == true)
+            XCTAssertTrue(request.url?.path.hasSuffix(VikunjaAPI.path("/projects/7")) == true)
             return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), responseJSON)
         }
 
@@ -388,7 +388,7 @@ final class ProjectServiceTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertEqual(request.httpMethod, "DELETE")
-            XCTAssertTrue(request.url?.path.hasSuffix("/api/v1/projects/9") == true)
+            XCTAssertTrue(request.url?.path.hasSuffix(VikunjaAPI.path("/projects/9")) == true)
             return (
                 MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
                 #"{"message":"deleted"}"#.data(using: .utf8)!

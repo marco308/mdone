@@ -1,7 +1,7 @@
 import Foundation
 
 enum HTTPMethod: String {
-    case GET, POST, PUT, DELETE
+    case GET, POST, PUT, PATCH, DELETE
 }
 
 struct Endpoint {
@@ -15,19 +15,26 @@ struct Endpoint {
         self.queryItems = queryItems
     }
 
+    /// An endpoint under the Vikunja API prefix: `api: "/tasks/1"` is
+    /// `/api/v1/tasks/1`. Every Vikunja endpoint below is built this way so the
+    /// API version is named once, in `VikunjaAPI`.
+    init(api route: String, method: HTTPMethod = .GET, queryItems: [URLQueryItem]? = nil) {
+        self.init(path: VikunjaAPI.path(route), method: method, queryItems: queryItems)
+    }
+
     // MARK: - Auth
 
-    static let login = Endpoint(path: "/api/v1/login", method: .POST)
+    static let login = Endpoint(api: "/login", method: .POST)
 
     /// Vikunja 2.0.0+ JWT refresh. Accepts the `vikunja_refresh_token` cookie
     /// (not a Bearer token) and returns a fresh short-lived JWT plus a new
     /// Set-Cookie that invalidates the previous refresh token.
-    static let refreshToken = Endpoint(path: "/api/v1/user/token/refresh", method: .POST)
+    static let refreshToken = Endpoint(api: "/user/token/refresh", method: .POST)
 
     /// Instance metadata, including which auth methods the server offers.
     /// Unauthenticated: this is what the login screen reads before it knows
     /// anything about the server.
-    static let info = Endpoint(path: "/api/v1/info")
+    static let info = Endpoint(api: "/info")
 
     /// Exchanges an OIDC authorization code for a Vikunja JWT. `provider` is
     /// the provider `key` from `/api/v1/info`, not its display name.
@@ -38,7 +45,7 @@ struct Endpoint {
     /// would move this POST to a different path, and this is the request that
     /// carries the authorization code.
     static func openIDCallback(provider: String) -> Endpoint {
-        Endpoint(path: "/api/v1/auth/openid/\(pathSegment(provider))/callback", method: .POST)
+        Endpoint(api: "/auth/openid/\(pathSegment(provider))/callback", method: .POST)
     }
 
     /// Percent-encodes a single path segment. Deliberately narrower than
@@ -51,7 +58,7 @@ struct Endpoint {
 
     // MARK: - User
 
-    static let currentUser = Endpoint(path: "/api/v1/user")
+    static let currentUser = Endpoint(api: "/user")
 
     // MARK: - Projects
 
@@ -65,15 +72,15 @@ struct Endpoint {
         if includeArchived {
             items.append(URLQueryItem(name: "is_archived", value: "true"))
         }
-        return Endpoint(path: "/api/v1/projects", queryItems: items)
+        return Endpoint(api: "/projects", queryItems: items)
     }
 
     static func project(id: Int64) -> Endpoint {
-        Endpoint(path: "/api/v1/projects/\(id)")
+        Endpoint(api: "/projects/\(id)")
     }
 
     static func projectViews(projectId: Int64) -> Endpoint {
-        Endpoint(path: "/api/v1/projects/\(projectId)/views")
+        Endpoint(api: "/projects/\(projectId)/views")
     }
 
     /// The users who can see a project, through a direct share, a team or as
@@ -81,7 +88,7 @@ struct Endpoint {
     /// `/projects/{id}/users` it leaves out email addresses and needs only read
     /// access. Not paginated.
     static func projectUsers(projectId: Int64) -> Endpoint {
-        Endpoint(path: "/api/v1/projects/\(projectId)/projectusers")
+        Endpoint(api: "/projects/\(projectId)/projectusers")
     }
 
     // MARK: - Kanban Buckets
@@ -95,7 +102,7 @@ struct Endpoint {
     /// `x-pagination-total-pages` describes the buckets too, so it reads `1`
     /// even when a bucket has further pages of tasks waiting (issue #141).
     static func kanbanBuckets(projectId: Int64, viewId: Int64, page: Int = 1, perPage: Int = 50) -> Endpoint {
-        Endpoint(path: "/api/v1/projects/\(projectId)/views/\(viewId)/tasks", queryItems: [
+        Endpoint(api: "/projects/\(projectId)/views/\(viewId)/tasks", queryItems: [
             URLQueryItem(name: "page", value: "\(page)"),
             URLQueryItem(name: "per_page", value: "\(perPage)"),
         ])
@@ -104,24 +111,24 @@ struct Endpoint {
     /// Moves a task into a bucket. Vikunja uses POST with a body of `{ "task_id": <id> }`.
     static func moveTaskToBucket(projectId: Int64, viewId: Int64, bucketId: Int64) -> Endpoint {
         Endpoint(
-            path: "/api/v1/projects/\(projectId)/views/\(viewId)/buckets/\(bucketId)/tasks",
+            api: "/projects/\(projectId)/views/\(viewId)/buckets/\(bucketId)/tasks",
             method: .POST
         )
     }
 
     /// Creates a project. Vikunja uses PUT (not POST) for creation.
     static func createProject() -> Endpoint {
-        Endpoint(path: "/api/v1/projects", method: .PUT)
+        Endpoint(api: "/projects", method: .PUT)
     }
 
     /// Updates a project (title, description, colour, favourite, archived).
     static func updateProject(id: Int64) -> Endpoint {
-        Endpoint(path: "/api/v1/projects/\(id)", method: .POST)
+        Endpoint(api: "/projects/\(id)", method: .POST)
     }
 
     /// Deletes a project. Vikunja cascades this to all tasks and descendant projects.
     static func deleteProject(id: Int64) -> Endpoint {
-        Endpoint(path: "/api/v1/projects/\(id)", method: .DELETE)
+        Endpoint(api: "/projects/\(id)", method: .DELETE)
     }
 
     // MARK: - Tasks
@@ -154,11 +161,11 @@ struct Endpoint {
         // Vikunja (2.x) populates `related_tasks` in list responses anyway,
         // but versions that gate it behind `expand` need this to be explicit.
         items.append(URLQueryItem(name: "expand", value: "subtasks"))
-        return Endpoint(path: "/api/v1/tasks", queryItems: items)
+        return Endpoint(api: "/tasks", queryItems: items)
     }
 
     static func projectTasks(projectId: Int64, viewId: Int64, page: Int = 1, perPage: Int = 50) -> Endpoint {
-        Endpoint(path: "/api/v1/projects/\(projectId)/views/\(viewId)/tasks", queryItems: [
+        Endpoint(api: "/projects/\(projectId)/views/\(viewId)/tasks", queryItems: [
             URLQueryItem(name: "page", value: "\(page)"),
             URLQueryItem(name: "per_page", value: "\(perPage)"),
             URLQueryItem(name: "expand", value: "subtasks"),
@@ -166,19 +173,19 @@ struct Endpoint {
     }
 
     static func createTask(projectId: Int64) -> Endpoint {
-        Endpoint(path: "/api/v1/projects/\(projectId)/tasks", method: .PUT)
+        Endpoint(api: "/projects/\(projectId)/tasks", method: .PUT)
     }
 
     static func updateTask(id: Int64) -> Endpoint {
-        Endpoint(path: "/api/v1/tasks/\(id)", method: .POST)
+        Endpoint(api: "/tasks/\(id)", method: .POST)
     }
 
     static func deleteTask(id: Int64) -> Endpoint {
-        Endpoint(path: "/api/v1/tasks/\(id)", method: .DELETE)
+        Endpoint(api: "/tasks/\(id)", method: .DELETE)
     }
 
     static func task(id: Int64) -> Endpoint {
-        Endpoint(path: "/api/v1/tasks/\(id)")
+        Endpoint(api: "/tasks/\(id)")
     }
 
     // MARK: - Task Relations
@@ -188,13 +195,13 @@ struct Endpoint {
     /// The inverse relation (e.g. `parenttask` on the other task when creating
     /// a `subtask`) is created server-side automatically.
     static func createTaskRelation(taskId: Int64) -> Endpoint {
-        Endpoint(path: "/api/v1/tasks/\(taskId)/relations", method: .PUT)
+        Endpoint(api: "/tasks/\(taskId)/relations", method: .PUT)
     }
 
     /// Removes a relation; the server also removes the inverse relation from
     /// the other task.
     static func deleteTaskRelation(taskId: Int64, relationKind: String, otherTaskId: Int64) -> Endpoint {
-        Endpoint(path: "/api/v1/tasks/\(taskId)/relations/\(relationKind)/\(otherTaskId)", method: .DELETE)
+        Endpoint(api: "/tasks/\(taskId)/relations/\(relationKind)/\(otherTaskId)", method: .DELETE)
     }
 
     // MARK: - Task Assignees
@@ -203,13 +210,13 @@ struct Endpoint {
     /// `{ "assignees": [{ "id": <userId> }] }`; an empty list unassigns all.
     /// Vikunja answers 7003 when a user cannot see the task's project.
     static func setTaskAssignees(taskId: Int64) -> Endpoint {
-        Endpoint(path: "/api/v1/tasks/\(taskId)/assignees/bulk", method: .POST)
+        Endpoint(api: "/tasks/\(taskId)/assignees/bulk", method: .POST)
     }
 
     // MARK: - Labels
 
     static func labels(page: Int = 1, perPage: Int = 50) -> Endpoint {
-        Endpoint(path: "/api/v1/labels", queryItems: [
+        Endpoint(api: "/labels", queryItems: [
             URLQueryItem(name: "page", value: "\(page)"),
             URLQueryItem(name: "per_page", value: "\(perPage)"),
         ])
@@ -217,36 +224,36 @@ struct Endpoint {
 
     /// Creates a label. Vikunja uses PUT (not POST) for creation.
     static func createLabel() -> Endpoint {
-        Endpoint(path: "/api/v1/labels", method: .PUT)
+        Endpoint(api: "/labels", method: .PUT)
     }
 
     /// Associates a label with a task. Body: `{ "label_id": <id> }`.
     static func addLabelToTask(taskId: Int64) -> Endpoint {
-        Endpoint(path: "/api/v1/tasks/\(taskId)/labels", method: .PUT)
+        Endpoint(api: "/tasks/\(taskId)/labels", method: .PUT)
     }
 
     /// Removes a label association from a task.
     static func removeLabelFromTask(taskId: Int64, labelId: Int64) -> Endpoint {
-        Endpoint(path: "/api/v1/tasks/\(taskId)/labels/\(labelId)", method: .DELETE)
+        Endpoint(api: "/tasks/\(taskId)/labels/\(labelId)", method: .DELETE)
     }
 
     // MARK: - Notifications
 
     static func notifications(page: Int = 1) -> Endpoint {
-        Endpoint(path: "/api/v1/notifications", queryItems: [
+        Endpoint(api: "/notifications", queryItems: [
             URLQueryItem(name: "page", value: "\(page)"),
         ])
     }
 
     static func markNotificationRead(id: Int64) -> Endpoint {
-        Endpoint(path: "/api/v1/notifications/\(id)", method: .POST)
+        Endpoint(api: "/notifications/\(id)", method: .POST)
     }
 
-    static let markAllNotificationsRead = Endpoint(path: "/api/v1/notifications", method: .POST)
+    static let markAllNotificationsRead = Endpoint(api: "/notifications", method: .POST)
 
     // MARK: - Task Position
 
     static func updateTaskPosition(taskId: Int64) -> Endpoint {
-        Endpoint(path: "/api/v1/tasks/\(taskId)/position", method: .POST)
+        Endpoint(api: "/tasks/\(taskId)/position", method: .POST)
     }
 }

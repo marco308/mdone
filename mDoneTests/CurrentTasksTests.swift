@@ -101,7 +101,7 @@ final class CurrentTasksTests: XCTestCase {
         await appState.toggleCurrent(task)
 
         XCTAssertTrue(appState.isCurrent(appState.tasks[0]))
-        XCTAssertEqual(MockURLProtocol.capturedRequests.last?.url?.path, "/api/v1/tasks/1/labels")
+        XCTAssertEqual(MockURLProtocol.capturedRequests.last?.url?.path, VikunjaAPI.path("/tasks/1/labels"))
         XCTAssertEqual(MockURLProtocol.capturedRequests.last?.httpMethod, "PUT")
     }
 
@@ -148,7 +148,7 @@ final class CurrentTasksTests: XCTestCase {
         appState.tasks = [task]
 
         MockURLProtocol.requestHandler = { request in
-            if request.url?.path == "/api/v1/labels" {
+            if request.url?.path == VikunjaAPI.path("/labels") {
                 let json = #"{"id": 9, "title": "Current"}"#.data(using: .utf8)!
                 return (MockURLProtocol.makeResponse(statusCode: 201, url: request.url), json)
             }
