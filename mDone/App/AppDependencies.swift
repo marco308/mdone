@@ -10,11 +10,8 @@ struct AppDependencies {
     let storeRecovery: StoreRecovery
 
     /// True when the app has been launched only to host the unit-test bundle.
-    ///
-    /// `XCTestConfigurationFilePath` is set in the host process for a unit-test
-    /// run and not for a UI-test run, where the app is launched normally by a
-    /// separate runner, so this leaves `mDoneUITests` on the real launch path.
-    static let isHostingUnitTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    /// See `StorageScope.isHostingUnitTests` for how that is detected.
+    static let isHostingUnitTests = StorageScope.isHostingUnitTests
 
     init() {
         // Hosting the unit tests means doing none of this. They build their own

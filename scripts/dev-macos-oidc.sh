@@ -6,11 +6,10 @@
 #   ./scripts/dev-macos-oidc.sh            build and launch
 #   ./scripts/dev-macos-oidc.sh --cleanup  quit it and remove every trace
 #
-# Why the isolation matters: the normal macOS build shares bundle identifier
-# com.mdone.app with the copy in /Applications, so it reads the same keychain
-# and the same sandbox container. Running it would sign you straight into your
-# real server without ever showing the setup screen, and signing in to a test
-# server would overwrite the credentials your real app is using.
+# Why a throwaway identity: a normal Debug build is mDone Dev
+# (com.mdone.app.dev), separate from the copy in /Applications but still
+# holding whatever login you last gave it, so it may skip the setup screen this
+# flow needs to start from.
 #
 # Overriding PRODUCT_BUNDLE_IDENTIFIER gives the build its own keychain access
 # group and its own container, so nothing it does can touch the real app.

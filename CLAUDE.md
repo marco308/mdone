@@ -22,6 +22,12 @@ The iOS and macOS app targets compile the **same** `mDone/` + `mDoneShared/` sou
 
 `project.yml` pins a few settings that XcodeGen 2.45.4 stopped emitting (`PRODUCT_NAME`, `ENABLE_TESTABILITY` for Debug, `SDKROOT` for the iOS app). Do not remove them: builds and `@testable import mDone` break without them. The comments in the file explain each one.
 
+### Dev builds and tests are isolated from the installed app
+
+Debug builds are a separate app, **mDone Dev** (`com.mdone.app.dev`, app group `group.com.mdone.app.dev`), so they never share a container, keychain item or widget with the App Store or TestFlight copy. Release is still `com.mdone.app`. The identity is three settings in `project.yml` (`MDONE_BUNDLE_ID`, `MDONE_APP_GROUP`, `MDONE_DISPLAY_NAME`); the entitlements files reference `$(MDONE_APP_GROUP)`, and `StorageScope.appGroupID` in `mDoneShared/SharedConstants.swift` must match it.
+
+Unit tests additionally get scratch stores from `StorageScope`: the server URL, the app group defaults and the keychain accounts are all redirected in the test host and emptied at the start of each run. Reach credentials and shared state through `AuthService`, `SharedTokenStore` and `SharedKeys.sharedDefaults`, never `UserDefaults.standard` or a raw keychain query, or a test will leak into the dev app.
+
 ### Local dev server
 
 Never develop against a real Vikunja. Bring up a throwaway one on `http://localhost:3456`:

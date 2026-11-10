@@ -5,22 +5,36 @@ actor AuthService {
     static let shared = AuthService()
 
     private let serverURLKey = "com.mdone.serverURL"
-    private let tokenKeychainKey = "com.mdone.apiToken"
-    private let refreshTokenKeychainKey = "com.mdone.refreshToken"
+    private let tokenKeychainKey = StorageScope.keychainAccount("com.mdone.apiToken")
+    private let refreshTokenKeychainKey = StorageScope.keychainAccount("com.mdone.refreshToken")
+
+    /// The server URL lives here rather than in `UserDefaults.standard`
+    /// directly so that unit tests get a scratch copy (see `StorageScope`).
+    nonisolated private var defaults: UserDefaults {
+        StorageScope.appDefaults
+    }
+
+    init() {
+        // The keychain outlives a test process, unlike the scratch defaults,
+        // so a test run starts by clearing what the last one left.
+        if StorageScope.isHostingUnitTests {
+            clearSession()
+        }
+    }
 
     // MARK: - Server URL (UserDefaults)
 
     nonisolated func getServerURL() -> String? {
-        UserDefaults.standard.string(forKey: serverURLKey)
+        defaults.string(forKey: serverURLKey)
     }
 
     nonisolated func saveServerURL(_ url: String) {
-        UserDefaults.standard.set(url, forKey: serverURLKey)
+        defaults.set(url, forKey: serverURLKey)
         SharedKeys.sharedDefaults.set(url, forKey: SharedKeys.serverURLKey)
     }
 
     nonisolated func clearServerURL() {
-        UserDefaults.standard.removeObject(forKey: serverURLKey)
+        defaults.removeObject(forKey: serverURLKey)
         SharedKeys.sharedDefaults.removeObject(forKey: SharedKeys.serverURLKey)
     }
 

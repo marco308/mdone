@@ -28,8 +28,20 @@ settings:
     DEVELOPMENT_TEAM: "Z62E7MGREE"
     CODE_SIGN_IDENTITY: "Apple Development"
     CODE_SIGN_STYLE: Automatic
+    # The identity of the app. Debug overrides all three below, so a build run
+    # from Xcode or xcodebuild is a separate app, "mDone Dev", with its own
+    # container, keychain items, app group and widgets. It can be installed
+    # next to the App Store or TestFlight copy and neither sees the other's
+    # login. Release, which is what gets archived, is unchanged.
+    # MDONE_APP_GROUP must match StorageScope.appGroupID in mDoneShared.
+    MDONE_BUNDLE_ID: com.mdone.app
+    MDONE_APP_GROUP: group.com.mdone.app
+    MDONE_DISPLAY_NAME: mDone
   configs:
     Debug:
+      MDONE_BUNDLE_ID: com.mdone.app.dev
+      MDONE_APP_GROUP: group.com.mdone.app.dev
+      MDONE_DISPLAY_NAME: mDone Dev
       # Same XcodeGen 2.45.4 regression: the historical Debug default of
       # ENABLE_TESTABILITY=YES is no longer emitted, so the app module is
       # built without -enable-testing and every `@testable import mDone`
@@ -51,7 +63,7 @@ targets:
       base:
         INFOPLIST_FILE: mDone/Info.plist
         CODE_SIGN_ENTITLEMENTS: mDone/mDone.entitlements
-        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app
+        PRODUCT_BUNDLE_IDENTIFIER: "$(MDONE_BUNDLE_ID)"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_EMIT_LOC_STRINGS: "YES"
         # XcodeGen 2.45.4 stopped emitting an iOS SDKROOT for app targets
@@ -91,7 +103,7 @@ targets:
       base:
         INFOPLIST_FILE: mDone/Info.plist
         CODE_SIGN_ENTITLEMENTS: mDone/mDone-macOS.entitlements
-        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app
+        PRODUCT_BUNDLE_IDENTIFIER: "$(MDONE_BUNDLE_ID)"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_EMIT_LOC_STRINGS: "YES"
         SUPPORTS_MACCATALYST: "NO"
@@ -162,7 +174,7 @@ targets:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: "$(MDONE_BUNDLE_ID).widgets"
         CODE_SIGN_ENTITLEMENTS: mDoneWidgets/mDoneWidgets.entitlements
         # The extension is its own bundle, so it needs its own copy of the
         # catalog and its own extraction pass. See docs/localization.md.
@@ -193,7 +205,7 @@ targets:
       base:
         # Same bundle ID as the iOS extension: the app shares com.mdone.app
         # across platforms (universal purchase), and so do its extensions.
-        PRODUCT_BUNDLE_IDENTIFIER: com.mdone.app.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: "$(MDONE_BUNDLE_ID).widgets"
         CODE_SIGN_ENTITLEMENTS: mDoneMacWidgets/mDoneMacWidgets.entitlements
         SWIFT_EMIT_LOC_STRINGS: "YES"
 
