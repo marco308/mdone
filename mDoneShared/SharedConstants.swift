@@ -86,3 +86,15 @@ enum VikunjaAPI {
         basePath + route
     }
 }
+
+/// The Vikunja REST API the app and its widgets talk to. The version lives
+/// here and nowhere else, so moving to `/api/v2` (#289) is one edit plus
+/// whatever really differs between the two.
+enum VikunjaAPI {
+    static let basePath = "/api/v1"
+
+    /// The full path of an API route: `path("/tasks/1")` is `/api/v1/tasks/1`.
+    static func path(_ route: String) -> String {
+        basePath + route
+    }
+}
