@@ -60,11 +60,6 @@ struct APIError: Decodable {
         case code, message, detail
     }
 
-    init(code: Int? = nil, message: String? = nil) {
-        self.code = code
-        self.message = message
-    }
-
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         code = try container.decodeIfPresent(Int.self, forKey: .code)
