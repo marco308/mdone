@@ -11,7 +11,8 @@ struct VikunjaVersion: Comparable, Equatable, CustomStringConvertible {
     let minor: Int
     let patch: Int
 
-    /// The first release with the v2 API, which a future mDone will need (#289).
+    /// The first release with the v2 API, the oldest server mDone works with
+    /// (#291).
     static let firstWithAPIv2 = VikunjaVersion(major: 2, minor: 4, patch: 0)
 
     init(major: Int, minor: Int, patch: Int) {
@@ -45,14 +46,20 @@ struct VikunjaVersion: Comparable, Equatable, CustomStringConvertible {
     }
 }
 
-/// The wording of the "your server is getting old" notice, shared by the
-/// one-time alert and the row in Settings.
+/// The wording of the "your server is too old" message, shared by the sign-in
+/// error, the alert for someone already signed in, and the row in Settings.
 enum ServerUpdateNotice {
-    static func message(for version: VikunjaVersion) -> String {
+    /// `version` is nil when the server did not report one.
+    static func message(for version: VikunjaVersion?) -> String {
         let required = VikunjaVersion.firstWithAPIv2.description
+        guard let version else {
+            return String(
+                localized: "mDone needs Vikunja \(required) or newer, and this server looks older. Update your server to use mDone with it."
+            )
+        }
         // swiftformat:disable:next wrap
         return String(
-            localized: "Your server runs Vikunja \(version.description). A future version of mDone will need Vikunja \(required) or newer. mDone keeps working for now, but please update your server before then."
+            localized: "mDone needs Vikunja \(required) or newer, and your server runs Vikunja \(version.description). Update your server to use mDone with it."
         )
     }
 }

@@ -35,7 +35,7 @@ final class ProjectServiceTests: XCTestCase {
             XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/projects")) == true)
             XCTAssertEqual(request.httpMethod, "GET")
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
-            return (response, projectsJSON)
+            return (response, MockURLProtocol.page(projectsJSON))
         }
 
         let projects = try await service.fetchProjects()
@@ -52,7 +52,7 @@ final class ProjectServiceTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
-            return (response, "[]".data(using: .utf8)!)
+            return (response, MockURLProtocol.page("[]", totalPages: 0))
         }
 
         let projects = try await service.fetchProjects()
@@ -64,7 +64,11 @@ final class ProjectServiceTests: XCTestCase {
     /// A page of projects with the given ids, plus the `-2` pseudo-project
     /// ("My Open Tasks") that Vikunja appends to *every* page outside the
     /// pagination count. Shape taken from a live v2.5.0 response.
-    private static func projectsPage(ids: ClosedRange<Int>, includePseudo: Bool = true) -> Data {
+    private static func projectsPage(
+        ids: ClosedRange<Int>,
+        includePseudo: Bool = true,
+        totalPages: Int? = 1
+    ) -> Data {
         // `##"…"##`: the payload contains `"#4772FA"`, and the `"#` in that
         // would close a single-hash raw string.
         var objects = ids.map { id in
@@ -75,7 +79,7 @@ final class ProjectServiceTests: XCTestCase {
                 ##"{"id": -2, "title": "My Open Tasks", "hex_color": "", "is_archived": false, "is_favorite": false, "position": 0, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"}"##
             )
         }
-        return "[\(objects.joined(separator: ","))]".data(using: .utf8)!
+        return MockURLProtocol.page("[\(objects.joined(separator: ","))]", totalPages: totalPages)
     }
 
     private static func pageParam(of request: URLRequest) -> Int {
@@ -95,13 +99,9 @@ final class ProjectServiceTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { request in
             let body = Self.pageParam(of: request) == 1
-                ? Self.projectsPage(ids: 1 ... 50)
-                : Self.projectsPage(ids: 51 ... 65)
-            let response = MockURLProtocol.makeResponse(
-                statusCode: 200,
-                url: request.url,
-                headers: ["x-pagination-total-pages": "2"]
-            )
+                ? Self.projectsPage(ids: 1 ... 50, totalPages: 2)
+                : Self.projectsPage(ids: 51 ... 65, totalPages: 2)
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             return (response, body)
         }
 
@@ -122,13 +122,9 @@ final class ProjectServiceTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { request in
             let body = Self.pageParam(of: request) == 1
-                ? Self.projectsPage(ids: 1 ... 3)
-                : Self.projectsPage(ids: 4 ... 6)
-            let response = MockURLProtocol.makeResponse(
-                statusCode: 200,
-                url: request.url,
-                headers: ["x-pagination-total-pages": "3"]
-            )
+                ? Self.projectsPage(ids: 1 ... 3, totalPages: 2)
+                : Self.projectsPage(ids: 4 ... 6, totalPages: 2)
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             return (response, body)
         }
 
@@ -138,14 +134,17 @@ final class ProjectServiceTests: XCTestCase {
         XCTAssertEqual(Set(projects.map(\.id)).count, projects.count, "duplicate ids break SwiftUI ForEach")
     }
 
-    /// Servers (or proxies) that drop the pagination header must not send us
-    /// into a request loop: one page and stop, which is the old behaviour.
-    func testFetchProjectsStopsAtOnePageWhenHeaderIsMissing() async throws {
+    /// An envelope with no `total_pages` must not send us into a request
+    /// loop: one page and stop.
+    func testFetchProjectsStopsAtOnePageWhenTotalPagesIsMissing() async throws {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
         MockURLProtocol.requestHandler = { request in
-            (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), Self.projectsPage(ids: 1 ... 3))
+            (
+                MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
+                Self.projectsPage(ids: 1 ... 3, totalPages: nil)
+            )
         }
 
         let projects = try await service.fetchProjects()
@@ -159,12 +158,8 @@ final class ProjectServiceTests: XCTestCase {
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
         MockURLProtocol.requestHandler = { request in
-            let response = MockURLProtocol.makeResponse(
-                statusCode: 200,
-                url: request.url,
-                headers: ["x-pagination-total-pages": "2"]
-            )
-            return (response, Self.projectsPage(ids: 1 ... 2, includePseudo: false))
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
+            return (response, Self.projectsPage(ids: 1 ... 2, includePseudo: false, totalPages: 2))
         }
 
         _ = try await service.fetchProjects(includeArchived: true)
@@ -213,7 +208,7 @@ final class ProjectServiceTests: XCTestCase {
         MockURLProtocol.requestHandler = { request in
             XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/projects/5/views")) == true)
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
-            return (response, viewsJSON)
+            return (response, MockURLProtocol.page(viewsJSON))
         }
 
         let views = try await service.fetchProjectViews(projectId: 5)
@@ -338,7 +333,7 @@ final class ProjectServiceTests: XCTestCase {
 
     // MARK: - Project Mutations
 
-    func testCreateProjectSendsPutRequest() async throws {
+    func testCreateProjectSendsPostRequest() async throws {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
@@ -347,7 +342,7 @@ final class ProjectServiceTests: XCTestCase {
         """.data(using: .utf8)!
 
         MockURLProtocol.requestHandler = { request in
-            XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertEqual(request.httpMethod, "POST")
             XCTAssertTrue(request.url?.path.hasSuffix(VikunjaAPI.path("/projects")) == true)
             return (MockURLProtocol.makeResponse(statusCode: 201, url: request.url), responseJSON)
         }
@@ -359,7 +354,7 @@ final class ProjectServiceTests: XCTestCase {
         XCTAssertEqual(project.title, "Marketing")
     }
 
-    func testUpdateProjectSendsPostRequest() async throws {
+    func testUpdateProjectSendsPutRequest() async throws {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
@@ -368,7 +363,7 @@ final class ProjectServiceTests: XCTestCase {
         """.data(using: .utf8)!
 
         MockURLProtocol.requestHandler = { request in
-            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.httpMethod, "PUT")
             XCTAssertTrue(request.url?.path.hasSuffix(VikunjaAPI.path("/projects/7")) == true)
             return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), responseJSON)
         }
@@ -405,7 +400,7 @@ final class ProjectServiceTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertEqual(request.url?.query?.contains("is_archived=true"), true)
-            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), "[]".data(using: .utf8)!)
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), MockURLProtocol.page("[]", totalPages: 0))
         }
 
         _ = try await service.fetchProjects(includeArchived: true)
@@ -417,7 +412,7 @@ final class ProjectServiceTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertFalse(request.url?.query?.contains("is_archived") ?? false)
-            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), "[]".data(using: .utf8)!)
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), MockURLProtocol.page("[]", totalPages: 0))
         }
 
         _ = try await service.fetchProjects()

@@ -23,7 +23,7 @@ enum DefaultProjectPreference {
 
     /// The projects a task can actually be created in. Vikunja hands back its
     /// saved filters and pseudo-projects ("My Open Tasks") alongside the real
-    /// ones with negative ids, and `PUT /projects/-2/tasks` is not a thing, so
+    /// ones with negative ids, and `POST /projects/-2/tasks` is not a thing, so
     /// they can never be the default.
     static func selectable(from projects: [Project]) -> [Project] {
         projects.filter { $0.id > 0 }

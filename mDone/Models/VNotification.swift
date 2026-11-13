@@ -84,7 +84,7 @@ struct VNotification: Codable, Identifiable {
     }
 }
 
-/// Body for `POST /notifications` and `POST /notifications/{id}`. Vikunja takes the
+/// Body for `POST /notifications` and `PUT /notifications/{id}`. Vikunja takes the
 /// read state from this flag and writes `read_at` from it, so it has to be sent.
 struct MarkNotificationReadRequest: Encodable {
     let read: Bool

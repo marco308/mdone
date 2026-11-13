@@ -118,7 +118,7 @@ enum OIDCLogin {
     /// app supplies everything else.
     ///
     /// - Parameters:
-    ///   - provider: as advertised by `GET /api/v1/info`.
+    ///   - provider: as advertised by `GET /info`.
     ///   - redirectURI: must match the value later sent to Vikunja's callback
     ///     byte for byte, or the token exchange fails with `invalid_grant`.
     ///   - state: from `generateState()`, compared on the way back.

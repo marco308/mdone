@@ -6,12 +6,13 @@ import XCTest
 /// server-supplied value into its path has to encode it itself.
 ///
 /// This matters most for the OIDC callback, which is the request carrying the
-/// authorization code.
+/// authorization code. It is also the one request still sent to the v1 API,
+/// because v2 has no OIDC callback, so its paths are built with `legacyPath`.
 final class EndpointPathEncodingTests: XCTestCase {
     func testOrdinaryProviderKeyIsUnchanged() {
         // The common case: Vikunja lowercases the provider name.
-        XCTAssertEqual(Endpoint.openIDCallback(provider: "authelia").path, VikunjaAPI.path("/auth/openid/authelia/callback"))
-        XCTAssertEqual(Endpoint.openIDCallback(provider: "keycloak-1").path, VikunjaAPI.path("/auth/openid/keycloak-1/callback"))
+        XCTAssertEqual(Endpoint.openIDCallback(provider: "authelia").path, VikunjaAPI.legacyPath("/auth/openid/authelia/callback"))
+        XCTAssertEqual(Endpoint.openIDCallback(provider: "keycloak-1").path, VikunjaAPI.legacyPath("/auth/openid/keycloak-1/callback"))
     }
 
     func testSlashCannotEscapeThePathSegment() {
@@ -20,7 +21,7 @@ final class EndpointPathEncodingTests: XCTestCase {
         let path = Endpoint.openIDCallback(provider: "a/../../evil").path
         XCTAssertFalse(path.contains("a/"))
         XCTAssertFalse(path.contains(".."))
-        XCTAssertEqual(path, VikunjaAPI.path("/auth/openid/a%2F%2E%2E%2F%2E%2E%2Fevil/callback"))
+        XCTAssertEqual(path, VikunjaAPI.legacyPath("/auth/openid/a%2F%2E%2E%2F%2E%2E%2Fevil/callback"))
     }
 
     func testDotsAreEncodedSoTraversalCannotSurvive() {

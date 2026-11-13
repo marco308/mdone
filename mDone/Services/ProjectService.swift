@@ -33,34 +33,31 @@ actor ProjectService {
     }
 
     func fetchProjectViews(projectId: Int64) async throws -> [ProjectView] {
-        try await apiClient.fetch(Endpoint.projectViews(projectId: projectId))
+        try await apiClient.fetchList(Endpoint.projectViews(projectId: projectId))
     }
 
     /// Fetches the kanban buckets (columns) for a project view, each with its
-    /// embedded tasks. Uses the view *tasks* endpoint: for a kanban view it
-    /// returns bucket objects with tasks inside (the `/buckets` endpoint stopped
-    /// embedding tasks in Vikunja v0.24).
+    /// embedded tasks.
     ///
     /// `page`/`per_page` paginate the tasks *inside* each bucket, not the
     /// buckets themselves: every page repeats all the buckets, each carrying
     /// the next slice of its tasks. That makes `fetchAllPages` the wrong tool
-    /// here, because `x-pagination-total-pages` counts the buckets and so
-    /// reads `1` however many pages of tasks there are. Following it stopped
-    /// after one request and capped every column at `per_page` cards, with
+    /// here, because the envelope counts buckets and carries no page count at
+    /// all. Reading one page capped every column at `per_page` cards, with
     /// nothing on the board to say cards were missing (issue #141).
     ///
     /// So page on the buckets' own `count` instead, and stop as soon as a page
     /// brings nothing new. That second condition is what protects against
     /// servers that omit `count` or ignore `page` entirely.
     func fetchBuckets(projectId: Int64, viewId: Int64, perPage: Int = 100) async throws -> [Bucket] {
-        var buckets: [Bucket] = try await apiClient.fetch(
+        var buckets: [Bucket] = try await apiClient.fetchList(
             Endpoint.kanbanBuckets(projectId: projectId, viewId: viewId, page: 1, perPage: perPage)
         )
         var seenTaskIds = Set(buckets.flatMap { ($0.tasks ?? []).map(\.id) })
         var page = 2
 
         while Self.hasIncompleteBucket(buckets) {
-            let nextPage: [Bucket] = try await apiClient.fetch(
+            let nextPage: [Bucket] = try await apiClient.fetchList(
                 Endpoint.kanbanBuckets(projectId: projectId, viewId: viewId, page: page, perPage: perPage)
             )
 

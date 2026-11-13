@@ -244,14 +244,17 @@ final class APIClientRefreshTests: XCTestCase {
                 cookie: nil
             )
             if path.hasSuffix("/projects") {
-                return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), Data("[]".utf8))
+                return (
+                    MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
+                    MockURLProtocol.page("[]", totalPages: 0)
+                )
             }
             // The token was created without the notifications permission.
             return (MockURLProtocol.makeResponse(statusCode: 401, url: request.url), Data())
         }
 
         do {
-            let _: [VNotification] = try await client.fetch(Endpoint.notifications())
+            let _: [VNotification] = try await client.fetchList(Endpoint.notifications())
             XCTFail("Expected missingPermission")
         } catch let error as NetworkError {
             guard case .missingPermission = error else {
@@ -288,7 +291,7 @@ final class APIClientRefreshTests: XCTestCase {
         }
 
         do {
-            let _: [VNotification] = try await client.fetch(Endpoint.notifications())
+            let _: [VNotification] = try await client.fetchList(Endpoint.notifications())
             XCTFail("Expected unauthorized")
         } catch let error as NetworkError {
             guard case .unauthorized = error else {
@@ -346,7 +349,7 @@ final class APIClientRefreshTests: XCTestCase {
         }
 
         do {
-            let _: [VNotification] = try await client.fetch(Endpoint.notifications())
+            let _: [VNotification] = try await client.fetchList(Endpoint.notifications())
             XCTFail("Expected a connectivity error")
         } catch let error as NetworkError {
             XCTAssertTrue(error.isConnectivityFailure, "Expected a connectivity error, got \(error)")
@@ -380,7 +383,7 @@ final class APIClientRefreshTests: XCTestCase {
         let outcomes = OutcomeBox()
         let firstDone = Task {
             do {
-                let _: [VNotification] = try await client.fetch(Endpoint.notifications())
+                let _: [VNotification] = try await client.fetchList(Endpoint.notifications())
                 outcomes.append(nil)
             } catch {
                 outcomes.append(error)
@@ -388,7 +391,7 @@ final class APIClientRefreshTests: XCTestCase {
         }
         let secondDone = Task {
             do {
-                let _: [VNotification] = try await client.fetch(Endpoint.notifications())
+                let _: [VNotification] = try await client.fetchList(Endpoint.notifications())
                 outcomes.append(nil)
             } catch {
                 outcomes.append(error)
@@ -403,7 +406,7 @@ final class APIClientRefreshTests: XCTestCase {
         // testing a race rather than the client.
         let secondJoined = await waitUntil { await client.tokenProbeWaiterCount == 1 }
         XCTAssertTrue(secondJoined, "The second 401 should be parked on the first caller's probe")
-        probeGate.releaseAll(statusCode: 200, data: Data("[]".utf8))
+        probeGate.releaseAll(statusCode: 200, data: MockURLProtocol.page("[]", totalPages: 0))
         await firstDone.value
         await secondDone.value
 

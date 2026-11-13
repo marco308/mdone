@@ -64,7 +64,7 @@ final class TaskReorderTests: XCTestCase {
                 "project_id": projectId, "position": Double(index + 1) * 1000,
             ]
         }
-        return (try? JSONSerialization.data(withJSONObject: objects)) ?? Data()
+        return MockURLProtocol.page(objects)
     }
 
     private static func body(of request: URLRequest) throws -> [String: Any] {
@@ -81,7 +81,7 @@ final class TaskReorderTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
-            if request.httpMethod == "POST" {
+            if request.httpMethod == "PUT" {
                 return (response, Data())
             }
             // The refetch answers with the same order the user made.
@@ -91,9 +91,9 @@ final class TaskReorderTests: XCTestCase {
         let ok = await state.moveTask(moved, toPosition: 50, newOrder: newOrder)
 
         XCTAssertTrue(ok)
-        let post = try XCTUnwrap(MockURLProtocol.capturedRequests.first { $0.httpMethod == "POST" })
-        XCTAssertEqual(post.url?.path, VikunjaAPI.path("/tasks/3/position"))
-        let body = try Self.body(of: post)
+        let put = try XCTUnwrap(MockURLProtocol.capturedRequests.first { $0.httpMethod == "PUT" })
+        XCTAssertEqual(put.url?.path, VikunjaAPI.path("/tasks/3/position"))
+        let body = try Self.body(of: put)
         XCTAssertEqual(body["position"] as? Double, 50)
         XCTAssertEqual(body["project_view_id"] as? Int, 100, "positions belong to the list view")
         XCTAssertEqual(state.tasksForProject(7).map(\.id), [3, 1, 2])
@@ -107,7 +107,7 @@ final class TaskReorderTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
-            if request.httpMethod == "POST" {
+            if request.httpMethod == "PUT" {
                 return (response, Data())
             }
             return (response, Self.viewTasksJSON(ids: [1, 3, 2]))
@@ -135,7 +135,7 @@ final class TaskReorderTests: XCTestCase {
         XCTAssertFalse(ok)
         XCTAssertEqual(state.tasksForProject(7).map(\.id), [1, 2, 3], "the drop must not stick")
         XCTAssertNotNil(state.errorMessage)
-        XCTAssertTrue(MockURLProtocol.capturedRequests.allSatisfy { $0.httpMethod == "POST" }, "no refetch on failure")
+        XCTAssertTrue(MockURLProtocol.capturedRequests.allSatisfy { $0.httpMethod == "PUT" }, "no refetch on failure")
     }
 
     func testMoveTaskWithoutAListViewDoesNothing() async {
@@ -209,7 +209,7 @@ final class TaskReorderTests: XCTestCase {
             .data(using: .utf8)!
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
-            if request.httpMethod == "POST" {
+            if request.httpMethod == "PUT" {
                 return (response, movedJSON)
             }
             // The server put the moved task first in Home's list view.
@@ -242,16 +242,13 @@ final class TaskReorderTests: XCTestCase {
         state.projectTaskCache[8] = [homeTask]
         state.projectTaskCache[99] = [task(50, position: 1)] // a project deleted elsewhere
 
-        let json: (Any) -> Data = { (try? JSONSerialization.data(withJSONObject: $0)) ?? Data() }
-        let projectsJSON = json([
+        let projectsJSON = MockURLProtocol.page([
             ["id": 7, "title": "Work", "views": [["id": 100, "title": "List", "project_id": 7, "view_kind": "list"]]],
             ["id": 8, "title": "Home", "views": [["id": 300, "title": "List", "project_id": 8, "view_kind": "list"]]],
         ])
         MockURLProtocol.requestHandler = { request in
             let path = request.url?.path ?? ""
-            let response = MockURLProtocol.makeResponse(
-                statusCode: 200, url: request.url, headers: ["x-pagination-total-pages": "1"]
-            )
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             if path.hasSuffix("/views/300/tasks") {
                 // Task 1 was moved into Home (by a replayed edit or another client) and sits first.
                 return (response, Self.viewTasksJSON(ids: [1, 9], projectId: 8))
@@ -263,7 +260,7 @@ final class TaskReorderTests: XCTestCase {
                 return (response, projectsJSON)
             }
             if path.hasSuffix("/labels") {
-                return (response, json([]))
+                return (response, MockURLProtocol.page([Any]()))
             }
             // Everything the server holds, with task 1 already in Home.
             return (response, Self.viewTasksJSON(ids: [1, 9], projectId: 8))
@@ -292,7 +289,7 @@ final class TaskReorderTests: XCTestCase {
 
         await state.updateTask(id: 1, request: TaskUpdateRequest(title: "Renamed"))
 
-        XCTAssertEqual(MockURLProtocol.capturedRequests.map(\.httpMethod), ["POST"])
+        XCTAssertEqual(MockURLProtocol.capturedRequests.map(\.httpMethod), ["PUT"])
         XCTAssertEqual(state.tasks.first { $0.id == 1 }?.title, "Renamed")
     }
 
@@ -306,10 +303,8 @@ final class TaskReorderTests: XCTestCase {
         let createdJSON = #"{"id": 4, "title": "New", "done": false, "priority": 0, "project_id": 7}"#
             .data(using: .utf8)!
         MockURLProtocol.requestHandler = { request in
-            let response = MockURLProtocol.makeResponse(
-                statusCode: 200, url: request.url, headers: ["x-pagination-total-pages": "1"]
-            )
-            if request.httpMethod == "PUT" {
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
+            if request.httpMethod == "POST" {
                 return (response, createdJSON)
             }
             return (response, Self.viewTasksJSON(ids: [4, 1, 2, 3]))
@@ -336,7 +331,7 @@ final class TaskReorderTests: XCTestCase {
 
         await state.createTask(title: "New", projectId: 7)
 
-        XCTAssertEqual(MockURLProtocol.capturedRequests.map(\.httpMethod), ["PUT"])
+        XCTAssertEqual(MockURLProtocol.capturedRequests.map(\.httpMethod), ["POST"])
     }
 
     // MARK: - Board placement

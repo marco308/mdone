@@ -20,9 +20,9 @@ final class LabelServiceTests: XCTestCase {
 
     // MARK: - fetchLabels (issue #139)
 
-    private static func labelsPage(ids: ClosedRange<Int>) -> Data {
+    private static func labelsPage(ids: ClosedRange<Int>, totalPages: Int? = 1) -> Data {
         let objects = ids.map { #"{"id": \#($0), "title": "Label \#($0)", "hex_color": "1a8cff"}"# }
-        return "[\(objects.joined(separator: ","))]".data(using: .utf8)!
+        return MockURLProtocol.page("[\(objects.joined(separator: ","))]", totalPages: totalPages)
     }
 
     func testFetchLabelsRequestsLabelsEndpoint() async throws {
@@ -47,12 +47,13 @@ final class LabelServiceTests: XCTestCase {
         MockURLProtocol.requestHandler = { request in
             let items = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems
             let page = Int(items?.first(where: { $0.name == "page" })?.value ?? "1") ?? 1
-            let response = MockURLProtocol.makeResponse(
-                statusCode: 200,
-                url: request.url,
-                headers: ["x-pagination-total-pages": "2"]
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
+            return (
+                response,
+                page == 1
+                    ? Self.labelsPage(ids: 1 ... 50, totalPages: 2)
+                    : Self.labelsPage(ids: 51 ... 63, totalPages: 2)
             )
-            return (response, page == 1 ? Self.labelsPage(ids: 1 ... 50) : Self.labelsPage(ids: 51 ... 63))
         }
 
         let labels = try await service.fetchLabels()
@@ -62,7 +63,7 @@ final class LabelServiceTests: XCTestCase {
         XCTAssertTrue(labels.contains { $0.id == 63 }, "labels on the last page must survive")
     }
 
-    func testCreateLabelPutsToLabelsAndDecodes() async throws {
+    func testCreateLabelPostsToLabelsAndDecodes() async throws {
         let service = await makeService()
         MockURLProtocol.requestHandler = { request in
             let json = #"{"id": 7, "title": "Current", "hex_color": "1a8cff"}"#.data(using: .utf8)!
@@ -75,10 +76,10 @@ final class LabelServiceTests: XCTestCase {
         XCTAssertEqual(label.title, "Current")
         let request = try XCTUnwrap(MockURLProtocol.capturedRequests.first)
         XCTAssertEqual(request.url?.path, VikunjaAPI.path("/labels"))
-        XCTAssertEqual(request.httpMethod, "PUT")
+        XCTAssertEqual(request.httpMethod, "POST")
     }
 
-    func testAddLabelPutsToTaskLabelsEndpoint() async throws {
+    func testAddLabelPostsToTaskLabelsEndpoint() async throws {
         let service = await makeService()
         MockURLProtocol.requestHandler = { request in
             (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), #"{"label_id": 7}"#.data(using: .utf8)!)
@@ -88,7 +89,7 @@ final class LabelServiceTests: XCTestCase {
 
         let request = try XCTUnwrap(MockURLProtocol.capturedRequests.first)
         XCTAssertEqual(request.url?.path, VikunjaAPI.path("/tasks/42/labels"))
-        XCTAssertEqual(request.httpMethod, "PUT")
+        XCTAssertEqual(request.httpMethod, "POST")
     }
 
     func testRemoveLabelDeletesFromTaskLabelEndpoint() async throws {

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Reads `GET /api/v1/info` from a server the app has no credentials for, so
+/// Reads `GET /info` from a server the app has no credentials for, so
 /// the setup screen can adapt to the auth methods that server actually offers.
 ///
 /// Deliberately does **not** default to `APIClient.shared` the way the other
@@ -19,9 +19,17 @@ actor ServerInfoService {
     /// Fetches the instance info. Throws like any other API call; callers on the
     /// setup screen should treat a failure as "we do not know" and fall back to
     /// `AuthOptions.unknownServer` rather than blocking the user.
+    ///
+    /// A server older than Vikunja 2.4.0 has no v2 API and answers 404, so that
+    /// one case is asked again on v1. The version it reports is what lets the
+    /// app say "update your server" rather than fail on every request (#291).
     func fetch(from serverURL: URL) async throws -> ServerInfo {
         await apiClient.configure(serverURL: serverURL.absoluteString, token: "")
-        return try await apiClient.fetch(Endpoint.info)
+        do {
+            return try await apiClient.fetch(Endpoint.info)
+        } catch let NetworkError.serverError(statusCode, _) where statusCode == 404 {
+            return try await apiClient.fetch(Endpoint.legacyInfo)
+        }
     }
 
     /// `APIClient` stamps its own 20s timeout on every request and retries

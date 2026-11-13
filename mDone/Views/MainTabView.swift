@@ -88,9 +88,9 @@ struct MainTabView: View {
         } message: {
             Text(appState.failedSyncMessages.joined(separator: "\n\n"))
         }
-        // Notice, not an error: a later mDone will need Vikunja's v2 API (#289).
+        // mDone only speaks Vikunja's v2 API, which this server is too old for (#291).
         .alert(
-            "Update your Vikunja server soon",
+            "Update your Vikunja server",
             isPresented: Binding(
                 get: { appState.showServerUpdateNotice },
                 set: {

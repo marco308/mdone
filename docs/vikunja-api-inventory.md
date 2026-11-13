@@ -1,29 +1,114 @@
-# Vikunja v1 REST API -- Complete Inventory
+# Vikunja REST API -- Inventory
 
-> Verified 2026-08-06 against Vikunja **v2.5.0** (released 2026-08-04), from source code (routes.go, models/*.go, events.go) and official documentation.
-> Base path: `/api/v1`
-> Auth: `Authorization: Bearer <token>` (API token or JWT)
-> Pagination headers: `x-pagination-total-pages`, `x-pagination-result-count`
-> Permission header: `x-max-permission` (0=Read, 1=Read&Write, 2=Admin) on single-item responses
+> mDone talks to the **v2** API (`/api/v2`) and needs Vikunja **2.4.0** or newer.
+> The v2 section below was verified 2026-11-13 against Vikunja **v2.4.0** and **v2.8.0**, from each server's
+> own `/api/v2/openapi.json` and by calling every route the app uses.
+> The v1 inventory that follows it was verified 2026-08-06 against v2.5.0 and is kept as the map of what
+> Vikunja offers: v2 does not yet cover everything in it.
+> Auth for both: `Authorization: Bearer <token>` (API token or JWT)
 
 ## API version status
 
-Vikunja ships two parallel HTTP APIs. This document inventories **v1**, which is what mDone uses today.
+Vikunja ships two parallel HTTP APIs.
 
 | API | Base path | Status |
 |-----|-----------|--------|
-| v1 | `/api/v1` | Fully supported, but on a sunset path. What mDone currently calls. |
-| v2 | `/api/v2` | Added in Vikunja 2.4.0 (2026-07-19). Upstream recommends it for new client work. |
+| v1 | `/api/v1` | Still served, on a sunset path. mDone uses it for one request: the OIDC login callback. |
+| v2 | `/api/v2` | Added in Vikunja 2.4.0 (2026-07-19). What mDone calls. |
 
-The v2 API adds structured error responses, `PATCH` for partial updates, and `?format=markdown` to
-exchange rich-text fields as Markdown rather than HTML. It lives in `pkg/routes/api/v2/` upstream and
-is documented separately at `/api/v2/docs` -- it is **not** in `docs.json`, which remains v1-only.
+The prefix is named once, in `VikunjaAPI` (`mDoneShared/SharedConstants.swift`). v2 is documented by
+the server itself at `/api/v2/docs`, with the spec at `/api/v2/openapi.json`. It is **not** in
+`docs.json`, which remains v1-only.
+
+## What mDone calls on v2
+
+### How v2 differs from v1
+
+| Area | v1 | v2 |
+|------|----|----|
+| Create / update | `PUT` / `POST` | `POST` / `PUT` |
+| Partial update | none | `PATCH` (JSON merge patch). Not used yet, see #292. |
+| Lists | bare array, `x-pagination-*` headers | `{items, total, page, per_page, total_pages}` |
+| Errors | `{code, message}` | `application/problem+json`: `{title, status, detail, code}` |
+| Validation failures | 412 | 422, with an `errors` array naming each field |
+| Create / delete status | 200 / 200 | 201 / 204 |
+| Search parameter | `s` | `q` |
+
+Things that did **not** change, each checked on a live server:
+
+- Models, snake_case keys, the zero date (`0001-01-01T00:00:00Z`), Bearer auth and the filter DSL.
+- `PUT /tasks/{id}` replaces the whole task exactly as v1's `POST` did: a field left out of the body
+  is cleared. The merge in `TaskUpdateRequest.preservingExistingValues(from:)` is still needed.
+- A 401 from the auth middleware keeps the old `{code, message}` body, not problem+json.
+  `APIError` reads `detail` and falls back to `message`.
+- TOTP login: a missing or wrong passcode is still 412 with `code` 1017. A wrong password is still
+  403 with `code` 1011.
+- The refresh cookie: `POST /api/v2/login` sets `vikunja_refresh_token` with
+  `Path=/api/v1/user/token/refresh`, and `POST /api/v2/user/token/refresh` accepts it. mDone sends
+  the cookie by hand, so the path attribute does not matter to it.
+- Pseudo-projects (negative ids) are still appended to every page of `/projects` and left out of
+  `total`, so `ProjectService.fetchProjects` still de-duplicates.
+- `items` is `[]` on an empty list in everything tested, but the schema allows `null`, so
+  `ListPage` treats a missing or null `items` as empty. An empty list reports `total_pages: 0`.
+
+### Routes
+
+| Purpose | Method | Route | Notes |
+|---------|--------|-------|-------|
+| Instance info | GET | `/info` | Unauthenticated. On 404 the app asks `/api/v1/info` once, to read the version of a server too old for v2. |
+| Password login | POST | `/login` | 404 when local sign-in is disabled, same as v1. |
+| Refresh JWT | POST | `/user/token/refresh` | Takes the refresh cookie, not a Bearer token. |
+| OIDC callback | POST | **`/api/v1`**`/auth/openid/{provider}/callback` | Not in v2 as of 2.8.0. The JWT it returns works on v2. |
+| Current user | GET | `/user` | |
+| Projects | GET | `/projects` | Paginated. `is_archived=true` returns active and archived. |
+| Project | GET / POST / PUT / DELETE | `/projects`, `/projects/{id}` | |
+| Project views | GET | `/projects/{id}/views` | Envelope, one page. |
+| Assignable users | GET | `/projects/{id}/users/search` | Replaces v1's `/projectusers`. Envelope, one page. |
+| All tasks | GET | `/tasks` | Paginated. `filter`, `q`, `sort_by`, `order_by`, `expand=subtasks`. |
+| Tasks of a view | GET | `/projects/{id}/views/{view}/tasks` | Paginated, in stored view order. In v2 this is always a flat task list. |
+| Kanban board | GET | `/projects/{id}/views/{view}/buckets/tasks` | `{items, total}`, no `total_pages`. See below. |
+| Move card | PUT | `/projects/{id}/views/{view}/buckets/{bucket}/tasks` | Body `{task_id}`. |
+| Task | GET / PUT / DELETE | `/tasks/{id}` | |
+| Create task | POST | `/projects/{id}/tasks` | |
+| Task position | PUT | `/tasks/{id}/position` | Body `{position, project_view_id}`. |
+| Relations | POST / DELETE | `/tasks/{id}/relations`, `/tasks/{id}/relations/{kind}/{other}` | |
+| Assignees | PUT | `/tasks/{id}/assignees/bulk` | Body `{assignees: [{id}]}`. |
+| Labels | GET / POST | `/labels` | Paginated. |
+| Label on task | POST / DELETE | `/tasks/{id}/labels`, `/tasks/{id}/labels/{label}` | |
+| Notifications | GET | `/notifications` | Envelope. |
+| Mark one read | PUT | `/notifications/{id}` | Body `{read: true}`. |
+| Mark all read | POST | `/notifications` | No body needed; one is tolerated. |
+
+### Kanban paging
+
+Upstream describes `/buckets/tasks` as "not paginated". On 2.4.0 and 2.8.0 it still applies `page` and
+`per_page` to the tasks inside each bucket: every bucket comes back on every page, each with one slice
+of its tasks, and each bucket's `count` gives its true size. `ProjectService.fetchBuckets` therefore
+pages until every bucket holds `count` tasks or a page brings nothing new, which is also correct if a
+later server really does ignore `page`.
+
+### Old servers
+
+Sign-in reads `/info` first and refuses a server that reports a version below 2.4.0 with
+`NetworkError.serverTooOld`. Someone already signed in to such a server when they update mDone gets an
+alert once per launch and a note in Settings. Requests queued offline by an older build hold v1 paths
+and methods; they are replayed as stored, which works because every server with v2 still serves v1.
+
+### Changes between 2.4.0 and 2.8.0 that touch these routes
+
+None in behaviour. The task path parameter was renamed in the spec (`{projecttask}` to `{task}`), and
+2.8.0 added a trash (`/tasks/deleted`, `/tasks/{id}/restore`, `/tasks/{id}/permanent`), so
+`DELETE /tasks/{id}` there is recoverable from the web app.
+
+---
+
+# v1 inventory (reference)
+
+Everything below describes `/api/v1`, with v1's verbs: creates are `PUT`, updates are `POST`.
 
 Upstream's 2.4.0 release notes state that v1 stays fully supported for now but will eventually be
-removed, and that new client work should target v2. mDone has not begun a migration; there is no v2
-usage anywhere in the codebase. Between v2.1.0 and v2.5.0 the v1 surface was purely additive
-(26 route registrations added in `routes.go`, **none removed**), so nothing here is at risk in the
-near term.
+removed. Between v2.1.0 and v2.5.0 the v1 surface was purely additive (26 route registrations added in
+`routes.go`, **none removed**).
 
 ### A note on refreshing this document
 
@@ -983,7 +1068,7 @@ of credential mDone holds.
 - Link share authentication via `/shares/:share/auth` returns a limited JWT
 
 ### Pagination Strategy
-- Always check `x-pagination-total-pages` and `x-pagination-result-count` headers
+- On v2, read `total_pages` from the list envelope (v1: the `x-pagination-total-pages` header)
 - Default page size varies; explicitly set `per_page` for consistent behavior
 
 ### Task Operations

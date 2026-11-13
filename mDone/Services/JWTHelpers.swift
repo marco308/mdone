@@ -5,7 +5,7 @@ import Foundation
 /// never verify the signature — the server is the only thing that can do that.
 enum JWTHelpers {
     /// Vikunja API tokens (created in the user's settings UI) start with `tk_`
-    /// and are non-expiring. Anything else returned by `/api/v1/login` is a JWT.
+    /// and are non-expiring. Anything else returned by `/login` is a JWT.
     static func isJWT(_ token: String) -> Bool {
         if token.hasPrefix("tk_") { return false }
         let segments = token.split(separator: ".", omittingEmptySubsequences: false)

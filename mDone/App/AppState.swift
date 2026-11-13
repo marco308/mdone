@@ -168,15 +168,17 @@ final class AppState {
     /// The signed-in server's Vikunja version. Nil until `/info` has answered,
     /// and when its version string has no number in it.
     private(set) var serverVersion: VikunjaVersion?
-    /// Drives the one-time "update your server" alert.
+    /// Drives the "update your server" alert, shown once per launch.
     var showServerUpdateNotice = false
 
-    /// Whether the server predates Vikunja's v2 API. An unknown version is
-    /// never treated as old.
+    /// Whether the server predates Vikunja's v2 API, the only one mDone
+    /// speaks. An unknown version is never treated as old.
     var serverNeedsUpdate: Bool {
         serverVersion.map { $0 < .firstWithAPIv2 } ?? false
     }
 
+    /// Left behind by the one-time notice of #290. Nothing reads it any more;
+    /// logout still removes it so it does not linger.
     private static let serverUpdateNoticeSeenKey = "serverUpdateNoticeSeen"
     private let authService = AuthService.shared
     private let notificationService = NotificationService.shared
@@ -492,6 +494,7 @@ final class AppState {
         await registerAPIClientHandlers()
 
         let url = serverURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        try await requireSupportedServer(url)
         let (token, refreshToken) = try await obtainToken(serverURL: url, using: method)
 
         // Configure with the token plus any refresh cookie, so ordinary
@@ -501,7 +504,12 @@ final class AppState {
         // Validate by fetching projects: works with both JWT and API tokens.
         // One page is enough to prove the credentials are good; the full
         // paginated list is loaded by refreshAll().
-        let projects: [Project] = try await APIClient.shared.fetch(Endpoint.projects())
+        let projects: [Project]
+        do {
+            projects = try await APIClient.shared.fetchList(Endpoint.projects())
+        } catch let NetworkError.serverError(statusCode, _) where statusCode == 404 {
+            throw NetworkError.serverTooOld(version: nil)
+        }
         #if DEBUG
         print("[mDone] Validation OK - got \(projects.count) projects")
         #endif
@@ -515,6 +523,24 @@ final class AppState {
             authService.saveRefreshToken(refreshToken)
         }
         isAuthenticated = true
+    }
+
+    /// Refuses a server too old for the v2 API before any credentials are sent
+    /// to it, so the user reads "update your server" rather than a 404 (#291).
+    ///
+    /// Only a version the server states outright counts. If `/info` cannot be
+    /// read or reports something unparseable, sign-in carries on, and a server
+    /// that turns out to have no v2 routes is caught by the 404 check on the
+    /// validation fetch in `completeLogin`. A 404 from `/login` itself proves
+    /// nothing: a server with local sign-in disabled answers the same way.
+    @MainActor
+    private func requireSupportedServer(_ serverURL: String) async throws {
+        guard let url = URL(string: serverURL),
+              let info = try? await serverInfoService.fetch(from: url),
+              let version = info.version.flatMap(VikunjaVersion.init),
+              version < .firstWithAPIv2
+        else { return }
+        throw NetworkError.serverTooOld(version: version)
     }
 
     /// The only part that differs per login method.
@@ -560,7 +586,6 @@ final class AppState {
         print("[mDone] logout() called")
         #endif
         authService.clearAll()
-        // The next server signed in to may be a different one, and just as old.
         UserDefaults.standard.removeObject(forKey: Self.serverUpdateNoticeSeenKey)
         await tearDownSession(clearingCache: true)
     }
@@ -1228,12 +1253,13 @@ final class AppState {
         }
     }
 
-    // MARK: - Server version (#290)
+    // MARK: - Server version (#290, #291)
 
-    /// Reads the signed-in server's Vikunja version, once per session, and
-    /// raises the update notice the first time it turns out to be older than
-    /// the v2 API. mDone still works against such a server today; this is
-    /// notice that a later release will not (#289).
+    /// Reads the signed-in server's Vikunja version, once per launch, and
+    /// raises the update alert when it is older than the v2 API. Sign-in
+    /// refuses such a server outright; this is for someone who was already
+    /// signed in when mDone moved to v2, whose every request now fails and who
+    /// needs to be told why.
     ///
     /// Fails quietly. `/info` is public, but a proxy in front of the server can
     /// still refuse it, and not knowing the version is not worth an error.
@@ -1244,16 +1270,15 @@ final class AppState {
               let info = try? await serverInfoService.fetch(from: serverURL)
         else { return }
         serverVersion = info.version.flatMap(VikunjaVersion.init)
-        if serverNeedsUpdate, !UserDefaults.standard.bool(forKey: Self.serverUpdateNoticeSeenKey) {
+        if serverNeedsUpdate {
             showServerUpdateNotice = true
         }
     }
 
-    /// Records that the user has seen the update notice, so it is shown once
-    /// per server. Settings keeps saying it for as long as it is true.
+    /// Dismisses the update alert until the next launch. Settings keeps saying
+    /// it for as long as it is true.
     @MainActor
     func acknowledgeServerUpdateNotice() {
-        UserDefaults.standard.set(true, forKey: Self.serverUpdateNoticeSeenKey)
         showServerUpdateNotice = false
     }
 
@@ -2437,7 +2462,7 @@ final class AppState {
     @MainActor
     func fetchNotifications() async {
         do {
-            let result: [VNotification] = try await APIClient.shared.fetch(Endpoint.notifications())
+            let result: [VNotification] = try await APIClient.shared.fetchList(Endpoint.notifications())
             notifications = result
         } catch {
             #if DEBUG

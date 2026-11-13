@@ -144,6 +144,31 @@ final class MockURLProtocol: URLProtocol {
         )!
     }
 
+    /// Wraps a JSON array in the envelope Vikunja's v2 API puts around every
+    /// list: `{"items": [...], "total": n, "page": 1, "per_page": 50,
+    /// "total_pages": n}`. Pass `totalPages: nil` for the kanban buckets route,
+    /// which sends `total` and nothing else.
+    static func page(_ items: Data, totalPages: Int? = 1, page: Int = 1) -> Data {
+        let array = (try? JSONSerialization.jsonObject(with: items)) as? [Any] ?? []
+        return self.page(array, totalPages: totalPages, page: page)
+    }
+
+    /// The same envelope for fixtures built as Foundation objects.
+    static func page(_ items: [Any], totalPages: Int? = 1, page: Int = 1) -> Data {
+        var envelope: [String: Any] = ["items": items, "total": items.count]
+        if let totalPages {
+            envelope["page"] = page
+            envelope["per_page"] = 50
+            envelope["total_pages"] = totalPages
+        }
+        return (try? JSONSerialization.data(withJSONObject: envelope)) ?? Data()
+    }
+
+    /// The envelope from a JSON array literal.
+    static func page(_ items: String, totalPages: Int? = 1, page: Int = 1) -> Data {
+        self.page(Data(items.utf8), totalPages: totalPages, page: page)
+    }
+
     /// Creates a URLSession configured to use this mock protocol.
     ///
     /// The session is stamped with the generation current at the moment it is

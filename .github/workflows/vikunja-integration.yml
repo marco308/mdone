@@ -1,6 +1,6 @@
 name: Vikunja Integration
 
-# Nightly check that the v1 API mDone speaks hasn't moved under us.
+# Nightly check that the v2 API mDone speaks hasn't moved under us.
 #
 # The unit suite mocks every response, so it stays green no matter what a
 # Vikunja release does to the wire format. These tests drive the real services
@@ -32,11 +32,11 @@ jobs:
       fail-fast: false
       matrix:
         # `latest` is the canary: a failure there means upstream changed
-        # something. The pinned release is the version
-        # docs/vikunja-api-inventory.md was verified against, so a failure
-        # there means *we* changed something. Bump it whenever that doc gets
-        # re-verified. Values are GitHub release tags of go-vikunja/vikunja.
-        vikunja: ["latest", "v2.5.0"]
+        # something. The pinned release is the oldest server mDone supports,
+        # the first with the v2 API (VikunjaVersion.firstWithAPIv2), so a
+        # failure there means *we* broke the floor. Values are GitHub release
+        # tags of go-vikunja/vikunja.
+        vikunja: ["latest", "v2.4.0"]
 
     steps:
       - name: Checkout

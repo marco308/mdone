@@ -4,10 +4,11 @@ import XCTest
 /// The two-factor half of the password login (issue #179): how Vikunja's
 /// refusals of `POST /login` reach the setup screen.
 ///
-/// Status codes and bodies here were captured from a real Vikunja v2.4.0 with
-/// TOTP enrolled on the account, not written from the docs. Vikunja answers a
-/// missing, empty or wrong passcode identically (412, code 1017), and a wrong
-/// password with 403, code 1011.
+/// Status codes and bodies here were captured from the v2 API of a real
+/// Vikunja (2.4.0 and 2.8.0) with TOTP enrolled on the account, not written
+/// from the docs. Vikunja answers a missing, empty or wrong passcode
+/// identically (412, code 1017), and a wrong password with 403, code 1011. v2
+/// sends these as `application/problem+json`, with the text in `detail`.
 final class TOTPLoginTests: XCTestCase {
     override func setUp() {
         super.setUp()
@@ -18,6 +19,11 @@ final class TOTPLoginTests: XCTestCase {
         MockURLProtocol.reset()
         super.tearDown()
     }
+
+    private static let invalidPasscodeBody =
+        #"{"title":"Precondition Failed","status":412,"detail":"Invalid totp passcode.","code":1017}"#
+    private static let wrongPasswordBody =
+        #"{"title":"Forbidden","status":403,"detail":"Wrong username or password.","code":1011}"#
 
     private func login(
         status: Int,
@@ -47,14 +53,14 @@ final class TOTPLoginTests: XCTestCase {
     // MARK: - APIClient maps Vikunja's login refusals
 
     func testRejectedPasscodeBecomesInvalidTOTPPasscode() async {
-        let error = await login(status: 412, body: #"{"code":1017,"message":"Invalid totp passcode."}"#)
+        let error = await login(status: 412, body: Self.invalidPasscodeBody)
         guard case .invalidTOTPPasscode = error else {
             return XCTFail("Expected .invalidTOTPPasscode, got \(String(describing: error))")
         }
     }
 
     func testWrongPasswordBecomesInvalidCredentials() async {
-        let error = await login(status: 403, body: #"{"code":1011,"message":"Wrong username or password."}"#)
+        let error = await login(status: 403, body: Self.wrongPasswordBody)
         guard case .invalidCredentials = error else {
             return XCTFail("Expected .invalidCredentials, got \(String(describing: error))")
         }
@@ -63,7 +69,7 @@ final class TOTPLoginTests: XCTestCase {
     func testOther412StaysAServerError() async {
         // Only the two login codes get names. Anything else keeps the generic
         // path so no existing caller sees a new case it does not handle.
-        let error = await login(status: 412, body: #"{"code":1016,"message":"Totp is not enabled for this user."}"#)
+        let error = await login(status: 412, body: #"{"title":"Precondition Failed","status":412,"detail":"Totp is not enabled for this user.","code":1016}"#)
         guard case let .serverError(status, message) = error else {
             return XCTFail("Expected .serverError, got \(String(describing: error))")
         }
@@ -75,13 +81,13 @@ final class TOTPLoginTests: XCTestCase {
         // The mapping is on status and code together. Code 1017 under a
         // status Vikunja does not use for it is not the login refusal this
         // was written for, and must not masquerade as one.
-        let error = await login(status: 400, body: #"{"code":1017,"message":"Invalid totp passcode."}"#)
+        let error = await login(status: 400, body: Self.invalidPasscodeBody)
         guard case let .serverError(status, _) = error else {
             return XCTFail("Expected .serverError, got \(String(describing: error))")
         }
         XCTAssertEqual(status, 400)
 
-        let mismatched = await login(status: 412, body: #"{"code":1011,"message":"Wrong username or password."}"#)
+        let mismatched = await login(status: 412, body: Self.wrongPasswordBody)
         guard case .serverError = mismatched else {
             return XCTFail("Expected .serverError, got \(String(describing: mismatched))")
         }
@@ -97,7 +103,7 @@ final class TOTPLoginTests: XCTestCase {
     }
 
     func testPasscodeIsSentInTheBody() async {
-        _ = await login(status: 412, body: #"{"code":1017,"message":"Invalid totp passcode."}"#, passcode: "123456")
+        _ = await login(status: 412, body: Self.invalidPasscodeBody, passcode: "123456")
         let body = MockURLProtocol.capturedRequests.first.flatMap(MockURLProtocol.bodyData(from:))
         let json = body.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
         XCTAssertEqual(json?["totp_passcode"] as? String, "123456")
@@ -105,7 +111,7 @@ final class TOTPLoginTests: XCTestCase {
     }
 
     func testNoPasscodeMeansNoField() async {
-        _ = await login(status: 403, body: #"{"code":1011,"message":"Wrong username or password."}"#)
+        _ = await login(status: 403, body: Self.wrongPasswordBody)
         let body = MockURLProtocol.capturedRequests.first.flatMap(MockURLProtocol.bodyData(from:))
         let json = body.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
         XCTAssertNotNil(json)

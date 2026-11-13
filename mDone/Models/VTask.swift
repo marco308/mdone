@@ -367,7 +367,7 @@ struct TaskUpdateRequest: Encodable {
 
     /// Carries every field this request doesn't set forward from `task`.
     ///
-    /// Vikunja's `POST /tasks/{id}` is a **full replace**: any field missing
+    /// Vikunja's `PUT /tasks/{id}` is a **full replace**: any field missing
     /// from the body is reset to its zero value. A partial request such as
     /// "just mark it done" therefore wipes whatever it doesn't mention.
     ///

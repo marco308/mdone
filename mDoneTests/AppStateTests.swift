@@ -242,7 +242,7 @@ final class AppStateTests: XCTestCase {
                 {"id": 2, "title": "Archived", "is_archived": true}
             ]
             """.data(using: .utf8)!
-            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), json)
+            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), MockURLProtocol.page(json))
         }
 
         await appState.fetchArchivedProjects()
@@ -447,13 +447,12 @@ final class AppStateTests: XCTestCase {
             projectService: ProjectService(apiClient: client),
             labelService: LabelService(apiClient: client)
         )
-        func json(_ value: Any) throws -> Data {
-            try JSONSerialization.data(withJSONObject: value)
+        func tasks(_ ids: [Int64]) -> Data {
+            MockURLProtocol.page(
+                ids.map { ["id": $0, "title": "Task \($0)", "done": false, "priority": 0, "project_id": 4] as [String: Any] }
+            )
         }
-        func tasks(_ ids: [Int64]) throws -> Data {
-            try json(ids.map { ["id": $0, "title": "Task \($0)", "done": false, "priority": 0, "project_id": 4] })
-        }
-        let projects = try json([
+        let projects = MockURLProtocol.page([
             ["id": 4, "title": "Errands", "views": [["id": 13, "title": "List", "project_id": 4, "view_kind": "list"]]],
             [
                 "id": -3,
@@ -461,9 +460,9 @@ final class AppStateTests: XCTestCase {
                 "views": [["id": 21, "title": "List", "project_id": -3, "view_kind": "list"]],
             ],
         ])
-        let all = try tasks([1, 2, 3, 14])
-        let empty = try json([])
-        var matches = try tasks([1, 3])
+        let all = tasks([1, 2, 3, 14])
+        let empty = MockURLProtocol.page([Any]())
+        var matches = tasks([1, 3])
         MockURLProtocol.requestHandler = { request in
             let path = request.url?.path ?? ""
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
@@ -484,7 +483,7 @@ final class AppStateTests: XCTestCase {
         await appState.fetchProjectTasks(project: filter)
         XCTAssertEqual(appState.tasksForProject(-3).map(\.id), [1, 3])
 
-        matches = try tasks([3, 14])
+        matches = tasks([3, 14])
         await appState.refreshAll()
         XCTAssertEqual(appState.tasksForProject(-3).map(\.id), [3, 14])
     }

@@ -83,6 +83,111 @@ final class OfflineEditQueueTests: XCTestCase {
         XCTAssertTrue(MockURLProtocol.capturedRequests.isEmpty, "offline must not hit the network")
     }
 
+    // MARK: - v2 methods and rows queued under v1 (#291)
+
+    private func pendingOperations(in container: ModelContainer) throws -> [PendingOperation] {
+        try container.mainContext.fetch(FetchDescriptor<PendingOperation>())
+    }
+
+    /// A queued edit records the update endpoint as it is today: `PUT` on v2.
+    func testQueuedEditStoresTheV2UpdatePathAndMethod() async throws {
+        let container = try makeContainer()
+        let sync = await makeSyncService(container: container)
+
+        sync.queueTaskEdit(taskId: 1, edit: QueuedTaskEdit(from: TaskUpdateRequest(done: true)))
+
+        let operation = try XCTUnwrap(pendingOperations(in: container).first)
+        XCTAssertEqual(operation.method, "PUT")
+        XCTAssertEqual(operation.endpointPath, VikunjaAPI.path("/tasks/1"))
+        XCTAssertEqual(operation.operationKind, .taskEdit)
+    }
+
+    /// An edit queued by a build that still spoke v1 holds `POST /api/v1/...`.
+    /// Edits are replayed through `TaskService`, not from the stored path, so
+    /// it goes out as today's fetch and `PUT`.
+    func testEditQueuedUnderV1ReplaysThroughTheV2Endpoints() async throws {
+        let container = try makeContainer()
+        let sync = await makeSyncService(container: container)
+        let edit = QueuedTaskEdit(from: TaskUpdateRequest(done: true))
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        container.mainContext.insert(PendingOperation(
+            endpointPath: VikunjaAPI.legacyPath("/tasks/1"),
+            method: "POST",
+            bodyData: try encoder.encode(edit),
+            kind: .taskEdit,
+            taskId: 1
+        ))
+        try container.mainContext.save()
+
+        MockURLProtocol.requestHandler = { request in
+            let task: [String: Any] = ["id": 1, "title": "T", "done": false, "priority": 0, "project_id": 3]
+            return try (
+                MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
+                JSONSerialization.data(withJSONObject: task)
+            )
+        }
+        await sync.processPendingOperations()
+
+        XCTAssertEqual(
+            MockURLProtocol.capturedRequests.map { "\($0.httpMethod ?? "") \($0.url?.path ?? "")" },
+            ["GET \(VikunjaAPI.path("/tasks/1"))", "PUT \(VikunjaAPI.path("/tasks/1"))"]
+        )
+        XCTAssertEqual(sync.pendingOperationCount(), 0)
+    }
+
+    /// A generic row queued under v1 (a Siri create, here) is a finished
+    /// request, and is replayed verbatim: same v1 path, same v1 method. Every
+    /// server with v2 still serves v1, so this is intended, not a leftover.
+    func testGenericRowQueuedUnderV1IsReplayedVerbatim() async throws {
+        let container = try makeContainer()
+        let sync = await makeSyncService(container: container)
+        container.mainContext.insert(PendingOperation(
+            endpointPath: "/api/v1/projects/5/tasks",
+            method: "PUT",
+            bodyData: Data(#"{"title":"Buy milk"}"#.utf8)
+        ))
+        try container.mainContext.save()
+
+        MockURLProtocol.requestHandler = { request in
+            (
+                MockURLProtocol.makeResponse(statusCode: 201, url: request.url),
+                Data(#"{"id": 9, "title": "Buy milk", "done": false, "priority": 0, "project_id": 5}"#.utf8)
+            )
+        }
+        await sync.processPendingOperations()
+
+        let replay = try XCTUnwrap(MockURLProtocol.capturedRequests.first)
+        XCTAssertEqual(MockURLProtocol.capturedRequests.count, 1)
+        XCTAssertEqual(replay.httpMethod, "PUT")
+        XCTAssertEqual(replay.url?.path, "/api/v1/projects/5/tasks")
+        XCTAssertEqual(replay.decodedJSONBody?["title"] as? String, "Buy milk")
+        XCTAssertEqual(sync.pendingOperationCount(), 0)
+    }
+
+    /// The same for a delete queued under v1.
+    func testDeleteQueuedUnderV1IsReplayedVerbatim() async throws {
+        let container = try makeContainer()
+        let sync = await makeSyncService(container: container)
+        container.mainContext.insert(PendingOperation(
+            endpointPath: "/api/v1/tasks/7",
+            method: "DELETE",
+            kind: .taskDelete,
+            taskId: 7
+        ))
+        try container.mainContext.save()
+
+        MockURLProtocol.requestHandler = { request in
+            (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), Data(#"{"message":"ok"}"#.utf8))
+        }
+        await sync.processPendingOperations()
+
+        let replay = try XCTUnwrap(MockURLProtocol.capturedRequests.first)
+        XCTAssertEqual(replay.httpMethod, "DELETE")
+        XCTAssertEqual(replay.url?.path, "/api/v1/tasks/7")
+        XCTAssertEqual(sync.pendingOperationCount(), 0)
+    }
+
     /// The old behaviour: nothing visible for ~7s, then a vanishing error.
     func testOfflineEditSurvivesInTheCache() async throws {
         let container = try makeContainer()

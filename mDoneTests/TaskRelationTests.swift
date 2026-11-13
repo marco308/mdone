@@ -154,7 +154,7 @@ final class TaskRelationTests: XCTestCase {
     func testRelationEndpoints() {
         let create = Endpoint.createTaskRelation(taskId: 7)
         XCTAssertEqual(create.path, VikunjaAPI.path("/tasks/7/relations"))
-        XCTAssertEqual(create.method, .PUT)
+        XCTAssertEqual(create.method, .POST)
 
         let delete = Endpoint.deleteTaskRelation(taskId: 7, relationKind: "subtask", otherTaskId: 9)
         XCTAssertEqual(delete.path, VikunjaAPI.path("/tasks/7/relations/subtask/9"))
@@ -180,7 +180,7 @@ final class TaskRelationTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertEqual(request.url?.path, VikunjaAPI.path("/tasks/1/relations"))
-            XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertEqual(request.httpMethod, "POST")
             if let body = MockURLProtocol.bodyData(from: request),
                let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any]
             {
@@ -418,7 +418,7 @@ final class TaskRelationTests: XCTestCase {
         MockURLProtocol.requestHandler = { request in
             let path = request.url?.path ?? ""
             switch (request.httpMethod, path) {
-            case ("PUT", VikunjaAPI.path("/tasks/1/relations")):
+            case ("POST", VikunjaAPI.path("/tasks/1/relations")):
                 return (MockURLProtocol.makeResponse(statusCode: 201, url: request.url), relationResponse)
             case ("GET", VikunjaAPI.path("/tasks/1")):
                 return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), parentResponse)
@@ -491,9 +491,9 @@ final class TaskRelationTests: XCTestCase {
         MockURLProtocol.requestHandler = { request in
             let path = request.url?.path ?? ""
             switch (request.httpMethod, path) {
-            case ("PUT", VikunjaAPI.path("/projects/5/tasks")):
+            case ("POST", VikunjaAPI.path("/projects/5/tasks")):
                 return (MockURLProtocol.makeResponse(statusCode: 201, url: request.url), newTaskResponse)
-            case ("PUT", VikunjaAPI.path("/tasks/1/relations")):
+            case ("POST", VikunjaAPI.path("/tasks/1/relations")):
                 if let requestBody = MockURLProtocol.bodyData(from: request),
                    let json = try? JSONSerialization.jsonObject(with: requestBody) as? [String: Any]
                 {

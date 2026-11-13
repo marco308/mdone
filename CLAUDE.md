@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-mDone is a native iOS/macOS task management app that connects to a self-hosted **Vikunja** server via its **v1** REST API (`/api/v1`, verified against Vikunja v2.5.0). Pure Swift with SwiftUI, no external dependencies. Vikunja 2.4.0 added a parallel `/api/v2` that upstream recommends for new clients; mDone has not migrated. See `docs/vikunja-api-inventory.md`.
+mDone is a native iOS/macOS task management app that connects to a self-hosted **Vikunja** server via its **v2** REST API (`/api/v2`, verified against Vikunja v2.4.0 and v2.8.0). Pure Swift with SwiftUI, no external dependencies. v2 arrived in Vikunja 2.4.0, so that is the oldest server mDone works with. The one request still made to `/api/v1` is the OIDC login callback, which v2 does not have. See `docs/vikunja-api-inventory.md`.
 
 Beyond plain task CRUD the app also covers: focus sessions with a Live Activity, Kanban boards, subtasks and task relations, calendar (EventKit) overlay, home/lock screen widgets, Shortcuts and Siri actions, and offline caching with a pending-operation queue.
 
@@ -46,7 +46,7 @@ Log in with `devuser` / `devpassword`. `./scripts/reset-dev-vikunja.sh` nukes an
 - **AppState** (`App/AppState.swift`): Single `@Observable` class holding all app state: tasks, projects, labels, notifications, auth status, filters. All mutating async methods are `@MainActor`. A weak `AppState.shared` exists purely so App Intents can reach the live instance.
 - **Services are actors**: `APIClient`, `TaskService`, `ProjectService`, `AuthService`, `NotificationService`, `SyncService`, `LabelService`, `CalendarService` are actors for thread safety. The exceptions are `FocusManager` and `FocusOutboxService`, which are `@MainActor @Observable` classes because they own SwiftData reads/writes on the main context and drive UI directly.
 - **APIClient** (`Services/APIClient.swift`): Singleton actor. Uses `convertFromSnakeCase`/`convertToSnakeCase` key strategies. Custom date decoding handles ISO8601 with and without fractional seconds, plus Vikunja's zero-date (`0001-01-01T00:00:00Z` → `Date.distantPast`). It also owns JWT refresh: `setOnTokensUpdated` persists rotated tokens, `setOnSessionExpired` bounces the user to login.
-- **Endpoint** (`Services/Endpoint.swift`): Static factory methods returning `Endpoint` structs with path, HTTP method, and query items. The API prefix (`/api/v1`) is named once, in `VikunjaAPI` (`mDoneShared/SharedConstants.swift`), and endpoints are built with `Endpoint(api: "/tasks/1")`. Add new endpoints here rather than building URLs inline, and build expected paths in tests with `VikunjaAPI.path(...)` rather than hard-coding the prefix.
+- **Endpoint** (`Services/Endpoint.swift`): Static factory methods returning `Endpoint` structs with path, HTTP method, and query items. The API prefix (`/api/v2`) is named once, in `VikunjaAPI` (`mDoneShared/SharedConstants.swift`), and endpoints are built with `Endpoint(api: "/tasks/1")`. Add new endpoints here rather than building URLs inline, and build expected paths in tests with `VikunjaAPI.path(...)` rather than hard-coding the prefix.
 - **Platform split**: iOS uses `MainTabView` (tab bar), macOS uses `MacContentView` (NavigationSplitView sidebar). Conditional compilation via `#if os(iOS)` / `#if os(macOS)`.
 - **Auth**: Vikunja token in the Keychain (`AuthService`), server URL in UserDefaults. Login validates by fetching projects.
 - **Offline support**: SwiftData models in `CacheService.swift` (`CachedTask`, `CachedProject`, `CachedLabel`, `FocusRecord`, `PendingOperation`), container built in `AppDependencies`, reconciled by `SyncService` when `NetworkMonitor` reports connectivity. Mutations made offline become `PendingOperation` rows and replay on reconnect.
@@ -57,11 +57,14 @@ Log in with `devuser` / `devpassword`. `./scripts/reset-dev-vikunja.sh` nukes an
 - **Siri adds tasks in the background**: `AddTaskIntent` (`App/AddTaskIntent.swift`) has no `openAppWhenRun`, which is what lets it run over CarPlay, AirPods and the Watch, where there is no screen to hand to. It calls `AppState.createTaskFromIntent`, which signs in from the Keychain on a cold launch, reads projects from the cache, and queues the create when offline. The UI deliberately does not queue creates (#146); the intent does, because its caller cannot see the list and losing the task is worse. `ProjectEntity` gives Siri the project names; `refreshAll` calls `updateAppShortcutParameters()` after every project fetch so that vocabulary stays current. A CarPlay app proper is off the table: Apple only grants the entitlement to fixed categories that exclude task managers.
 
 ### Vikunja API Notes
-- Task creation uses `PUT /api/v1/projects/{id}/tasks` (not POST)
-- Task update uses `POST /api/v1/tasks/{id}` (not PUT)
-- Vikunja's PUT/POST split is general: creates are `PUT`, updates are `POST`, for projects and labels too
-- Per-project task and bucket reads go through a **view**: fetch `/projects/{id}/views` first, then `/projects/{id}/views/{viewId}/tasks` or `.../buckets`. The buckets response embeds each bucket's tasks, so one fetch renders a whole board.
-- Relations: `PUT /api/v1/tasks/{id}/relations` to create, `DELETE /api/v1/tasks/{id}/relations/{kind}/{otherId}` to remove. Kinds are lowercase with no underscores (`parenttask`, `duplicateof`, ...) so they survive snake-case key conversion untouched.
+- Creates are `POST`, updates are `PUT`, for tasks, projects and labels: `POST /api/v2/projects/{id}/tasks` creates a task, `PUT /api/v2/tasks/{id}` updates one. This is the reverse of v1, so do not copy verbs from old code or from the v1 half of the inventory.
+- `PUT` replaces the whole resource: a field left out of a task update is cleared. Merge onto the current task first (`TaskUpdateRequest.preservingExistingValues(from:)`). `PATCH` is the partial update and is not used yet (#292).
+- Every list comes in an envelope, `{items, total, page, per_page, total_pages}`. Use `APIClient.fetchAllPages` for paginated lists and `fetchList` for single-page ones; `fetch` is for single objects.
+- Errors are `application/problem+json` with the text in `detail` and Vikunja's number in `code`. Validation failures are 422.
+- Per-project task and bucket reads go through a **view**: fetch `/projects/{id}/views` first, then `/projects/{id}/views/{viewId}/tasks` for the list or `.../buckets/tasks` for the board. The board response embeds each bucket's tasks, so one fetch renders it, but it still pages the tasks inside each bucket: see `ProjectService.fetchBuckets`.
+- Relations: `POST /api/v2/tasks/{id}/relations` to create, `DELETE /api/v2/tasks/{id}/relations/{kind}/{otherId}` to remove. Kinds are lowercase with no underscores (`parenttask`, `duplicateof`, ...) so they survive snake-case key conversion untouched.
+- A server older than 2.4.0 has no v2. Sign-in refuses it with `NetworkError.serverTooOld`; `ServerInfoService` falls back to `/api/v1/info` only to learn that server's version.
+- `PendingOperation` rows store a path and method. Rows queued by a build that spoke v1 are replayed as stored, which works because every server with v2 still serves v1. Do not rewrite them.
 - Filtering uses Vikunja DSL syntax, e.g. `"priority = 3 && due_date > now && done = false"`
 - All IDs are `Int64`
 - `docs/vikunja-api-inventory.md` lists what the API offers and what the app already uses. Check it before adding an endpoint.

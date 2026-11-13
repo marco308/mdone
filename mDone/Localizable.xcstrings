@@ -4907,12 +4907,22 @@
         }
       }
     },
-    "Update your Vikunja server soon" : {
+    "Update your Vikunja server" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请尽快更新你的 Vikunja 服务器"
+            "value" : "请更新你的 Vikunja 服务器"
+          }
+        }
+      }
+    },
+    "Update your Vikunja server, then sign in again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请更新你的 Vikunja 服务器，然后重新登录。"
           }
         }
       }
@@ -5135,16 +5145,6 @@
         }
       }
     },
-    "Your server runs Vikunja %@. A future version of mDone will need Vikunja %@ or newer. mDone keeps working for now, but please update your server before then." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的服务器运行的是 Vikunja %@。mDone 的后续版本将需要 Vikunja %@ 或更高版本。目前 mDone 仍可正常使用，但请在此之前更新服务器。"
-          }
-        }
-      }
-    },
     "Your session has expired. Please log in again." : {
       "localizations" : {
         "zh-Hans" : {
@@ -5271,6 +5271,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "mDone 由一人独立开发和维护。如果它对你有帮助，打赏或赞助将有助于项目持续发展。"
+          }
+        }
+      }
+    },
+    "mDone needs Vikunja %@ or newer, and this server looks older. Update your server to use mDone with it." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mDone 需要 Vikunja %@ 或更高版本，而这台服务器的版本似乎更旧。请更新服务器后再使用 mDone。"
+          }
+        }
+      }
+    },
+    "mDone needs Vikunja %@ or newer, and your server runs Vikunja %@. Update your server to use mDone with it." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mDone 需要 Vikunja %@ 或更高版本，而你的服务器运行的是 Vikunja %@。请更新服务器后再使用 mDone。"
           }
         }
       }

@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 @testable import mDone
 
-/// Live-server checks for the parts of Vikunja's v1 API that mDone depends on
+/// Live-server checks for the parts of Vikunja's v2 API that mDone depends on
 /// in ways a release could quietly change. Each test states the assumption the
 /// app makes, so a failure names the assumption rather than a status code.
 ///
@@ -24,17 +24,17 @@ final class VikunjaAPIContractTests: VikunjaIntegrationCase {
 
         let freshClient = APIClient()
         await freshClient.configure(serverURL: config.serverURL, token: token)
-        let all: [Project] = try await freshClient.fetch(Endpoint.projects())
+        let all: [Project] = try await freshClient.fetchList(Endpoint.projects())
         XCTAssertFalse(all.isEmpty, "The token from /login did not authorize a project read")
     }
 
-    // MARK: - Creates are PUT, updates are POST
+    // MARK: - Creates are POST, updates are PUT
 
-    /// Vikunja inverts the usual REST convention. If a release ever "fixes"
-    /// that, every create in the app starts 404ing or 405ing.
-    func testProjectCreateIsPUTAndUpdateIsPOST() async throws {
-        XCTAssertEqual(Endpoint.createProject().method, .PUT)
-        XCTAssertEqual(Endpoint.updateProject(id: scratchProject.id).method, .POST)
+    /// v2 uses the usual REST convention, the reverse of v1. The scratch
+    /// project in `setUp` already proves the create; this proves the update.
+    func testProjectCreateIsPOSTAndUpdateIsPUT() async throws {
+        XCTAssertEqual(Endpoint.createProject().method, .POST)
+        XCTAssertEqual(Endpoint.updateProject(id: scratchProject.id).method, .PUT)
 
         let renamed = try await projects.updateProject(
             id: scratchProject.id,
@@ -75,7 +75,7 @@ final class VikunjaAPIContractTests: VikunjaIntegrationCase {
 
     // MARK: - Full-replace update semantics (issue #147)
 
-    /// The behaviour that caused #147: `POST /tasks/{id}` replaces the whole
+    /// The behaviour that caused #147: `PUT /tasks/{id}` replaces the whole
     /// task, so a body that omits a field resets it. A failure here is not
     /// automatically bad news, it means the server switched to partial updates
     /// and `preservingExistingValues(from:)` may no longer be needed.
@@ -160,7 +160,7 @@ final class VikunjaAPIContractTests: VikunjaIntegrationCase {
         )
         let open = try await makeTask(TaskCreateRequest(title: "filter: still open", priority: 3))
 
-        let results: [VTask] = try await client.fetch(
+        let results: [VTask] = try await client.fetchList(
             Endpoint.allTasks(perPage: 200, filter: "done = false && priority >= 3")
         )
 
@@ -213,9 +213,8 @@ final class VikunjaAPIContractTests: VikunjaIntegrationCase {
 
     // MARK: - Kanban
 
-    /// The board renders from one fetch because the view-tasks endpoint embeds
-    /// each bucket's tasks. The plain `/buckets` endpoint stopped doing that in
-    /// v0.24, so this is the assumption most likely to move again.
+    /// The board renders from one fetch because `/buckets/tasks` embeds each
+    /// bucket's tasks. The plain `/buckets` endpoint is metadata only.
     func testKanbanViewEmbedsTasksInTheirBuckets() async throws {
         let created = try await makeTask(TaskCreateRequest(title: "on the board"))
         let kanbanViewId = try await viewId(kind: "kanban")
@@ -310,5 +309,108 @@ final class VikunjaAPIContractTests: VikunjaIntegrationCase {
 
         let listAfter = try await tasks.fetchProjectTasks(projectId: scratchProject.id, viewId: listViewId)
         XCTAssertEqual(listAfter.map(\.id), listBefore.map(\.id), "a kanban position leaked into the list view")
+    }
+
+    // MARK: - v2 wire format (#291)
+
+    /// Lists arrive in an envelope whose `total_pages` drives `fetchAllPages`.
+    /// With one task per page, three tasks must take three pages to collect.
+    func testListEnvelopeReportsPagesThatFetchAllPagesFollows() async throws {
+        var created: [Int64] = []
+        for index in 1 ... 3 {
+            try await created.append(makeTask(TaskCreateRequest(title: "page \(index)")).id)
+        }
+        let listViewId = try await viewId(kind: "list")
+
+        let all: [VTask] = try await client.fetchAllPages({ page, perPage in
+            Endpoint.projectTasks(
+                projectId: self.scratchProject.id, viewId: listViewId, page: page, perPage: perPage
+            )
+        }, perPage: 1)
+
+        XCTAssertEqual(
+            Set(all.map(\.id)), Set(created),
+            "Paging by the envelope's total_pages lost or repeated tasks"
+        )
+    }
+
+    /// The kanban route is documented as not paginated, but still slices each
+    /// bucket's tasks by `per_page`. `fetchBuckets` pages on the buckets' own
+    /// `count`, so a full column must come back even one card per page.
+    func testKanbanBucketsStillPageTheirTasks() async throws {
+        var created: [Int64] = []
+        for index in 1 ... 3 {
+            try await created.append(makeTask(TaskCreateRequest(title: "card \(index)")).id)
+        }
+        let kanbanViewId = try await viewId(kind: "kanban")
+
+        let buckets = try await projects.fetchBuckets(
+            projectId: scratchProject.id, viewId: kanbanViewId, perPage: 1
+        )
+
+        let embedded = Set(buckets.flatMap { $0.tasks ?? [] }.map(\.id))
+        XCTAssertTrue(embedded.isSuperset(of: created), "A column lost cards when read one per page")
+    }
+
+    /// Search moved from `s` to `q`.
+    func testSearchUsesTheQParameter() async throws {
+        let needle = "needle-\(UUID().uuidString.prefix(8))"
+        let wanted = try await makeTask(TaskCreateRequest(title: "find the \(needle)"))
+        let other = try await makeTask(TaskCreateRequest(title: "leave this one"))
+
+        let results: [VTask] = try await client.fetchList(Endpoint.allTasks(perPage: 50, search: needle))
+
+        XCTAssertTrue(results.contains { $0.id == wanted.id }, "Search did not find a task by its title")
+        XCTAssertFalse(results.contains { $0.id == other.id }, "Search ignored the query and returned everything")
+    }
+
+    /// Refusals are `application/problem+json`: the text is in `detail` and
+    /// Vikunja's own number is still in `code`. A missing task is 404 / 4002.
+    func testErrorsCarryDetailAndCode() async throws {
+        do {
+            _ = try await tasks.fetchTask(id: 999_999_999)
+            XCTFail("Fetching a task that does not exist should throw")
+        } catch let NetworkError.serverError(statusCode, message) {
+            XCTAssertEqual(statusCode, 404)
+            XCTAssertFalse((message ?? "").isEmpty, "The error body no longer carries a readable `detail`")
+        }
+    }
+
+    /// The assignee picker reads `/projects/{id}/users/search`. The owner of a
+    /// project can always be assigned to its tasks.
+    func testProjectUsersIncludesTheOwner() async throws {
+        let users = try await UserService(apiClient: client).fetchProjectUsers(projectId: scratchProject.id)
+        XCTAssertTrue(
+            users.contains { $0.username == config.username },
+            "The project's own user is missing from its assignable users"
+        )
+    }
+
+    /// The widget ticks a task off by fetching it and sending the whole JSON
+    /// back with `done` set, read-only fields included. The server has to take
+    /// that body, and the task's other fields have to survive (#283).
+    func testWidgetCompletionRoundTripKeepsTheTask() async throws {
+        let created = try await makeTask(
+            TaskCreateRequest(title: "tick me off in a widget", description: "keep me", priority: 3)
+        )
+        let token = try await IntegrationSession.shared.token(for: config)
+        let url = try XCTUnwrap(URL(string: config.serverURL + Endpoint.task(id: created.id).path))
+
+        var fetch = URLRequest(url: url)
+        fetch.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (fetched, _) = try await URLSession.shared.data(for: fetch)
+
+        var update = URLRequest(url: url)
+        update.httpMethod = Endpoint.updateTask(id: created.id).method.rawValue
+        update.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        update.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        update.httpBody = try WidgetDataProvider.completionBody(from: fetched)
+        let (_, response) = try await URLSession.shared.data(for: update)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200, "The server refused a fetched task sent back whole")
+
+        let after = try await tasks.fetchTask(id: created.id)
+        XCTAssertTrue(after.done)
+        XCTAssertEqual(after.priority, 3)
+        XCTAssertFalse((after.description ?? "").isEmpty, "Completing from a widget wiped the description")
     }
 }

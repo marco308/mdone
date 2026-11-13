@@ -30,12 +30,13 @@ final class NotificationReadStateTests: XCTestCase {
                 httpVersion: nil,
                 headerFields: ["Content-Type": "application/json"]
             )!
-            return (response, json.data(using: .utf8)!)
+            return (response, MockURLProtocol.page(json))
         }
     }
 
-    /// The exact shape Vikunja returns: no `read` key at all, and the zero date
-    /// for anything still unread.
+    /// The notifications as Vikunja returns them, before `respond` wraps them
+    /// in the list envelope: no `read` key at all, and the zero date for
+    /// anything still unread.
     private let serverPayload = """
     [
         {
@@ -61,7 +62,7 @@ final class NotificationReadStateTests: XCTestCase {
         respond(with: serverPayload)
         let client = await makeClient()
 
-        let notifications: [VNotification] = try await client.fetch(Endpoint.notifications())
+        let notifications: [VNotification] = try await client.fetchList(Endpoint.notifications())
 
         XCTAssertEqual(notifications.count, 2)
         XCTAssertFalse(notifications[0].isUnread, "read_at holds a real timestamp, so this is read")
@@ -71,7 +72,7 @@ final class NotificationReadStateTests: XCTestCase {
         respond(with: serverPayload)
         let client = await makeClient()
 
-        let notifications: [VNotification] = try await client.fetch(Endpoint.notifications())
+        let notifications: [VNotification] = try await client.fetchList(Endpoint.notifications())
 
         XCTAssertTrue(notifications[1].isUnread, "the zero date means never read")
     }
@@ -79,7 +80,7 @@ final class NotificationReadStateTests: XCTestCase {
     func testUnreadCountCountsOnlyServerUnreadNotifications() async throws {
         respond(with: serverPayload)
         let client = await makeClient()
-        let notifications: [VNotification] = try await client.fetch(Endpoint.notifications())
+        let notifications: [VNotification] = try await client.fetchList(Endpoint.notifications())
 
         let appState = AppState()
         appState.notifications = notifications

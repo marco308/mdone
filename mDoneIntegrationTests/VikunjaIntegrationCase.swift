@@ -12,7 +12,7 @@ import XCTest
 ///
 /// They are not part of the PR run. `.github/workflows/vikunja-integration.yml`
 /// brings a server up nightly and runs them against `vikunja/vikunja:latest`,
-/// so a release that breaks the v1 contract shows up as a red nightly instead
+/// so a release that breaks the v2 contract shows up as a red nightly instead
 /// of a user's bug report. With nothing reachable every test skips, which keeps
 /// a whole-scheme `xcodebuild test` green on a laptop with Docker switched off.
 ///

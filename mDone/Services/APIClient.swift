@@ -557,6 +557,13 @@ actor APIClient {
         }
     }
 
+    /// Fetches a list endpoint that answers in a single page: a project's views
+    /// or users, a board's buckets. v2 wraps every list in the same envelope,
+    /// so this unwraps `items` and ignores the page counts.
+    func fetchList<T: Decodable>(_ endpoint: Endpoint) async throws -> [T] {
+        try await fetchPage(endpoint).0
+    }
+
     /// Fetches all pages of a paginated endpoint and returns the combined results.
     ///
     /// The first page says how many there are; the rest are then read a few
@@ -600,14 +607,12 @@ actor APIClient {
     private func fetchPage<T: Decodable>(_ endpoint: Endpoint) async throws -> ([T], Int) {
         let (data, httpResponse) = try await executeWithRefresh { try self.buildRequest(for: endpoint) }
         let responseData = try handleResponse(data: data, httpResponse: httpResponse)
-        let items: [T]
         do {
-            items = try decoder.decode([T].self, from: responseData)
+            let page = try decoder.decode(ListPage<T>.self, from: responseData)
+            return (page.items ?? [], page.totalPages ?? 1)
         } catch {
             throw NetworkError.decodingError(error)
         }
-        let totalPages = Int(httpResponse.value(forHTTPHeaderField: "x-pagination-total-pages") ?? "1") ?? 1
-        return (items, totalPages)
     }
 
     func send<R: Decodable>(_ endpoint: Endpoint, body: some Encodable) async throws -> R {
