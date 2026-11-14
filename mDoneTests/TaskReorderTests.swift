@@ -192,7 +192,7 @@ final class TaskReorderTests: XCTestCase {
     /// Saving a task into a different project must read that project's
     /// order back, or the task sits at the bottom of a manually sorted list
     /// until the screen is reopened.
-    func testMovingATaskToAnotherProjectRefetchesTheDestinationOrder() async {
+    func testMovingATaskToAnotherProjectRefetchesTheDestinationOrder() async throws {
         let state = await makeAppState()
         let destination = Project(
             id: 8,
@@ -205,8 +205,8 @@ final class TaskReorderTests: XCTestCase {
         state.tasks.append(homeTask)
         state.projectTaskCache[8] = [homeTask]
 
-        let movedJSON = #"{"id": 1, "title": "Task 1", "done": false, "priority": 0, "project_id": 8}"#
-            .data(using: .utf8)!
+        let movedJSON = try XCTUnwrap(#"{"id": 1, "title": "Task 1", "done": false, "priority": 0, "project_id": 8}"#
+            .data(using: .utf8))
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             if request.httpMethod == "PUT" {
@@ -219,7 +219,11 @@ final class TaskReorderTests: XCTestCase {
         await state.updateTask(id: 1, request: TaskUpdateRequest(projectId: 8))
 
         let refetch = MockURLProtocol.capturedRequests.first { $0.httpMethod == "GET" }
-        XCTAssertEqual(refetch?.url?.path, VikunjaAPI.path("/projects/8/views/300/tasks"), "destination list view read back")
+        XCTAssertEqual(
+            refetch?.url?.path,
+            VikunjaAPI.path("/projects/8/views/300/tasks"),
+            "destination list view read back"
+        )
         XCTAssertEqual(state.tasksForProject(8).map(\.id), [1, 9])
         XCTAssertEqual(state.tasksForProject(7).map(\.id), [2, 3], "the task left its old project")
     }
@@ -279,10 +283,10 @@ final class TaskReorderTests: XCTestCase {
     }
 
     /// An ordinary edit that keeps the project must not cost a refetch.
-    func testEditingWithoutChangingProjectDoesNotRefetch() async {
+    func testEditingWithoutChangingProjectDoesNotRefetch() async throws {
         let state = await makeAppState()
-        let editedJSON = #"{"id": 1, "title": "Renamed", "done": false, "priority": 0, "project_id": 7}"#
-            .data(using: .utf8)!
+        let editedJSON = try XCTUnwrap(#"{"id": 1, "title": "Renamed", "done": false, "priority": 0, "project_id": 7}"#
+            .data(using: .utf8))
         MockURLProtocol.requestHandler = { request in
             (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), editedJSON)
         }
@@ -298,10 +302,10 @@ final class TaskReorderTests: XCTestCase {
     /// Vikunja gives a new task the lowest position, so it belongs at the top
     /// of a manually sorted list, as on the web. Without reading the order
     /// back it sat at the bottom until the next refresh, then jumped.
-    func testCreatingATaskReadsTheProjectOrderBack() async {
+    func testCreatingATaskReadsTheProjectOrderBack() async throws {
         let state = await makeAppState()
-        let createdJSON = #"{"id": 4, "title": "New", "done": false, "priority": 0, "project_id": 7}"#
-            .data(using: .utf8)!
+        let createdJSON = try XCTUnwrap(#"{"id": 4, "title": "New", "done": false, "priority": 0, "project_id": 7}"#
+            .data(using: .utf8))
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             if request.httpMethod == "POST" {
@@ -320,11 +324,11 @@ final class TaskReorderTests: XCTestCase {
 
     /// A project whose order was never read has nothing to correct: its
     /// screen reads the order when it opens, so a create costs no refetch.
-    func testCreatingATaskInAnUncachedProjectDoesNotRefetch() async {
+    func testCreatingATaskInAnUncachedProjectDoesNotRefetch() async throws {
         let state = await makeAppState()
         state.projectTaskCache[7] = nil
-        let createdJSON = #"{"id": 4, "title": "New", "done": false, "priority": 0, "project_id": 7}"#
-            .data(using: .utf8)!
+        let createdJSON = try XCTUnwrap(#"{"id": 4, "title": "New", "done": false, "priority": 0, "project_id": 7}"#
+            .data(using: .utf8))
         MockURLProtocol.requestHandler = { request in
             (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), createdJSON)
         }

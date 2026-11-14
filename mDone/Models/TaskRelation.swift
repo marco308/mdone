@@ -92,7 +92,9 @@ enum SubtaskLinkCandidates {
             .sorted { a, b in
                 let aInProject = a.projectId == parent.projectId
                 let bInProject = b.projectId == parent.projectId
-                if aInProject != bInProject { return aInProject }
+                if aInProject != bInProject {
+                    return aInProject
+                }
                 return a.title.localizedCompare(b.title) == .orderedAscending
             }
     }

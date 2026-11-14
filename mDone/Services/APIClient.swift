@@ -294,7 +294,7 @@ actor APIClient {
     private func handleResponse(data: Data, httpResponse: HTTPURLResponse) throws -> Data {
         switch httpResponse.statusCode {
         case 200 ... 299:
-            return data
+            data
         case 401:
             throw NetworkError.unauthorized
         case 429:

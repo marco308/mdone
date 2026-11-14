@@ -406,7 +406,11 @@ final class VikunjaAPIContractTests: VikunjaIntegrationCase {
         update.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         update.httpBody = try WidgetDataProvider.completionBody(from: fetched)
         let (_, response) = try await URLSession.shared.data(for: update)
-        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200, "The server refused a fetched task sent back whole")
+        XCTAssertEqual(
+            (response as? HTTPURLResponse)?.statusCode,
+            200,
+            "The server refused a fetched task sent back whole"
+        )
 
         let after = try await tasks.fetchTask(id: created.id)
         XCTAssertTrue(after.done)

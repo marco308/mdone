@@ -11,8 +11,14 @@ import XCTest
 final class EndpointPathEncodingTests: XCTestCase {
     func testOrdinaryProviderKeyIsUnchanged() {
         // The common case: Vikunja lowercases the provider name.
-        XCTAssertEqual(Endpoint.openIDCallback(provider: "authelia").path, VikunjaAPI.legacyPath("/auth/openid/authelia/callback"))
-        XCTAssertEqual(Endpoint.openIDCallback(provider: "keycloak-1").path, VikunjaAPI.legacyPath("/auth/openid/keycloak-1/callback"))
+        XCTAssertEqual(
+            Endpoint.openIDCallback(provider: "authelia").path,
+            VikunjaAPI.legacyPath("/auth/openid/authelia/callback")
+        )
+        XCTAssertEqual(
+            Endpoint.openIDCallback(provider: "keycloak-1").path,
+            VikunjaAPI.legacyPath("/auth/openid/keycloak-1/callback")
+        )
     }
 
     func testSlashCannotEscapeThePathSegment() {

@@ -24,12 +24,12 @@ final class ProjectServiceTests: XCTestCase {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let projectsJSON = """
+        let projectsJSON = try XCTUnwrap("""
         [
             {"id": 1, "title": "Work", "hex_color": "#4772FA", "is_archived": false, "is_favorite": true, "position": 1.0, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"},
             {"id": 2, "title": "Personal", "hex_color": "#FF4444", "is_archived": false, "is_favorite": false, "position": 2.0, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"}
         ]
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/projects")) == true)
@@ -176,9 +176,9 @@ final class ProjectServiceTests: XCTestCase {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let projectJSON = """
+        let projectJSON = try XCTUnwrap("""
         {"id": 5, "title": "Home", "description": "Home tasks", "hex_color": "#00AA00", "is_archived": false, "is_favorite": false, "position": 3.0, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/projects/5")) == true)
@@ -198,12 +198,12 @@ final class ProjectServiceTests: XCTestCase {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let viewsJSON = """
+        let viewsJSON = try XCTUnwrap("""
         [
             {"id": 1, "title": "List", "project_id": 5, "view_kind": "list", "position": 1.0},
             {"id": 2, "title": "Kanban", "project_id": 5, "view_kind": "kanban", "position": 2.0}
         ]
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/projects/5/views")) == true)
@@ -243,13 +243,13 @@ final class ProjectServiceTests: XCTestCase {
         }
     }
 
-    func testFetchProjectThrowsOnServerError() async {
+    func testFetchProjectThrowsOnServerError() async throws {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let errorJSON = """
+        let errorJSON = try XCTUnwrap("""
         {"code": 404, "message": "Project not found"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 404, url: request.url)
@@ -337,9 +337,9 @@ final class ProjectServiceTests: XCTestCase {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let responseJSON = """
+        let responseJSON = try XCTUnwrap("""
         {"id": 42, "title": "Marketing", "hex_color": "#4772FA", "is_archived": false, "is_favorite": false}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertEqual(request.httpMethod, "POST")
@@ -358,9 +358,9 @@ final class ProjectServiceTests: XCTestCase {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let responseJSON = """
+        let responseJSON = try XCTUnwrap("""
         {"id": 7, "title": "Renamed", "is_archived": true, "is_favorite": false}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertEqual(request.httpMethod, "PUT")
@@ -400,7 +400,10 @@ final class ProjectServiceTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertEqual(request.url?.query?.contains("is_archived=true"), true)
-            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), MockURLProtocol.page("[]", totalPages: 0))
+            return (
+                MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
+                MockURLProtocol.page("[]", totalPages: 0)
+            )
         }
 
         _ = try await service.fetchProjects(includeArchived: true)
@@ -412,7 +415,10 @@ final class ProjectServiceTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertFalse(request.url?.query?.contains("is_archived") ?? false)
-            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), MockURLProtocol.page("[]", totalPages: 0))
+            return (
+                MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
+                MockURLProtocol.page("[]", totalPages: 0)
+            )
         }
 
         _ = try await service.fetchProjects()

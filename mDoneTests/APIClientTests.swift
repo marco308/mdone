@@ -5,7 +5,7 @@ final class APIClientTests: XCTestCase {
     // MARK: - Model Decoding Tests
 
     func testVTaskDecoding() throws {
-        let json = """
+        let json = try XCTUnwrap("""
         {
             "id": 1,
             "title": "Buy groceries",
@@ -20,7 +20,7 @@ final class APIClientTests: XCTestCase {
             "created": "2026-03-15T08:00:00Z",
             "updated": "2026-03-15T08:00:00Z"
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -48,7 +48,7 @@ final class APIClientTests: XCTestCase {
     }
 
     func testProjectDecoding() throws {
-        let json = """
+        let json = try XCTUnwrap("""
         {
             "id": 1,
             "title": "Work",
@@ -60,7 +60,7 @@ final class APIClientTests: XCTestCase {
             "created": "2026-03-15T08:00:00Z",
             "updated": "2026-03-15T08:00:00Z"
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -84,7 +84,7 @@ final class APIClientTests: XCTestCase {
     }
 
     func testLabelDecoding() throws {
-        let json = """
+        let json = try XCTUnwrap("""
         {
             "id": 5,
             "title": "Bug",
@@ -93,7 +93,7 @@ final class APIClientTests: XCTestCase {
             "created": "2026-03-15T08:00:00Z",
             "updated": "2026-03-15T08:00:00Z"
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -115,7 +115,7 @@ final class APIClientTests: XCTestCase {
     }
 
     func testUserDecoding() throws {
-        let json = """
+        let json = try XCTUnwrap("""
         {
             "id": 1,
             "username": "testuser",
@@ -124,7 +124,7 @@ final class APIClientTests: XCTestCase {
             "created": "2026-03-15T08:00:00Z",
             "updated": "2026-03-15T08:00:00Z"
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -232,7 +232,7 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let taskJSON = """
+        let taskJSON = try XCTUnwrap("""
         {
             "id": 42,
             "title": "Test Task",
@@ -242,7 +242,7 @@ final class APIClientTests: XCTestCase {
             "created": "2026-03-15T08:00:00Z",
             "updated": "2026-03-15T08:00:00Z"
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
@@ -279,13 +279,13 @@ final class APIClientTests: XCTestCase {
         }
     }
 
-    func testFetchThrowsServerErrorOn500() async {
+    func testFetchThrowsServerErrorOn500() async throws {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let errorJSON = """
+        let errorJSON = try XCTUnwrap("""
         {"code": 500, "message": "Internal Server Error"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 500, url: request.url)
@@ -307,11 +307,11 @@ final class APIClientTests: XCTestCase {
         }
     }
 
-    func testFetchThrowsDecodingErrorOnMalformedJSON() async {
+    func testFetchThrowsDecodingErrorOnMalformedJSON() async throws {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let malformedJSON = "{ not valid json }".data(using: .utf8)!
+        let malformedJSON = try XCTUnwrap("{ not valid json }".data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
@@ -356,7 +356,7 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let responseJSON = """
+        let responseJSON = try XCTUnwrap("""
         {
             "id": 99,
             "title": "Created Task",
@@ -366,7 +366,7 @@ final class APIClientTests: XCTestCase {
             "created": "2026-03-20T10:00:00Z",
             "updated": "2026-03-20T10:00:00Z"
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             // Verify the request has a body
@@ -447,13 +447,13 @@ final class APIClientTests: XCTestCase {
         }
     }
 
-    func testDeleteThrowsServerErrorOn500() async {
+    func testDeleteThrowsServerErrorOn500() async throws {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let errorJSON = """
+        let errorJSON = try XCTUnwrap("""
         {"code": 500, "message": "Delete failed"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 500, url: request.url)
@@ -481,12 +481,12 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let tasksJSON = """
+        let tasksJSON = try XCTUnwrap("""
         [
             {"id": 1, "title": "Task 1", "done": false, "priority": 0, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"},
             {"id": 2, "title": "Task 2", "done": true, "priority": 1, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"}
         ]
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
@@ -506,18 +506,18 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let page1JSON = """
+        let page1JSON = try XCTUnwrap("""
         [
             {"id": 1, "title": "Task 1", "done": false, "priority": 0, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"},
             {"id": 2, "title": "Task 2", "done": false, "priority": 0, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"}
         ]
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
-        let page2JSON = """
+        let page2JSON = try XCTUnwrap("""
         [
             {"id": 3, "title": "Task 3", "done": false, "priority": 0, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"}
         ]
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         var requestCount = 0
         MockURLProtocol.requestHandler = { request in
@@ -592,7 +592,10 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         MockURLProtocol.requestHandler = { request in
-            (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), Data(#"{"items": null, "total": 0}"#.utf8))
+            (
+                MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
+                Data(#"{"items": null, "total": 0}"#.utf8)
+            )
         }
 
         let users: [User] = try await client.fetchList(Endpoint.projectUsers(projectId: 5))
@@ -666,7 +669,7 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let taskJSON = """
+        let taskJSON = try XCTUnwrap("""
         {
             "id": 1,
             "title": "No Due Date",
@@ -677,7 +680,7 @@ final class APIClientTests: XCTestCase {
             "created": "2026-03-15T08:00:00Z",
             "updated": "2026-03-15T08:00:00Z"
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
@@ -696,7 +699,7 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let taskJSON = """
+        let taskJSON = try XCTUnwrap("""
         {
             "id": 2,
             "title": "Fractional",
@@ -706,7 +709,7 @@ final class APIClientTests: XCTestCase {
             "created": "2026-03-15T08:30:45.123Z",
             "updated": "2026-03-15T08:30:45.456Z"
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
@@ -723,7 +726,7 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let taskJSON = """
+        let taskJSON = try XCTUnwrap("""
         {
             "id": 3,
             "title": "No Fractional",
@@ -733,7 +736,7 @@ final class APIClientTests: XCTestCase {
             "created": "2026-03-15T08:30:45Z",
             "updated": "2026-03-15T08:30:45Z"
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
@@ -752,9 +755,9 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "my-secret-token")
 
-        let taskJSON = """
+        let taskJSON = try XCTUnwrap("""
         {"id": 1, "title": "T", "done": false, "priority": 0, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
@@ -773,9 +776,9 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let responseJSON = """
+        let responseJSON = try XCTUnwrap("""
         {"id": 1, "title": "T", "done": false, "priority": 0, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
@@ -867,13 +870,13 @@ final class APIClientTests: XCTestCase {
         // Success if no error thrown
     }
 
-    func testSendRawDataThrowsServerError() async {
+    func testSendRawDataThrowsServerError() async throws {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let errorJSON = """
+        let errorJSON = try XCTUnwrap("""
         {"code": 503, "message": "Service Unavailable"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 503, url: request.url)

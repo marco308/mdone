@@ -24,7 +24,7 @@ final class KanbanTests: XCTestCase {
     // MARK: - Bucket model
 
     func testBucketDecodesWithEmbeddedTasks() throws {
-        let json = """
+        let json = try XCTUnwrap("""
         {
             "id": 5,
             "title": "In Progress",
@@ -37,7 +37,7 @@ final class KanbanTests: XCTestCase {
                 {"id": 12, "title": "B", "done": true, "priority": 2, "project_id": 1}
             ]
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         let bucket = try snakeCaseDecoder().decode(Bucket.self, from: json)
         XCTAssertEqual(bucket.id, 5)
@@ -60,7 +60,7 @@ final class KanbanTests: XCTestCase {
 
         limited.tasks = [
             VTask(id: 1, title: "x", done: false, priority: 0, projectId: 1),
-            VTask(id: 2, title: "y", done: false, priority: 0, projectId: 1)
+            VTask(id: 2, title: "y", done: false, priority: 0, projectId: 1),
         ]
         XCTAssertTrue(limited.isOverLimit)
     }
@@ -70,7 +70,7 @@ final class KanbanTests: XCTestCase {
         var limited = Bucket(id: 3, title: "Done", limit: 2)
         limited.tasks = [
             VTask(id: 1, title: "x", done: true, priority: 0, projectId: 1),
-            VTask(id: 2, title: "y", done: true, priority: 0, projectId: 1)
+            VTask(id: 2, title: "y", done: true, priority: 0, projectId: 1),
         ]
         XCTAssertTrue(limited.isOverLimit)
     }
@@ -91,7 +91,7 @@ final class KanbanTests: XCTestCase {
             title: "P",
             views: [
                 ProjectView(id: 100, title: "List", projectId: 1, viewKind: "list"),
-                ProjectView(id: 200, title: "Kanban", projectId: 1, viewKind: "kanban")
+                ProjectView(id: 200, title: "Kanban", projectId: 1, viewKind: "kanban"),
             ]
         )
         XCTAssertEqual(project.kanbanViewId, 200)
@@ -131,14 +131,14 @@ final class KanbanTests: XCTestCase {
 
         // Shaped like a real buckets-with-tasks response: `tasks` is omitted
         // for empty buckets, and `count`/`limit` are always present.
-        let bucketsJSON = """
+        let bucketsJSON = try XCTUnwrap("""
         [
             {"id": 1, "title": "Backlog", "project_view_id": 3, "limit": 0, "count": 0, "position": 1.0},
             {"id": 2, "title": "Done", "project_view_id": 3, "limit": 0, "count": 1, "position": 2.0, "tasks": [
                 {"id": 50, "title": "Ship it", "done": false, "priority": 0, "project_id": 7, "bucket_id": 2}
             ]}
         ]
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             // Must be `/buckets/tasks`: plain `/buckets` carries no tasks (#130).
@@ -331,7 +331,7 @@ final class KanbanTests: XCTestCase {
     // MARK: - AppState.fetchBuckets
 
     @MainActor
-    func testAppStateFetchBucketsSortsAndMergesTasks() async {
+    func testAppStateFetchBucketsSortsAndMergesTasks() async throws {
         let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         let appState = AppState(projectService: ProjectService(apiClient: client))
@@ -342,14 +342,14 @@ final class KanbanTests: XCTestCase {
             views: [ProjectView(id: 3, title: "Kanban", projectId: 7, viewKind: "kanban")]
         )
 
-        let bucketsJSON = """
+        let bucketsJSON = try XCTUnwrap("""
         [
             {"id": 2, "title": "Doing", "project_view_id": 3, "limit": 0, "count": 1, "position": 2.0, "tasks": [
                 {"id": 50, "title": "Ship it", "done": false, "priority": 0, "project_id": 7, "bucket_id": 2}
             ]},
             {"id": 1, "title": "Backlog", "project_view_id": 3, "limit": 0, "count": 0, "position": 1.0}
         ]
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertEqual(request.url?.path, VikunjaAPI.path("/projects/7/views/3/buckets/tasks"))
@@ -472,7 +472,9 @@ private extension URLRequest {
         defer { buffer.deallocate() }
         while stream.hasBytesAvailable {
             let read = stream.read(buffer, maxLength: bufferSize)
-            if read <= 0 { break }
+            if read <= 0 {
+                break
+            }
             data.append(buffer, count: read)
         }
         return data.isEmpty ? nil : data

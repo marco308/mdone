@@ -102,9 +102,9 @@ final class NetworkErrorTests: XCTestCase {
     // MARK: - APIError Model
 
     func testAPIErrorDecoding() throws {
-        let json = """
+        let json = try XCTUnwrap("""
         {"code": 404, "message": "Not found"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         let error = try JSONDecoder().decode(APIError.self, from: json)
         XCTAssertEqual(error.code, 404)
@@ -112,9 +112,9 @@ final class NetworkErrorTests: XCTestCase {
     }
 
     func testAPIErrorPartialDecoding() throws {
-        let json = """
+        let json = try XCTUnwrap("""
         {"message": "Something went wrong"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         let error = try JSONDecoder().decode(APIError.self, from: json)
         XCTAssertNil(error.code)
@@ -122,7 +122,7 @@ final class NetworkErrorTests: XCTestCase {
     }
 
     func testAPIErrorEmptyDecoding() throws {
-        let json = "{}".data(using: .utf8)!
+        let json = try XCTUnwrap("{}".data(using: .utf8))
 
         let error = try JSONDecoder().decode(APIError.self, from: json)
         XCTAssertNil(error.code)
@@ -157,9 +157,9 @@ final class NetworkErrorTests: XCTestCase {
     }
 
     func testLoginResponseDecoding() throws {
-        let json = """
+        let json = try XCTUnwrap("""
         {"token": "eyJhbGciOiJIUzI1NiJ9.test.signature"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         let response = try JSONDecoder().decode(LoginResponse.self, from: json)
         XCTAssertEqual(response.token, "eyJhbGciOiJIUzI1NiJ9.test.signature")
@@ -222,8 +222,10 @@ final class NetworkErrorTests: XCTestCase {
             return XCTFail("412 with code 1017 is a two-factor passcode problem")
         }
 
-        let missing = try decodeAPIError(#"{"title":"Not Found","status":404,"detail":"This task does not exist","code":4002}"#)
-        guard case let .serverError(status, message) = NetworkError.fromResponse(statusCode: 404, apiError: missing) else {
+        let missing =
+            try decodeAPIError(#"{"title":"Not Found","status":404,"detail":"This task does not exist","code":4002}"#)
+        guard case let .serverError(status, message) = NetworkError.fromResponse(statusCode: 404, apiError: missing)
+        else {
             return XCTFail("anything else stays a server error")
         }
         XCTAssertEqual(status, 404)

@@ -2,10 +2,10 @@ import AppIntents
 import EventKit
 import Foundation
 import SwiftUI
+import WidgetKit
 #if os(iOS)
 import UIKit
 #endif
-import WidgetKit
 
 @Observable
 final class AppState {
@@ -1646,8 +1646,8 @@ final class AppState {
     @discardableResult
     func createSubtask(title: String, parent: VTask) async -> Bool {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return false }
-        guard let newTask = await createTask(title: trimmed, projectId: parent.projectId) else { return false }
+        guard !trimmed.isEmpty,
+              let newTask = await createTask(title: trimmed, projectId: parent.projectId) else { return false }
         return await addSubtaskRelation(parentId: parent.id, childId: newTask.id)
     }
 

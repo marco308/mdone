@@ -449,7 +449,16 @@ final class AppStateTests: XCTestCase {
         )
         func tasks(_ ids: [Int64]) -> Data {
             MockURLProtocol.page(
-                ids.map { ["id": $0, "title": "Task \($0)", "done": false, "priority": 0, "project_id": 4] as [String: Any] }
+                ids
+                    .map {
+                        [
+                            "id": $0,
+                            "title": "Task \($0)",
+                            "done": false,
+                            "priority": 0,
+                            "project_id": 4,
+                        ] as [String: Any]
+                    }
             )
         }
         let projects = MockURLProtocol.page([
@@ -819,7 +828,7 @@ final class AppStateTests: XCTestCase {
     /// Vikunja answers "done" on a repeating task with the task undone and
     /// its next date. The completion hook must still fire, or a Focus Run
     /// would sit on that task instead of moving to the next one.
-    func testCompletingARepeatingTaskStillReportsCompletion() async throws {
+    func testCompletingARepeatingTaskStillReportsCompletion() async {
         let appState = await makeMockedAppState()
         let task = VTask(
             id: 85,

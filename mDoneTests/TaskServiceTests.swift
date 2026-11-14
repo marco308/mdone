@@ -538,12 +538,12 @@ final class TaskServiceTests: XCTestCase {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let tasksJSON = """
+        let tasksJSON = try XCTUnwrap("""
         [
             {"id": 1, "title": "Task A", "done": false, "priority": 1, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"},
             {"id": 2, "title": "Task B", "done": true, "priority": 3, "project_id": 2, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"}
         ]
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
@@ -596,9 +596,9 @@ final class TaskServiceTests: XCTestCase {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let taskJSON = """
+        let taskJSON = try XCTUnwrap("""
         {"id": 42, "title": "Specific Task", "done": false, "priority": 2, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/tasks/42")) == true)
@@ -615,9 +615,9 @@ final class TaskServiceTests: XCTestCase {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let responseJSON = """
+        let responseJSON = try XCTUnwrap("""
         {"id": 100, "title": "New Task", "done": false, "priority": 2, "project_id": 5, "created": "2026-03-20T10:00:00Z", "updated": "2026-03-20T10:00:00Z"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/projects/5/tasks")) == true)
@@ -637,9 +637,9 @@ final class TaskServiceTests: XCTestCase {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let responseJSON = """
+        let responseJSON = try XCTUnwrap("""
         {"id": 10, "title": "Updated Task", "done": false, "priority": 4, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-20T10:00:00Z"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/tasks/10")) == true)
@@ -674,9 +674,9 @@ final class TaskServiceTests: XCTestCase {
             repeatMode: 1
         )
 
-        let responseJSON = """
+        let responseJSON = try XCTUnwrap("""
         {"id": 7, "title": "Toggle Me", "done": true, "priority": 1, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-20T10:00:00Z"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/tasks/7")) == true)
@@ -709,9 +709,9 @@ final class TaskServiceTests: XCTestCase {
 
         let originalTask = VTask(id: 8, title: "Undone Me", done: true, priority: 1, projectId: 1)
 
-        let responseJSON = """
+        let responseJSON = try XCTUnwrap("""
         {"id": 8, "title": "Undone Me", "done": false, "priority": 1, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-20T10:00:00Z"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             guard let bodyJSON = request.decodedJSONBody else {
@@ -785,13 +785,13 @@ final class TaskServiceTests: XCTestCase {
         }
     }
 
-    func testCreateTaskThrowsOnServerError() async {
+    func testCreateTaskThrowsOnServerError() async throws {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let errorJSON = """
+        let errorJSON = try XCTUnwrap("""
         {"code": 500, "message": "Internal Server Error"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 500, url: request.url)

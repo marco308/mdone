@@ -23,7 +23,10 @@ final class RefreshLatencyTests: XCTestCase {
     /// One page of tasks in the v2 list envelope.
     private nonisolated static func tasksJSON(_ ids: [Int64], totalPages: Int = 1) -> Data {
         MockURLProtocol.page(
-            ids.map { ["id": $0, "title": "Task \($0)", "done": false, "priority": 0, "project_id": 1] as [String: Any] },
+            ids
+                .map {
+                    ["id": $0, "title": "Task \($0)", "done": false, "priority": 0, "project_id": 1] as [String: Any]
+                },
             totalPages: totalPages
         )
     }

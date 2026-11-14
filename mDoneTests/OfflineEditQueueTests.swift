@@ -111,10 +111,10 @@ final class OfflineEditQueueTests: XCTestCase {
         let edit = QueuedTaskEdit(from: TaskUpdateRequest(done: true))
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        container.mainContext.insert(PendingOperation(
+        try container.mainContext.insert(PendingOperation(
             endpointPath: VikunjaAPI.legacyPath("/tasks/1"),
             method: "POST",
-            bodyData: try encoder.encode(edit),
+            bodyData: encoder.encode(edit),
             kind: .taskEdit,
             taskId: 1
         ))

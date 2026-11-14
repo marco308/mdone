@@ -54,9 +54,15 @@ final class ServerInfoServiceTests: XCTestCase {
     func testFallsBackToTheV1InfoWhenV2AnswersNotFound() async throws {
         MockURLProtocol.requestHandler = { request in
             if request.url?.path == VikunjaAPI.path("/info") {
-                return (MockURLProtocol.makeResponse(statusCode: 404, url: request.url), Data(#"{"message":"Not Found"}"#.utf8))
+                return (
+                    MockURLProtocol.makeResponse(statusCode: 404, url: request.url),
+                    Data(#"{"message":"Not Found"}"#.utf8)
+                )
             }
-            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), Data(#"{"version": "v2.3.0"}"#.utf8))
+            return (
+                MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
+                Data(#"{"version": "v2.3.0"}"#.utf8)
+            )
         }
 
         let info = try await service().fetch(from: XCTUnwrap(URL(string: "https://vikunja.example.com")))

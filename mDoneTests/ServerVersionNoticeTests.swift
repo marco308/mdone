@@ -119,7 +119,10 @@ final class ServerVersionNoticeTests: XCTestCase {
             if request.url?.path == VikunjaAPI.path("/info") {
                 return (MockURLProtocol.makeResponse(statusCode: 404, url: request.url), Data())
             }
-            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), Data(#"{"version": "v0.24.6"}"#.utf8))
+            return (
+                MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
+                Data(#"{"version": "v0.24.6"}"#.utf8)
+            )
         }
         let appState = AppState(serverInfoService: ServerInfoService(apiClient: MockURLProtocol.mockClient()))
         appState.isAuthenticated = true
@@ -328,7 +331,11 @@ final class ServerVersionNoticeTests: XCTestCase {
                 return Self.respond(200, #"{"version": "unstable"}"#, to: request)
             }
             if path.hasSuffix("/login") {
-                return Self.respond(403, #"{"title":"Forbidden","status":403,"detail":"Wrong username or password.","code":1011}"#, to: request)
+                return Self.respond(
+                    403,
+                    #"{"title":"Forbidden","status":403,"detail":"Wrong username or password.","code":1011}"#,
+                    to: request
+                )
             }
             return Self.respond(500, "", to: request)
         }

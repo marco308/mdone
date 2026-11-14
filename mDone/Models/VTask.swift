@@ -116,21 +116,27 @@ struct VTask: Codable, Identifiable, Hashable {
     /// Returns nil for Vikunja's zero-date sentinel (year 1)
     var effectiveDueDate: Date? {
         guard let dueDate else { return nil }
-        if Calendar.current.component(.year, from: dueDate) <= 1 { return nil }
+        if Calendar.current.component(.year, from: dueDate) <= 1 {
+            return nil
+        }
         return dueDate
     }
 
     /// Returns nil for Vikunja's zero-date sentinel (year 1).
     var effectiveStartDate: Date? {
         guard let startDate else { return nil }
-        if Calendar.current.component(.year, from: startDate) <= 1 { return nil }
+        if Calendar.current.component(.year, from: startDate) <= 1 {
+            return nil
+        }
         return startDate
     }
 
     /// Returns nil for Vikunja's zero-date sentinel (year 1).
     var effectiveEndDate: Date? {
         guard let endDate else { return nil }
-        if Calendar.current.component(.year, from: endDate) <= 1 { return nil }
+        if Calendar.current.component(.year, from: endDate) <= 1 {
+            return nil
+        }
         return endDate
     }
 

@@ -19,8 +19,8 @@ enum StorageScope {
     /// runner, so UI tests and the widget extension stay on the real stores.
     static let isHostingUnitTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
-    /// The app group shared by the app and its widget extension. Must match
-    /// `MDONE_APP_GROUP` in `project.yml`, which is what the entitlements use.
+    // The app group shared by the app and its widget extension. Must match
+    // `MDONE_APP_GROUP` in `project.yml`, which is what the entitlements use.
     #if DEBUG
     static let appGroupID = "group.com.mdone.app.dev"
     #else

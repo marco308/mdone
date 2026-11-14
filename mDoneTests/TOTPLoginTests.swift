@@ -69,7 +69,10 @@ final class TOTPLoginTests: XCTestCase {
     func testOther412StaysAServerError() async {
         // Only the two login codes get names. Anything else keeps the generic
         // path so no existing caller sees a new case it does not handle.
-        let error = await login(status: 412, body: #"{"title":"Precondition Failed","status":412,"detail":"Totp is not enabled for this user.","code":1016}"#)
+        let error = await login(
+            status: 412,
+            body: #"{"title":"Precondition Failed","status":412,"detail":"Totp is not enabled for this user.","code":1016}"#
+        )
         guard case let .serverError(status, message) = error else {
             return XCTFail("Expected .serverError, got \(String(describing: error))")
         }
