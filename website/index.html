@@ -13,11 +13,12 @@
 <meta property="og:type" content="website" />
 <meta property="og:title" content="mDone: beautifully done tasks for self-hosted Vikunja" />
 <meta property="og:description" content="A polished, native iOS & macOS client for your Vikunja server. Smart lists, widgets, focus timer, Siri hands-free, offline sync, zero tracking." />
-<meta property="og:image" content="assets/icon.png" />
-<meta name="twitter:card" content="summary_large_image" />
+<meta property="og:url" content="https://marco308.github.io/mdone/" />
+<meta property="og:image" content="https://marco308.github.io/mdone/assets/icon.png" />
+<meta name="twitter:card" content="summary" />
 <meta name="twitter:title" content="mDone: beautifully done tasks for self-hosted Vikunja" />
 <meta name="twitter:description" content="A polished, native iOS & macOS client for your Vikunja server. Zero tracking." />
-<meta name="twitter:image" content="assets/icon.png" />
+<meta name="twitter:image" content="https://marco308.github.io/mdone/assets/icon.png" />
 
 <link rel="icon" href="assets/icon.png" />
 <link rel="apple-touch-icon" href="assets/icon.png" />
@@ -25,7 +26,7 @@
 <!-- Fonts: Fraunces (editorial display) + Hanken Grotesk (body) -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
 <style>
 /* ============================================================
@@ -34,6 +35,7 @@
    ============================================================ */
 :root{
   --brand:        #527AFA;
+  --brand-fill:   #3d63e6;   /* cobalt deep enough to carry white text (5.1:1) */
   --brand-ink:    #2f54d6;   /* darker cobalt for text/hover on light */
   --brand-deep:   #1d2c66;
   --brand-tint:   #eef2fe;   /* pale wash for chips/cards */
@@ -44,7 +46,7 @@
   --card:   #ffffff;
   --ink:    #14161d;         /* near-black, faint blue */
   --ink-2:  #565b69;         /* secondary text */
-  --ink-3:  #8a8f9c;         /* tertiary / captions */
+  --ink-3:  #666b78;         /* tertiary / captions, 4.6:1 on the warm band */
   --line:   rgba(20,22,29,.10);
   --line-2: rgba(20,22,29,.06);
 
@@ -89,7 +91,18 @@ body::before{
 
 a{ color:inherit; text-decoration:none; }
 img{ display:block; max-width:100%; }
-:focus-visible{ outline:2.5px solid var(--brand); outline-offset:3px; border-radius:6px; }
+:focus-visible{ outline:2.5px solid var(--brand-ink); outline-offset:3px; border-radius:6px; }
+/* On the dark and cobalt sections a cobalt ring disappears, so it turns white there. */
+.privacy :focus-visible, .final :focus-visible{ outline-color:#fff; }
+::selection{ background:var(--brand-tint-2); color:var(--brand-deep); }
+.privacy ::selection, .final ::selection{ background:#fff; color:var(--brand-deep); }
+
+.skip{
+  position:absolute; left:16px; top:-64px; z-index:200;
+  background:var(--ink); color:#fff; padding:12px 18px; border-radius:10px;
+  font-weight:600; font-size:15px; transition:top .15s ease;
+}
+.skip:focus{ top:12px; }
 
 .wrap{ width:100%; max-width:var(--maxw); margin:0 auto; padding:0 24px; }
 .eyebrow{
@@ -113,7 +126,7 @@ p{ margin:0; }
   white-space:nowrap;
 }
 .btn:active{ transform:translateY(1px); }
-.btn-primary{ background:var(--brand); color:#fff; box-shadow:0 10px 24px -10px rgba(82,122,250,.7); }
+.btn-primary{ background:var(--brand-fill); color:#fff; box-shadow:0 10px 24px -10px rgba(82,122,250,.7); }
 .btn-primary:hover{ background:var(--brand-ink); transform:translateY(-2px); box-shadow:0 16px 30px -10px rgba(82,122,250,.65); }
 .btn-ghost{ background:transparent; color:var(--ink); border-color:var(--line); }
 .btn-ghost:hover{ border-color:var(--ink); transform:translateY(-2px); background:rgba(20,22,29,.02); }
@@ -151,7 +164,16 @@ header.nav.scrolled{ border-bottom-color:var(--line); }
 .nav-links{ display:flex; align-items:center; gap:34px; }
 .nav-links a{ font-size:15px; font-weight:500; color:var(--ink-2); transition:color .2s; }
 .nav-links a:hover{ color:var(--ink); }
-.nav-cta{ display:flex; align-items:center; gap:14px; }
+.nav-cta{ display:flex; align-items:center; gap:10px; }
+/* Phones only, and only with JS: without it the footer carries the same links. */
+.nav-toggle{
+  display:none; width:44px; height:44px; padding:0; border-radius:12px; cursor:pointer;
+  background:transparent; border:1px solid var(--line); color:var(--ink);
+  place-items:center; transition:border-color .2s, background .2s;
+}
+.nav-toggle svg{ width:22px; height:22px; }
+.nav-toggle:hover{ border-color:var(--ink); }
+.nav-toggle[aria-expanded="true"]{ background:var(--ink); border-color:var(--ink); color:#fff; }
 
 /* ---------- hero ---------- */
 .hero{ position:relative; padding:74px 0 90px; overflow:hidden; }
@@ -227,7 +249,7 @@ section{ padding:96px 0; }
 .card:hover{ transform:translateY(-4px); box-shadow:var(--shadow-md); border-color:var(--brand-tint-2); }
 .card.col-3{ grid-column:span 3; }
 .card.col-2{ grid-column:span 2; }
-.new-tag{ display:inline-block; vertical-align:middle; margin-left:6px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:#fff; background:#1a8cff; }
+.new-tag{ display:inline-block; vertical-align:middle; margin-left:6px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:#fff; background:var(--brand-ink); }
 .card .ic{
   width:46px; height:46px; border-radius:13px; display:grid; place-items:center; margin-bottom:18px;
   background:var(--brand-tint); color:var(--brand-ink); border:1px solid var(--brand-tint-2);
@@ -272,7 +294,7 @@ section{ padding:96px 0; }
 }
 .widget-tile{ margin:0; width:min(430px,100%); }
 .widget-tile img{ width:100%; height:auto; filter:drop-shadow(0 20px 34px rgba(23,33,80,.30)); }
-.widget-tile figcaption{ text-align:center; margin-top:16px; font-size:12.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); }
+.widget-tile figcaption{ text-align:center; margin-top:16px; font-size:12.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-2); }
 
 /* ---------- privacy (dark) ---------- */
 .privacy{ background:var(--night); color:#fff; position:relative; overflow:hidden; }
@@ -293,7 +315,8 @@ section{ padding:96px 0; }
 
 /* ---------- open source + support ---------- */
 .split{ display:grid; grid-template-columns:1fr 1fr; gap:24px; }
-.panel{ border:1px solid var(--line); border-radius:var(--r-lg); padding:42px; background:var(--card); box-shadow:var(--shadow-sm); }
+/* min-width:0 lets the code line scroll inside the panel instead of widening the page on phones. */
+.panel{ min-width:0; border:1px solid var(--line); border-radius:var(--r-lg); padding:42px; background:var(--card); box-shadow:var(--shadow-sm); }
 .panel.tint{ background:linear-gradient(160deg,var(--brand-tint),#fff); }
 .panel h2{ font-size:30px; }
 .panel p{ color:var(--ink-2); margin-top:14px; }
@@ -306,16 +329,17 @@ section{ padding:96px 0; }
 .final{ text-align:center; }
 .final .box{
   max-width:760px; margin:0 auto; padding:64px 40px; border-radius:var(--r-lg);
-  background:linear-gradient(160deg,#5d83fb,#3f5fe6); color:#fff; position:relative; overflow:hidden;
+  background:linear-gradient(160deg,#3a5ce0,#2c49c4); color:#fff; position:relative; overflow:hidden;
   box-shadow:var(--shadow-lg);
 }
 .final .box::after{ content:""; position:absolute; inset:0; pointer-events:none;
-  background:radial-gradient(circle at 70% -10%, rgba(255,255,255,.28), transparent 55%); }
+  background:radial-gradient(circle at 70% -10%, rgba(255,255,255,.12), transparent 55%); }
 .final .box > *{ position:relative; }
 .final h2{ color:#fff; font-size:clamp(30px,4.4vw,44px); }
-.final p{ color:#e4ebff; margin-top:16px; font-size:18px; }
+.final p{ color:#eef2fe; margin-top:16px; font-size:18px; }
 .final .actions{ display:flex; gap:14px; justify-content:center; margin-top:30px; flex-wrap:wrap; }
-.final .req{ margin-top:22px; font-size:13.5px; color:#cdd9ff; }
+.final .req{ margin-top:22px; font-size:14px; color:#e4ebff; }
+.final .req a{ color:#fff; text-decoration:underline; text-underline-offset:3px; }
 .final .badge-apple{ background:#fff; color:#111; border-color:rgba(255,255,255,.6); }
 .final .btn-ghost{ color:#fff; border-color:rgba(255,255,255,.55); }
 .final .btn-ghost:hover{ background:rgba(255,255,255,.12); border-color:#fff; }
@@ -357,30 +381,48 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
 }
 @media (max-width:680px){
   .nav-links{ display:none; }
+  .js .nav-toggle{ display:grid; }
+  .nav-inner{ position:relative; }
+  .nav-links.open{
+    display:grid; gap:0; position:absolute; left:16px; right:16px; top:calc(100% + 6px);
+    background:var(--card); border:1px solid var(--line); border-radius:var(--r-md);
+    box-shadow:var(--shadow-md); padding:6px;
+  }
+  .nav-links.open a{ padding:13px 14px; border-radius:10px; font-size:16px; color:var(--ink); }
+  .nav-links.open a:hover{ background:var(--brand-tint); }
+  .nav-cta .btn{ padding:11px 18px; font-size:15px; }
   section{ padding:72px 0; }
   .bento{ grid-template-columns:1fr; }
   .hero-art .phone.back{ display:none; }
   .panel{ padding:30px; }
 }
+@media (max-width:360px){
+  /* The smallest phones: keep a gap between the wordmark and the header buttons. */
+  .wrap{ padding:0 18px; }
+  .nav-cta{ gap:8px; }
+  .nav-cta .btn{ padding:10px 14px; }
+}
 @media (prefers-reduced-motion:reduce){
   *{ animation:none !important; transition:none !important; }
-  .js .reveal{ opacity:1; transform:none; }
+  /* .load starts hidden and relies on its animation to appear, so it must be shown outright here. */
+  .js .reveal, .load{ opacity:1; transform:none; }
   html{ scroll-behavior:auto; }
 }
 </style>
 </head>
 <body>
+<a class="skip" href="#top">Skip to content</a>
 
 <!-- ================= NAV ================= -->
 <header class="nav" id="nav">
   <div class="wrap nav-inner">
     <a class="brand" href="#top" aria-label="mDone home">
       <span class="glyph" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.5l4.2 4.2L19.5 6" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4.5 12.5l4.2 4.2L19.5 6" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
       mDone
     </a>
-    <nav class="nav-links" aria-label="Primary">
+    <nav class="nav-links" id="navLinks" aria-label="Primary">
       <a href="#features">Features</a>
       <a href="#showcase">Screens</a>
       <a href="#privacy">Privacy</a>
@@ -388,6 +430,9 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
     </nav>
     <div class="nav-cta">
       <a class="btn btn-primary" href="https://apps.apple.com/us/app/mdone/id6760613430">Get mDone</a>
+      <button class="nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="navLinks" aria-label="Sections">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 8h14M5 16h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
     </div>
   </div>
 </header>
@@ -413,20 +458,20 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
         </a>
       </div>
       <div class="hero-note load d5">
-        <span><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Open source (MIT)</span>
-        <span><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> No analytics, ever</span>
-        <span><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Works offline</span>
+        <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Open source (MIT)</span>
+        <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> No analytics, ever</span>
+        <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Works offline</span>
       </div>
     </div>
 
     <div class="hero-art">
       <div class="phone back" aria-hidden="true">
         <span class="island"></span>
-        <div class="screen"><img src="assets/shot-calendar.png" alt="" loading="lazy" /></div>
+        <div class="screen"><img src="assets/shot-calendar.webp" width="660" height="1434" alt="" loading="lazy" /></div>
       </div>
       <div class="phone main">
         <span class="island"></span>
-        <div class="screen"><img src="assets/shot-inbox.png" alt="mDone inbox showing today and upcoming tasks" /></div>
+        <div class="screen"><img src="assets/shot-inbox.webp" width="660" height="1434" alt="mDone inbox showing today and upcoming tasks" fetchpriority="high" /></div>
       </div>
     </div>
   </div>
@@ -435,12 +480,12 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
 <!-- ================= TRUST STRIP ================= -->
 <div class="strip">
   <div class="wrap">
-    <span class="item"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg> Talks only to your server</span>
-    <span class="item"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="2"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> iOS 18 &amp; macOS 15</span>
-    <span class="item"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Smart quick add &amp; widgets</span>
-    <span class="item"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Focus timer + Live Activities</span>
-    <span class="item"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0114-5m2 5a8 8 0 01-14 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 3v4h-4M6 21v-4h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Offline sync</span>
-    <span class="item"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9s1-6.5 3.5-9z" stroke="currentColor" stroke-width="2"/></svg> English &amp; 简体中文</span>
+    <span class="item"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg> Talks only to your server</span>
+    <span class="item"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="2"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> iOS 18 &amp; macOS 15</span>
+    <span class="item"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Smart quick add &amp; widgets</span>
+    <span class="item"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Focus timer + Live Activities</span>
+    <span class="item"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12a8 8 0 0114-5m2 5a8 8 0 01-14 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 3v4h-4M6 21v-4h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Offline sync</span>
+    <span class="item"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9s1-6.5 3.5-9z" stroke="currentColor" stroke-width="2"/></svg> English &amp; <span lang="zh-Hans">简体中文</span></span>
   </div>
 </div>
 
@@ -455,57 +500,57 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
 
     <div class="bento">
       <div class="card col-3 reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8L12 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z" fill="currentColor"/></svg></div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8L12 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z" fill="currentColor"/></svg></div>
         <h3>Quick Add That Understands You <span class="new-tag">New</span></h3>
         <p>Type "Buy milk tomorrow at 5pm +Home !2" and mDone files it in Home, due tomorrow at five, priority 2. Each part shows as a chip before you add it, so nothing happens by surprise. Works in Siri and on the Mac too.</p>
       </div>
       <div class="card col-3 reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h10M4 12h16M4 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 5l1.4 1.4L22 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h10M4 12h16M4 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 5l1.4 1.4L22 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         <h3>Smart Lists</h3>
         <p>Today, Upcoming, and Overdue views organise everything automatically, repeating tasks included, so you always know what to focus on next.</p>
       </div>
       <div class="card col-2 reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M9 3h6l-1 5 3 3v2H7v-2l3-3-1-5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 15v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 3h6l-1 5 3 3v2H7v-2l3-3-1-5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 15v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
         <h3>Current</h3>
         <p>Pin long-running tasks to a section above Today, each with a progress bar and an idle nudge when one stalls, so slow-burn projects actually get finished.</p>
       </div>
       <div class="card col-2 reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 11l1.2 2.4 2.6.3-1.9 1.8.5 2.6L12 17l-2.4 1.1.5-2.6-1.9-1.8 2.6-.3L12 11z" fill="currentColor"/></svg></div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 11l1.2 2.4 2.6.3-1.9 1.8.5 2.6L12 17l-2.4 1.1.5-2.6-1.9-1.8 2.6-.3L12 11z" fill="currentColor"/></svg></div>
         <h3>Projects &amp; Favorites</h3>
         <p>Nest projects inside projects, sort by date, priority or your own drag-and-drop order, and keep favourites one tap away.</p>
       </div>
       <div class="card col-2 reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="5" height="16" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="10" y="4" width="5" height="11" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="17" y="4" width="4" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/></svg></div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="10" y="4" width="5" height="11" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="17" y="4" width="4" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/></svg></div>
         <h3>Kanban Boards</h3>
         <p>Open any project as a board. Drag cards between columns and up and down them, in the same order Vikunja's web app shows.</p>
       </div>
       <div class="card col-2 reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6l2 2 3-3M4 13l2 2 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 7h8M12 14h8M8 20h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6l2 2 3-3M4 13l2 2 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 7h8M12 14h8M8 20h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
         <h3>Subtasks, Checklists &amp; Labels</h3>
         <p>Break big tasks into subtasks, tick off checklists written in a description, and add or create labels without leaving the task.</p>
       </div>
       <div class="card col-2 reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/></svg></div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/></svg></div>
         <h3>Home &amp; Lock Screen Widgets</h3>
         <p>Today's agenda, upcoming, and overdue, right on your home or lock screen. Customise size and content.</p>
       </div>
       <div class="card col-2 reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" stroke-width="2"/><path d="M5 11a7 7 0 0014 0M12 18v3M9 21h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" stroke-width="2"/><path d="M5 11a7 7 0 0014 0M12 18v3M9 21h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         <h3>Siri, Hands-Free</h3>
         <p>Say "Add a task in mDone" and Siri asks what it is, adds it, and reads it back, without opening the app. Works in the car over CarPlay, on AirPods and on Apple Watch, even with no signal.</p>
       </div>
       <div class="card col-2 reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="13" r="7" stroke="currentColor" stroke-width="2"/><path d="M12 10v3l2 1.5M9 3h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="13" r="7" stroke="currentColor" stroke-width="2"/><path d="M12 10v3l2 1.5M9 3h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
         <h3>Focus Timer</h3>
         <p>Work through tasks with purpose. Live Activities keep the timer on your lock screen and Dynamic Island.</p>
       </div>
       <div class="card col-2 reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="16" rx="2.5" stroke="currentColor" stroke-width="2"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2.5" stroke="currentColor" stroke-width="2"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
         <h3>Calendar View</h3>
         <p>See your tasks across days and weeks. Spot the gaps, plan ahead, and keep your week in balance.</p>
       </div>
       <div class="card col-2 reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M7 18a4 4 0 01-.5-7.97A6 6 0 0118 9.5a3.5 3.5 0 011 6.86" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 12v8m0 0l-2.5-2.5M12 20l2.5-2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 18a4 4 0 01-.5-7.97A6 6 0 0118 9.5a3.5 3.5 0 011 6.86" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 12v8m0 0l-2.5-2.5M12 20l2.5-2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         <h3>Offline Support</h3>
         <p>Tasks are cached locally so you can keep working without a connection. Changes sync when you're back online.</p>
       </div>
@@ -519,80 +564,80 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
 
     <div class="show">
       <div class="show-art reveal">
-        <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-smartadd.png" alt="mDone quick add turning a typed sentence into date, project and priority chips" loading="lazy" /></div></div>
+        <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-smartadd.webp" width="660" height="1434" alt="mDone quick add turning a typed sentence into date, project and priority chips" loading="lazy" /></div></div>
       </div>
       <div class="show-copy reveal">
-        <span class="eyebrow">New in 1.19</span>
+        <span class="eyebrow">Quick add</span>
         <h2 class="serif">Type it the way you'd say it.</h2>
         <p>Write "Call Mum tomorrow 6pm +Home !3" and mDone pulls out the date, the project and the priority as you type, leaving just "Call Mum" as the title.</p>
         <ul class="show-list">
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Every part shows as a chip: tap its X to keep the words</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Dates and times, +projects, !priorities and *labels</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Understands 明天下午3点 as well as "next Friday"</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Every part shows as a chip: tap its X to keep the words</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Dates and times, +projects, !priorities and *labels</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Understands <span lang="zh-Hans">明天下午3点</span> as well as "next Friday"</li>
         </ul>
       </div>
     </div>
 
     <div class="show flip">
       <div class="show-art reveal">
-        <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-inbox.png" alt="mDone inbox with smart lists" loading="lazy" /></div></div>
+        <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-inbox.webp" width="660" height="1434" alt="mDone inbox with smart lists" loading="lazy" /></div></div>
       </div>
       <div class="show-copy reveal">
         <span class="eyebrow">Stay on top of it</span>
         <h2 class="serif">Today, front and centre.</h2>
         <p>Open mDone and the right things are already in front of you. Smart lists pull your day together so nothing slips.</p>
         <ul class="show-list">
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Quick-add a task without leaving the list</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Swipe to complete, postpone, or reschedule</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Shake to undo an accidental completion</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Quick-add a task without leaving the list</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Swipe to complete, postpone, or reschedule</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Shake to undo an accidental completion</li>
         </ul>
       </div>
     </div>
 
     <div class="show">
       <div class="show-art reveal">
-        <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-board.png" alt="mDone Kanban board with To-Do and Doing columns" loading="lazy" /></div></div>
+        <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-board.webp" width="660" height="1434" alt="mDone Kanban board with To-Do and Doing columns" loading="lazy" /></div></div>
       </div>
       <div class="show-copy reveal">
         <span class="eyebrow">Boards</span>
         <h2 class="serif">When a list isn't enough.</h2>
         <p>Flip any project to its Kanban board and drag work from column to column. It is the same board you see in Vikunja's web app, and mDone remembers which view each project opens in.</p>
         <ul class="show-list">
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Drag cards between columns, or reorder within one</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Due dates, labels and priorities on every card</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Filter-driven boards stay read-only, as on the web</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Drag cards between columns, or reorder within one</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Due dates, labels and priorities on every card</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Filter-driven boards stay read-only, as on the web</li>
         </ul>
       </div>
     </div>
 
     <div class="show flip">
       <div class="show-art reveal">
-        <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-calendar.png" alt="mDone calendar view" loading="lazy" /></div></div>
+        <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-calendar.webp" width="660" height="1434" alt="mDone calendar view" loading="lazy" /></div></div>
       </div>
       <div class="show-copy reveal">
         <span class="eyebrow">See the week</span>
         <h2 class="serif">The shape of your time.</h2>
         <p>An integrated calendar lays your tasks out across days and weeks, and folds in your device calendar events so you see the whole picture.</p>
         <ul class="show-list">
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Tasks and calendar events, side by side</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Choose which calendars contribute</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Start the week on any day you like</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Tasks and calendar events, side by side</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Choose which calendars contribute</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Start the week on any day you like</li>
         </ul>
       </div>
     </div>
 
     <div class="show">
       <div class="show-art reveal">
-        <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-detail.png" alt="mDone task detail editor" loading="lazy" /></div></div>
+        <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-detail.webp" width="660" height="1434" alt="mDone task detail editor" loading="lazy" /></div></div>
       </div>
       <div class="show-copy reveal">
         <span class="eyebrow">Every detail</span>
         <h2 class="serif">Rich tasks, one tap away.</h2>
         <p>Set due dates, priorities, repeats and labels, tick off a checklist in the description, and break the task into subtasks, in a detail view that feels native on every screen.</p>
         <ul class="show-list">
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Checklists you can tick, with a "2 of 4 done" bar</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Add a focus session right from a task</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Subtasks and linked tasks, nested in your lists</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Checklists you can tick, with a "2 of 4 done" bar</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Add a focus session right from a task</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Subtasks and linked tasks, nested in your lists</li>
         </ul>
       </div>
     </div>
@@ -603,7 +648,7 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
       <p class="muted" style="max-width:46ch;margin:16px auto 0;">A proper sidebar layout, keyboard-friendly navigation, and the same data, synced through your own server. On iPad, tasks open right beside the list.</p>
       <div class="macframe">
         <div class="macbar"><i class="r"></i><i class="y"></i><i class="g"></i></div>
-        <img src="assets/shot-mac.png" alt="mDone running on macOS with a sidebar and today's tasks" loading="lazy" />
+        <img src="assets/shot-mac.webp" width="1960" height="1273" alt="mDone running on macOS with a sidebar and today's tasks" loading="lazy" />
       </div>
     </div>
 
@@ -616,16 +661,16 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
 
     <div class="show">
       <div class="show-art reveal">
-        <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-focus.png" alt="mDone Focus Timer counting up on a task" loading="lazy" /></div></div>
+        <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-focus.webp" width="660" height="1431" alt="mDone Focus Timer counting up on a task" loading="lazy" /></div></div>
       </div>
       <div class="show-copy reveal">
         <span class="eyebrow">Focus</span>
         <h2 class="serif">One task. The clock. Nothing else.</h2>
         <p>Start a focus session on any task and the rest fades away. A Live Activity keeps the timer on your Lock Screen and in the Dynamic Island, so you can set the phone down and keep going.</p>
         <ul class="show-list">
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Pause, resume, or finish without unlocking</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Live Activity on the Lock Screen and Dynamic Island</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Focus time and session counts saved per task</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Pause, resume, or finish without unlocking</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Live Activity on the Lock Screen and Dynamic Island</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Focus time and session counts saved per task</li>
         </ul>
       </div>
     </div>
@@ -638,11 +683,11 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
       </div>
       <div class="widget-stage reveal">
         <figure class="widget-tile">
-          <img src="assets/shot-widget-today-medium.png" alt="mDone Today's Tasks widget showing an overdue task and tasks due today" loading="lazy" />
+          <img src="assets/shot-widget-today-medium.webp" width="860" height="407" alt="mDone Today's Tasks widget showing an overdue task and tasks due today" loading="lazy" />
           <figcaption>Today's Tasks</figcaption>
         </figure>
         <figure class="widget-tile">
-          <img src="assets/shot-widget-upcoming.png" alt="mDone Upcoming widget showing the next few days of tasks" loading="lazy" />
+          <img src="assets/shot-widget-upcoming.webp" width="860" height="407" alt="mDone Upcoming widget showing the next few days of tasks" loading="lazy" />
           <figcaption>Upcoming</figcaption>
         </figure>
       </div>
@@ -659,17 +704,17 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
     <p class="lead reveal">Self-hosting means your data is yours. mDone respects that completely. It talks only to the Vikunja server you choose, and nothing else.</p>
     <div class="priv-grid">
       <div class="priv-card reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         <h3>Zero analytics</h3>
         <p>No telemetry, no usage tracking, no "anonymous" data collection. None.</p>
       </div>
       <div class="priv-card reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="10" width="16" height="10" rx="2" stroke="currentColor" stroke-width="2"/><path d="M8 10V8a4 4 0 018 0v2" stroke="currentColor" stroke-width="2"/></svg></div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2" stroke="currentColor" stroke-width="2"/><path d="M8 10V8a4 4 0 018 0v2" stroke="currentColor" stroke-width="2"/></svg></div>
         <h3>No third-party SDKs</h3>
         <p>Nothing bundled to phone home. Just your device and your server.</p>
       </div>
       <div class="priv-card reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none"><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/></svg></div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/></svg></div>
         <h3>Credentials in the Keychain</h3>
         <p>Your token is stored securely on-device, never sent anywhere else.</p>
       </div>
@@ -721,7 +766,7 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
         </a>
         <a class="btn btn-ghost" href="https://github.com/marco308/mdone">View on GitHub</a>
       </div>
-      <p class="req">Requires iOS 18 / macOS 15 and your own <a href="https://vikunja.io" style="color:#fff;text-decoration:underline;">Vikunja</a> server (2.4.0 or newer).</p>
+      <p class="req">Requires iOS 18 / macOS 15 and your own <a href="https://vikunja.io">Vikunja</a> server (2.4.0 or newer).</p>
     </div>
   </div>
 </section>
@@ -734,7 +779,7 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
     <div class="foot-grid">
       <div class="foot-brand">
         <a class="brand" href="#top" aria-label="mDone home">
-          <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12.5l4.2 4.2L19.5 6" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4.5 12.5l4.2 4.2L19.5 6" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
           mDone
         </a>
         <p>A native task manager for your self-hosted Vikunja server. Beautifully done, privacy first.</p>
@@ -774,6 +819,22 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
   const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
   onScroll();
   window.addEventListener('scroll', onScroll, { passive:true });
+
+  // Section menu on phones: opens under the header, closes on a choice, Escape or a tap outside.
+  const toggle = document.getElementById('navToggle');
+  const links = document.getElementById('navLinks');
+  const setMenu = (open) => {
+    links.classList.toggle('open', open);
+    toggle.setAttribute('aria-expanded', String(open));
+  };
+  toggle.addEventListener('click', () => setMenu(!links.classList.contains('open')));
+  links.addEventListener('click', (e) => { if (e.target.closest('a')) setMenu(false); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && links.classList.contains('open')) { setMenu(false); toggle.focus(); }
+  });
+  document.addEventListener('click', (e) => {
+    if (!nav.contains(e.target)) setMenu(false);
+  });
 
   // Scroll-reveal
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
