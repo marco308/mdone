@@ -78,7 +78,7 @@ actor SyncService {
 
         let operation = PendingOperation(
             endpointPath: Endpoint.updateTask(id: taskId).path,
-            method: HTTPMethod.POST.rawValue,
+            method: Endpoint.updateTask(id: taskId).method.rawValue,
             bodyData: try? SyncService.editEncoder().encode(edit),
             kind: .taskEdit,
             taskId: taskId

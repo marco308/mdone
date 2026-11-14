@@ -389,7 +389,7 @@ final class WidgetDataTests: XCTestCase {
         XCTAssertEqual(json["due_date"] as? String, "2026-11-01T09:00:00Z")
     }
 
-    func testCompleteTaskFetchesTaskThenPostsItBackWhole() async throws {
+    func testCompleteTaskFetchesTaskThenPutsItBackWhole() async throws {
         useMockServer("https://mock.vikunja.io/")
 
         MockURLProtocol.requestHandler = { request in
@@ -400,7 +400,7 @@ final class WidgetDataTests: XCTestCase {
         try await provider.completeTask(id: 66)
 
         let requests = MockURLProtocol.capturedRequests
-        XCTAssertEqual(requests.map(\.httpMethod), ["GET", "POST"])
+        XCTAssertEqual(requests.map(\.httpMethod), ["GET", "PUT"])
         XCTAssertEqual(requests.map { $0.url?.absoluteString }, [
             "https://mock.vikunja.io\(VikunjaAPI.path("/tasks/66"))",
             "https://mock.vikunja.io\(VikunjaAPI.path("/tasks/66"))",
@@ -413,7 +413,7 @@ final class WidgetDataTests: XCTestCase {
         XCTAssertEqual(body["priority"] as? Int, 3)
     }
 
-    func testCompleteTaskDoesNotPostWhenFetchFails() async throws {
+    func testCompleteTaskDoesNotPutWhenFetchFails() async throws {
         useMockServer("https://mock.vikunja.io")
 
         MockURLProtocol.requestHandler = { request in
@@ -428,5 +428,61 @@ final class WidgetDataTests: XCTestCase {
 
         // Falling back to a bare {"done": true} would be the very bug this guards against.
         XCTAssertEqual(MockURLProtocol.capturedRequests.map(\.httpMethod), ["GET"])
+    }
+
+    // MARK: - WidgetDataProvider task lists (#291)
+
+    /// Keeps `fetchWidgetData`'s write to the shared cache out of other tests.
+    private func preserveCachedWidgetData() {
+        let defaults = SharedKeys.sharedDefaults
+        let saved = defaults.data(forKey: SharedKeys.widgetDataKey)
+        addTeardownBlock {
+            if let saved {
+                defaults.set(saved, forKey: SharedKeys.widgetDataKey)
+            } else {
+                defaults.removeObject(forKey: SharedKeys.widgetDataKey)
+            }
+        }
+    }
+
+    /// v2 wraps the task list in `{"items": [...]}`. Reading it as the bare
+    /// array v1 sent would leave every widget empty.
+    func testFetchWidgetDataReadsTheListEnvelope() async throws {
+        useMockServer("https://mock.vikunja.io")
+        preserveCachedWidgetData()
+        MockURLProtocol.requestHandler = { request in
+            (
+                MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
+                MockURLProtocol.page(
+                    #"[{"id": 5, "title": "Water plants", "done": false, "due_date": "2026-11-01T09:00:00Z", "priority": 2, "project_id": 1}]"#
+                )
+            )
+        }
+
+        let data = try await WidgetDataProvider(session: MockURLProtocol.mockSession()).fetchWidgetData()
+
+        XCTAssertEqual(data.todayTasks.map(\.id), [5])
+        XCTAssertEqual(data.upcomingTasks.map(\.id), [5])
+        XCTAssertEqual(data.overdueTasks.map(\.id), [5])
+        let requests = MockURLProtocol.capturedRequests
+        XCTAssertEqual(requests.count, 3)
+        XCTAssertTrue(requests.allSatisfy { $0.url?.path == VikunjaAPI.path("/tasks") && $0.httpMethod == "GET" })
+    }
+
+    func testFetchWidgetDataTreatsNullItemsAsNoTasks() async throws {
+        useMockServer("https://mock.vikunja.io")
+        preserveCachedWidgetData()
+        MockURLProtocol.requestHandler = { request in
+            (
+                MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
+                Data(#"{"items": null, "total": 0, "page": 1, "per_page": 10, "total_pages": 0}"#.utf8)
+            )
+        }
+
+        let data = try await WidgetDataProvider(session: MockURLProtocol.mockSession()).fetchWidgetData()
+
+        XCTAssertTrue(data.todayTasks.isEmpty)
+        XCTAssertTrue(data.upcomingTasks.isEmpty)
+        XCTAssertTrue(data.overdueTasks.isEmpty)
     }
 }

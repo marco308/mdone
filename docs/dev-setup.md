@@ -112,7 +112,7 @@ After `docker compose up -d` and the seed script, run the app and exercise the p
 
 ### Automated integration — against a live Vikunja
 
-`mDoneIntegrationTests` drives the real services (`TaskService`, `ProjectService`, `LabelService`, `APIClient`) against a running server instead of `MockURLProtocol`, so it catches the thing the unit suite structurally cannot: a Vikunja release changing the v1 API under us.
+`mDoneIntegrationTests` drives the real services (`TaskService`, `ProjectService`, `LabelService`, `APIClient`) against a running server instead of `MockURLProtocol`, so it catches the thing the unit suite structurally cannot: a Vikunja release changing the v2 API under us.
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d && ./scripts/seed-dev-vikunja.sh
@@ -290,7 +290,7 @@ it as an optional array.
 
 If you're chasing a bug that may be Vikunja-side, pin your dev compose file to the same version your prod instance runs to ensure the API shape matches.
 
-The nightly integration workflow tests two tags: `latest`, which tells us upstream changed something, and a pinned floor (currently `2.5.0`, the version [vikunja-api-inventory.md](vikunja-api-inventory.md) was verified against), which tells us we did. Bump the pin in the workflow matrix whenever that document is re-verified.
+The nightly integration workflow tests two tags: `latest`, which tells us upstream changed something, and a pinned floor (`2.4.0`, the oldest server mDone supports and the first with the v2 API), which tells us we did. The pin moves only if the minimum supported server does.
 
 ## When to update the Apple Review test server
 

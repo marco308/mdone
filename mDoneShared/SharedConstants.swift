@@ -19,8 +19,8 @@ enum StorageScope {
     /// runner, so UI tests and the widget extension stay on the real stores.
     static let isHostingUnitTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
-    /// The app group shared by the app and its widget extension. Must match
-    /// `MDONE_APP_GROUP` in `project.yml`, which is what the entitlements use.
+    // The app group shared by the app and its widget extension. Must match
+    // `MDONE_APP_GROUP` in `project.yml`, which is what the entitlements use.
     #if DEBUG
     static let appGroupID = "group.com.mdone.app.dev"
     #else
@@ -76,13 +76,24 @@ enum SharedKeys {
 }
 
 /// The Vikunja REST API the app and its widgets talk to. The version lives
-/// here and nowhere else, so moving to `/api/v2` (#289) is one edit plus
-/// whatever really differs between the two.
+/// here and nowhere else. mDone uses v2, which needs Vikunja 2.4.0 or newer
+/// (#291).
 enum VikunjaAPI {
-    static let basePath = "/api/v1"
+    static let basePath = "/api/v2"
 
-    /// The full path of an API route: `path("/tasks/1")` is `/api/v1/tasks/1`.
+    /// The older API, still served next to v2. Only for the few things v2
+    /// cannot do: see `legacyPath`.
+    static let legacyBasePath = "/api/v1"
+
+    /// The full path of an API route: `path("/tasks/1")` is `/api/v2/tasks/1`.
     static func path(_ route: String) -> String {
         basePath + route
+    }
+
+    /// The v1 path of a route. Two callers, both deliberate: the OIDC login
+    /// callback, which v2 does not have (checked up to Vikunja 2.8.0), and the
+    /// `/info` fallback that reads the version of a server too old for v2.
+    static func legacyPath(_ route: String) -> String {
+        legacyBasePath + route
     }
 }

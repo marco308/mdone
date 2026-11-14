@@ -65,7 +65,7 @@ struct ProjectView: Codable, Identifiable {
     var doneBucketId: Int64?
 }
 
-/// Request body for creating a project (`PUT /api/v1/projects`).
+/// Request body for creating a project (`POST /projects`).
 /// `title` is required by Vikunja (1–250 chars); other fields are optional.
 /// Snake-casing (`hexColor` → `hex_color`) is applied by `APIClient`'s encoder.
 struct ProjectCreateRequest: Encodable {
@@ -78,7 +78,7 @@ struct ProjectCreateRequest: Encodable {
     var parentProjectId: Int64?
 }
 
-/// Request body for updating a project (`POST /api/v1/projects/{id}`).
+/// Request body for updating a project (`PUT /projects/{id}`).
 ///
 /// We always send the project's *full* field set (not a partial patch): Vikunja's
 /// update can reset omitted columns and may skip zero-value booleans, so sending

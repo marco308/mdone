@@ -17,6 +17,6 @@ actor UserService {
 
     /// Everyone who can see the project, the signed-in user included.
     func fetchProjectUsers(projectId: Int64) async throws -> [User] {
-        try await apiClient.fetch(Endpoint.projectUsers(projectId: projectId))
+        try await apiClient.fetchList(Endpoint.projectUsers(projectId: projectId))
     }
 }

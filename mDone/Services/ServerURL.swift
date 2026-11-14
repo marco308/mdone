@@ -22,7 +22,7 @@ enum ServerURL {
             text = "https://" + text
         }
 
-        // Trailing slashes would produce "//api/v1/..." once a path is appended.
+        // Trailing slashes would produce "//api/v2/..." once a path is appended.
         while text.hasSuffix("/") {
             text.removeLast()
         }

@@ -30,12 +30,13 @@ final class NotificationReadStateTests: XCTestCase {
                 httpVersion: nil,
                 headerFields: ["Content-Type": "application/json"]
             )!
-            return (response, json.data(using: .utf8)!)
+            return (response, MockURLProtocol.page(json))
         }
     }
 
-    /// The exact shape Vikunja returns: no `read` key at all, and the zero date
-    /// for anything still unread.
+    /// The notifications as Vikunja returns them, before `respond` wraps them
+    /// in the list envelope: no `read` key at all, and the zero date for
+    /// anything still unread.
     private let serverPayload = """
     [
         {
@@ -55,13 +56,38 @@ final class NotificationReadStateTests: XCTestCase {
     ]
     """
 
+    // MARK: - AppState reads the v2 list envelope
+
+    /// `AppState.fetchNotifications` goes through `APIClient.shared`, which is
+    /// on `URLSession.shared`, so the mock has to be registered globally for
+    /// the length of this test.
+    func testAppStateFetchNotificationsReadsTheListEnvelope() async {
+        URLProtocol.registerClass(MockURLProtocol.self)
+        addTeardownBlock {
+            URLProtocol.unregisterClass(MockURLProtocol.self)
+            await APIClient.shared.clearCredentials()
+        }
+        respond(with: serverPayload)
+        await APIClient.shared.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+        let appState = AppState()
+
+        await appState.fetchNotifications()
+
+        XCTAssertEqual(appState.notifications.map(\.id), [1, 2])
+        XCTAssertEqual(appState.notifications.filter(\.isUnread).map(\.id), [2])
+        XCTAssertEqual(
+            MockURLProtocol.capturedRequests.last?.url?.path,
+            VikunjaAPI.path("/notifications")
+        )
+    }
+
     // MARK: - Decoding read state
 
     func testNotificationReadOnServerDecodesAsRead() async throws {
         respond(with: serverPayload)
         let client = await makeClient()
 
-        let notifications: [VNotification] = try await client.fetch(Endpoint.notifications())
+        let notifications: [VNotification] = try await client.fetchList(Endpoint.notifications())
 
         XCTAssertEqual(notifications.count, 2)
         XCTAssertFalse(notifications[0].isUnread, "read_at holds a real timestamp, so this is read")
@@ -71,7 +97,7 @@ final class NotificationReadStateTests: XCTestCase {
         respond(with: serverPayload)
         let client = await makeClient()
 
-        let notifications: [VNotification] = try await client.fetch(Endpoint.notifications())
+        let notifications: [VNotification] = try await client.fetchList(Endpoint.notifications())
 
         XCTAssertTrue(notifications[1].isUnread, "the zero date means never read")
     }
@@ -79,7 +105,7 @@ final class NotificationReadStateTests: XCTestCase {
     func testUnreadCountCountsOnlyServerUnreadNotifications() async throws {
         respond(with: serverPayload)
         let client = await makeClient()
-        let notifications: [VNotification] = try await client.fetch(Endpoint.notifications())
+        let notifications: [VNotification] = try await client.fetchList(Endpoint.notifications())
 
         let appState = AppState()
         appState.notifications = notifications

@@ -5,7 +5,7 @@ final class APIClientTests: XCTestCase {
     // MARK: - Model Decoding Tests
 
     func testVTaskDecoding() throws {
-        let json = """
+        let json = try XCTUnwrap("""
         {
             "id": 1,
             "title": "Buy groceries",
@@ -20,7 +20,7 @@ final class APIClientTests: XCTestCase {
             "created": "2026-03-15T08:00:00Z",
             "updated": "2026-03-15T08:00:00Z"
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -48,7 +48,7 @@ final class APIClientTests: XCTestCase {
     }
 
     func testProjectDecoding() throws {
-        let json = """
+        let json = try XCTUnwrap("""
         {
             "id": 1,
             "title": "Work",
@@ -60,7 +60,7 @@ final class APIClientTests: XCTestCase {
             "created": "2026-03-15T08:00:00Z",
             "updated": "2026-03-15T08:00:00Z"
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -84,7 +84,7 @@ final class APIClientTests: XCTestCase {
     }
 
     func testLabelDecoding() throws {
-        let json = """
+        let json = try XCTUnwrap("""
         {
             "id": 5,
             "title": "Bug",
@@ -93,7 +93,7 @@ final class APIClientTests: XCTestCase {
             "created": "2026-03-15T08:00:00Z",
             "updated": "2026-03-15T08:00:00Z"
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -115,7 +115,7 @@ final class APIClientTests: XCTestCase {
     }
 
     func testUserDecoding() throws {
-        let json = """
+        let json = try XCTUnwrap("""
         {
             "id": 1,
             "username": "testuser",
@@ -124,7 +124,7 @@ final class APIClientTests: XCTestCase {
             "created": "2026-03-15T08:00:00Z",
             "updated": "2026-03-15T08:00:00Z"
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -177,11 +177,11 @@ final class APIClientTests: XCTestCase {
 
         let createTask = Endpoint.createTask(projectId: 5)
         XCTAssertEqual(createTask.path, VikunjaAPI.path("/projects/5/tasks"))
-        XCTAssertEqual(createTask.method, .PUT)
+        XCTAssertEqual(createTask.method, .POST)
 
         let updateTask = Endpoint.updateTask(id: 10)
         XCTAssertEqual(updateTask.path, VikunjaAPI.path("/tasks/10"))
-        XCTAssertEqual(updateTask.method, .POST)
+        XCTAssertEqual(updateTask.method, .PUT)
 
         let deleteTask = Endpoint.deleteTask(id: 3)
         XCTAssertEqual(deleteTask.path, VikunjaAPI.path("/tasks/3"))
@@ -189,12 +189,25 @@ final class APIClientTests: XCTestCase {
     }
 
     /// The one place the API version is named. Every other test builds paths
-    /// through `VikunjaAPI.path`, so this is what pins the version (#290).
+    /// through `VikunjaAPI.path`, so this is what pins the version (#290, #291).
     func testAPIVersionPrefix() {
-        XCTAssertEqual(VikunjaAPI.basePath, "/api/v1")
-        XCTAssertEqual(VikunjaAPI.path("/tasks/1"), "/api/v1/tasks/1")
-        XCTAssertEqual(Endpoint(api: "/tasks/1", method: .PATCH).path, "/api/v1/tasks/1")
+        XCTAssertEqual(VikunjaAPI.basePath, "/api/v2")
+        XCTAssertEqual(VikunjaAPI.path("/tasks/1"), "/api/v2/tasks/1")
+        XCTAssertEqual(Endpoint(api: "/tasks/1", method: .PATCH).path, "/api/v2/tasks/1")
         XCTAssertEqual(HTTPMethod.PATCH.rawValue, "PATCH")
+    }
+
+    /// v1 is kept for exactly two requests: the OIDC callback, which v2 does
+    /// not have, and the `/info` fallback for a server too old for v2.
+    func testLegacyPrefixIsV1AndOnlyTheOIDCCallbackAndInfoFallbackUseIt() {
+        XCTAssertEqual(VikunjaAPI.legacyBasePath, "/api/v1")
+        XCTAssertEqual(VikunjaAPI.legacyPath("/info"), "/api/v1/info")
+        XCTAssertEqual(Endpoint.legacyInfo.path, "/api/v1/info")
+        XCTAssertEqual(Endpoint.legacyInfo.method, .GET)
+        XCTAssertEqual(Endpoint.info.path, "/api/v2/info")
+        XCTAssertEqual(Endpoint.openIDCallback(provider: "authelia").path, "/api/v1/auth/openid/authelia/callback")
+        XCTAssertEqual(Endpoint.login.path, "/api/v2/login")
+        XCTAssertEqual(Endpoint.refreshToken.path, "/api/v2/user/token/refresh")
     }
 
     // MARK: - APIClient Network Tests (using MockURLProtocol)
@@ -219,7 +232,7 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let taskJSON = """
+        let taskJSON = try XCTUnwrap("""
         {
             "id": 42,
             "title": "Test Task",
@@ -229,7 +242,7 @@ final class APIClientTests: XCTestCase {
             "created": "2026-03-15T08:00:00Z",
             "updated": "2026-03-15T08:00:00Z"
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
@@ -266,13 +279,13 @@ final class APIClientTests: XCTestCase {
         }
     }
 
-    func testFetchThrowsServerErrorOn500() async {
+    func testFetchThrowsServerErrorOn500() async throws {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let errorJSON = """
+        let errorJSON = try XCTUnwrap("""
         {"code": 500, "message": "Internal Server Error"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 500, url: request.url)
@@ -294,11 +307,11 @@ final class APIClientTests: XCTestCase {
         }
     }
 
-    func testFetchThrowsDecodingErrorOnMalformedJSON() async {
+    func testFetchThrowsDecodingErrorOnMalformedJSON() async throws {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let malformedJSON = "{ not valid json }".data(using: .utf8)!
+        let malformedJSON = try XCTUnwrap("{ not valid json }".data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
@@ -343,7 +356,7 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let responseJSON = """
+        let responseJSON = try XCTUnwrap("""
         {
             "id": 99,
             "title": "Created Task",
@@ -353,7 +366,7 @@ final class APIClientTests: XCTestCase {
             "created": "2026-03-20T10:00:00Z",
             "updated": "2026-03-20T10:00:00Z"
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             // Verify the request has a body
@@ -434,13 +447,13 @@ final class APIClientTests: XCTestCase {
         }
     }
 
-    func testDeleteThrowsServerErrorOn500() async {
+    func testDeleteThrowsServerErrorOn500() async throws {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let errorJSON = """
+        let errorJSON = try XCTUnwrap("""
         {"code": 500, "message": "Delete failed"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 500, url: request.url)
@@ -468,20 +481,16 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let tasksJSON = """
+        let tasksJSON = try XCTUnwrap("""
         [
             {"id": 1, "title": "Task 1", "done": false, "priority": 0, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"},
             {"id": 2, "title": "Task 2", "done": true, "priority": 1, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"}
         ]
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
-            let response = MockURLProtocol.makeResponse(
-                statusCode: 200,
-                url: request.url,
-                headers: ["x-pagination-total-pages": "1"]
-            )
-            return (response, tasksJSON)
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
+            return (response, MockURLProtocol.page(tasksJSON))
         }
 
         let tasks: [VTask] = try await client.fetchAllPages({ page, perPage in
@@ -497,36 +506,28 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let page1JSON = """
+        let page1JSON = try XCTUnwrap("""
         [
             {"id": 1, "title": "Task 1", "done": false, "priority": 0, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"},
             {"id": 2, "title": "Task 2", "done": false, "priority": 0, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"}
         ]
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
-        let page2JSON = """
+        let page2JSON = try XCTUnwrap("""
         [
             {"id": 3, "title": "Task 3", "done": false, "priority": 0, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"}
         ]
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         var requestCount = 0
         MockURLProtocol.requestHandler = { request in
             requestCount += 1
             if requestCount == 1 {
-                let response = MockURLProtocol.makeResponse(
-                    statusCode: 200,
-                    url: request.url,
-                    headers: ["x-pagination-total-pages": "2"]
-                )
-                return (response, page1JSON)
+                let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
+                return (response, MockURLProtocol.page(page1JSON, totalPages: 2))
             } else {
-                let response = MockURLProtocol.makeResponse(
-                    statusCode: 200,
-                    url: request.url,
-                    headers: ["x-pagination-total-pages": "2"]
-                )
-                return (response, page2JSON)
+                let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
+                return (response, MockURLProtocol.page(page2JSON, totalPages: 2, page: 2))
             }
         }
 
@@ -541,17 +542,93 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(requestCount, 2)
     }
 
+    // MARK: - List envelope (#291)
+
+    private func decodePage(_ json: String) throws -> ListPage<VTask> {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(ListPage<VTask>.self, from: Data(json.utf8))
+    }
+
+    func testListPageDecodesItemsAndTotalPages() throws {
+        let page = try decodePage(
+            #"{"$schema": "https://x/api/v2/schemas/PaginatedTask.json", "items": [{"id": 1, "title": "A", "done": false, "priority": 0, "project_id": 1}], "total": 120, "page": 1, "per_page": 50, "total_pages": 3}"#
+        )
+        XCTAssertEqual(page.items?.map(\.id), [1])
+        XCTAssertEqual(page.totalPages, 3)
+    }
+
+    /// Vikunja sends `null`, not `[]`, for some empty lists.
+    func testListPageDecodesNullItems() throws {
+        let page = try decodePage(#"{"items": null, "total": 0, "page": 1, "per_page": 50, "total_pages": 0}"#)
+        XCTAssertNil(page.items)
+        XCTAssertEqual(page.totalPages, 0)
+    }
+
+    /// The kanban buckets route sends `total` and no page count.
+    func testListPageDecodesWithoutTotalPages() throws {
+        let page = try decodePage(#"{"items": [], "total": 0}"#)
+        XCTAssertEqual(page.items?.count, 0)
+        XCTAssertNil(page.totalPages)
+    }
+
+    func testFetchListUnwrapsItems() async throws {
+        let client = makeTestClient()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+        MockURLProtocol.requestHandler = { request in
+            (
+                MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
+                MockURLProtocol.page(#"[{"id": 1, "title": "List", "project_id": 5, "view_kind": "list"}]"#)
+            )
+        }
+
+        let views: [ProjectView] = try await client.fetchList(Endpoint.projectViews(projectId: 5))
+
+        XCTAssertEqual(views.map(\.id), [1])
+        XCTAssertEqual(MockURLProtocol.capturedRequests.count, 1)
+    }
+
+    func testFetchListTreatsNullItemsAsEmpty() async throws {
+        let client = makeTestClient()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+        MockURLProtocol.requestHandler = { request in
+            (
+                MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
+                Data(#"{"items": null, "total": 0}"#.utf8)
+            )
+        }
+
+        let users: [User] = try await client.fetchList(Endpoint.projectUsers(projectId: 5))
+
+        XCTAssertTrue(users.isEmpty)
+    }
+
+    /// A v1 server answers a list with a bare array. That must fail loudly as
+    /// a decoding error, not read as an empty list.
+    func testFetchListRejectsABareArray() async {
+        let client = makeTestClient()
+        await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
+        MockURLProtocol.requestHandler = { request in
+            (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), Data("[]".utf8))
+        }
+
+        do {
+            let _: [ProjectView] = try await client.fetchList(Endpoint.projectViews(projectId: 5))
+            XCTFail("a bare array is not the v2 envelope")
+        } catch NetworkError.decodingError {
+            // expected
+        } catch {
+            XCTFail("expected a decoding error, got \(error)")
+        }
+    }
+
     func testFetchAllPagesEmptyResponse() async throws {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
         MockURLProtocol.requestHandler = { request in
-            let response = MockURLProtocol.makeResponse(
-                statusCode: 200,
-                url: request.url,
-                headers: ["x-pagination-total-pages": "1"]
-            )
-            return (response, "[]".data(using: .utf8)!)
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
+            return (response, MockURLProtocol.page("[]", totalPages: 0))
         }
 
         let tasks: [VTask] = try await client.fetchAllPages { page, perPage in
@@ -592,7 +669,7 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let taskJSON = """
+        let taskJSON = try XCTUnwrap("""
         {
             "id": 1,
             "title": "No Due Date",
@@ -603,7 +680,7 @@ final class APIClientTests: XCTestCase {
             "created": "2026-03-15T08:00:00Z",
             "updated": "2026-03-15T08:00:00Z"
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
@@ -622,7 +699,7 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let taskJSON = """
+        let taskJSON = try XCTUnwrap("""
         {
             "id": 2,
             "title": "Fractional",
@@ -632,7 +709,7 @@ final class APIClientTests: XCTestCase {
             "created": "2026-03-15T08:30:45.123Z",
             "updated": "2026-03-15T08:30:45.456Z"
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
@@ -649,7 +726,7 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let taskJSON = """
+        let taskJSON = try XCTUnwrap("""
         {
             "id": 3,
             "title": "No Fractional",
@@ -659,7 +736,7 @@ final class APIClientTests: XCTestCase {
             "created": "2026-03-15T08:30:45Z",
             "updated": "2026-03-15T08:30:45Z"
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
@@ -678,9 +755,9 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "my-secret-token")
 
-        let taskJSON = """
+        let taskJSON = try XCTUnwrap("""
         {"id": 1, "title": "T", "done": false, "priority": 0, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
@@ -699,9 +776,9 @@ final class APIClientTests: XCTestCase {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let responseJSON = """
+        let responseJSON = try XCTUnwrap("""
         {"id": 1, "title": "T", "done": false, "priority": 0, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-15T08:00:00Z"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
@@ -793,13 +870,13 @@ final class APIClientTests: XCTestCase {
         // Success if no error thrown
     }
 
-    func testSendRawDataThrowsServerError() async {
+    func testSendRawDataThrowsServerError() async throws {
         let client = makeTestClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let errorJSON = """
+        let errorJSON = try XCTUnwrap("""
         {"code": 503, "message": "Service Unavailable"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 503, url: request.url)

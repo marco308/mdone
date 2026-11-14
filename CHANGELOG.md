@@ -6,8 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Added
-- mDone now tells you, once, when your server is older than Vikunja 2.4.0, and Settings keeps a note of it. Nothing changes yet, but a future version of mDone will need Vikunja 2.4.0 or newer, so this is early notice to update your server (#290).
+### Changed
+- mDone now needs Vikunja 2.4.0 or newer. It has moved to Vikunja's newer v2 API, which older servers do not have. Signing in to an older server tells you which version it runs and asks you to update it. If you are already signed in to one, mDone says so each time it opens and in Settings, and cannot sync until the server is updated (#291).
 
 ### Fixed
 - Repeating tasks now show on the calendar on every day they are due, not only on their next one. A daily task appears on each remaining day of the month and a weekly task on each week it falls in, so you can see what is coming. These future occurrences are drawn in a lighter shade with a dashed circle and cannot be ticked off, edited or deleted, because Vikunja keeps a single copy of a repeating task and moves it forward when you complete the real one (#35).

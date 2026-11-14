@@ -148,7 +148,7 @@ final class SmartQuickAddTests: XCTestCase {
     // MARK: - Labels on create
 
     /// Vikunja ignores labels in the create body, so each parsed label goes
-    /// through `PUT /tasks/{id}/labels` after the task exists.
+    /// through `POST /tasks/{id}/labels` after the task exists.
     func testCreateTaskAddsLabelsThroughLabelEndpoint() async {
         let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
@@ -171,8 +171,8 @@ final class SmartQuickAddTests: XCTestCase {
         let created = await state.createTask(title: "Buy gift", projectId: 1, priority: 2, labelIds: [Self.shopping])
 
         XCTAssertEqual(paths, [
-            "PUT \(VikunjaAPI.path("/projects/1/tasks"))",
-            "PUT \(VikunjaAPI.path("/tasks/99/labels"))",
+            "POST \(VikunjaAPI.path("/projects/1/tasks"))",
+            "POST \(VikunjaAPI.path("/tasks/99/labels"))",
         ])
         XCTAssertEqual(created?.labels?.map(\.id), [Self.shopping])
         XCTAssertEqual(state.tasks.first { $0.id == 99 }?.labels?.map(\.id), [Self.shopping])
@@ -357,7 +357,7 @@ final class SmartQuickAddTests: XCTestCase {
             if path.hasSuffix("/labels"), request.httpMethod == "GET" {
                 return (
                     MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
-                    Data(#"[{"id": 10, "title": "shopping"}]"#.utf8)
+                    MockURLProtocol.page(#"[{"id": 10, "title": "shopping"}]"#)
                 )
             }
             if let data = MockURLProtocol.bodyData(from: request),

@@ -64,19 +64,15 @@ final class OfflineCacheTests: XCTestCase {
     private func serveFullSync() {
         MockURLProtocol.requestHandler = { request in
             let path = request.url?.path ?? ""
-            let body: Any = if path.contains("/labels") {
+            let body: [Any] = if path.contains("/labels") {
                 [["id": 7, "title": "Current"]]
             } else if path.contains("/projects") {
                 [["id": 3, "title": "Work"]]
             } else {
                 [["id": 1, "title": "Cached task", "done": false, "priority": 0, "project_id": 3]]
             }
-            let response = MockURLProtocol.makeResponse(
-                statusCode: 200,
-                url: request.url,
-                headers: ["x-pagination-total-pages": "1"]
-            )
-            return (response, self.json(body))
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
+            return (response, MockURLProtocol.page(body))
         }
     }
 

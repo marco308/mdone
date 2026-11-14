@@ -40,7 +40,7 @@ A native iOS and macOS task management app for your self-hosted [Vikunja](https:
 ## Requirements
 
 - iOS 18.0+ or macOS 15.0+
-- A self-hosted [Vikunja](https://vikunja.io) server instance
+- A self-hosted [Vikunja](https://vikunja.io) server, version 2.4.0 or newer
 - An account on that server
 
 ## Building from Source

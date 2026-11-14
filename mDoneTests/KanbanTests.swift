@@ -24,7 +24,7 @@ final class KanbanTests: XCTestCase {
     // MARK: - Bucket model
 
     func testBucketDecodesWithEmbeddedTasks() throws {
-        let json = """
+        let json = try XCTUnwrap("""
         {
             "id": 5,
             "title": "In Progress",
@@ -37,7 +37,7 @@ final class KanbanTests: XCTestCase {
                 {"id": 12, "title": "B", "done": true, "priority": 2, "project_id": 1}
             ]
         }
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         let bucket = try snakeCaseDecoder().decode(Bucket.self, from: json)
         XCTAssertEqual(bucket.id, 5)
@@ -60,7 +60,7 @@ final class KanbanTests: XCTestCase {
 
         limited.tasks = [
             VTask(id: 1, title: "x", done: false, priority: 0, projectId: 1),
-            VTask(id: 2, title: "y", done: false, priority: 0, projectId: 1)
+            VTask(id: 2, title: "y", done: false, priority: 0, projectId: 1),
         ]
         XCTAssertTrue(limited.isOverLimit)
     }
@@ -70,7 +70,7 @@ final class KanbanTests: XCTestCase {
         var limited = Bucket(id: 3, title: "Done", limit: 2)
         limited.tasks = [
             VTask(id: 1, title: "x", done: true, priority: 0, projectId: 1),
-            VTask(id: 2, title: "y", done: true, priority: 0, projectId: 1)
+            VTask(id: 2, title: "y", done: true, priority: 0, projectId: 1),
         ]
         XCTAssertTrue(limited.isOverLimit)
     }
@@ -91,7 +91,7 @@ final class KanbanTests: XCTestCase {
             title: "P",
             views: [
                 ProjectView(id: 100, title: "List", projectId: 1, viewKind: "list"),
-                ProjectView(id: 200, title: "Kanban", projectId: 1, viewKind: "kanban")
+                ProjectView(id: 200, title: "Kanban", projectId: 1, viewKind: "kanban"),
             ]
         )
         XCTAssertEqual(project.kanbanViewId, 200)
@@ -110,16 +110,16 @@ final class KanbanTests: XCTestCase {
     // MARK: - Endpoints
 
     func testBucketEndpointPaths() {
-        // Regression for #130: buckets with tasks come from the view *tasks*
-        // endpoint. `/views/{view}/buckets` returns metadata only since
-        // Vikunja v0.24, which left every board column empty.
+        // Regression for #130: buckets with tasks come from `/buckets/tasks`.
+        // Plain `/views/{view}/buckets` returns metadata only, which left
+        // every board column empty.
         let read = Endpoint.kanbanBuckets(projectId: 7, viewId: 3)
-        XCTAssertEqual(read.path, VikunjaAPI.path("/projects/7/views/3/tasks"))
+        XCTAssertEqual(read.path, VikunjaAPI.path("/projects/7/views/3/buckets/tasks"))
         XCTAssertEqual(read.method, .GET)
 
         let move = Endpoint.moveTaskToBucket(projectId: 7, viewId: 3, bucketId: 9)
         XCTAssertEqual(move.path, VikunjaAPI.path("/projects/7/views/3/buckets/9/tasks"))
-        XCTAssertEqual(move.method, .POST)
+        XCTAssertEqual(move.method, .PUT)
     }
 
     // MARK: - ProjectService.fetchBuckets
@@ -129,23 +129,25 @@ final class KanbanTests: XCTestCase {
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         let service = ProjectService(apiClient: client)
 
-        // Shaped like a real v2.x kanban view-tasks response: `tasks` is
-        // omitted for empty buckets, and `count`/`limit` are always present.
-        let bucketsJSON = """
+        // Shaped like a real buckets-with-tasks response: `tasks` is omitted
+        // for empty buckets, and `count`/`limit` are always present.
+        let bucketsJSON = try XCTUnwrap("""
         [
             {"id": 1, "title": "Backlog", "project_view_id": 3, "limit": 0, "count": 0, "position": 1.0},
             {"id": 2, "title": "Done", "project_view_id": 3, "limit": 0, "count": 1, "position": 2.0, "tasks": [
                 {"id": 50, "title": "Ship it", "done": false, "priority": 0, "project_id": 7, "bucket_id": 2}
             ]}
         ]
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
-            // Must be the view-tasks endpoint: the buckets endpoint stopped
-            // embedding tasks in Vikunja v0.24 (#130).
-            XCTAssertEqual(request.url?.path, VikunjaAPI.path("/projects/7/views/3/tasks"))
+            // Must be `/buckets/tasks`: plain `/buckets` carries no tasks (#130).
+            XCTAssertEqual(request.url?.path, VikunjaAPI.path("/projects/7/views/3/buckets/tasks"))
             XCTAssertEqual(request.httpMethod, "GET")
-            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), bucketsJSON)
+            return (
+                MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
+                MockURLProtocol.page(bucketsJSON, totalPages: nil)
+            )
         }
 
         let buckets = try await service.fetchBuckets(projectId: 7, viewId: 3)
@@ -165,8 +167,9 @@ final class KanbanTests: XCTestCase {
         let taskIds: [Int]
     }
 
-    /// A kanban view-tasks response. `tasks` is omitted for empty buckets and
-    /// `count` can be left out, matching what the server actually sends.
+    /// A buckets-with-tasks response: `{"items": [...], "total": n}` with no
+    /// page count. `tasks` is omitted for empty buckets and `count` can be
+    /// left out, matching what the server actually sends.
     private static func bucketsJSON(_ specs: [BucketSpec]) throws -> Data {
         let objects: [[String: Any]] = specs.map { spec in
             var bucket: [String: Any] = [
@@ -189,7 +192,7 @@ final class KanbanTests: XCTestCase {
             }
             return bucket
         }
-        return try JSONSerialization.data(withJSONObject: objects)
+        return MockURLProtocol.page(objects, totalPages: nil)
     }
 
     private static func pageParam(of request: URLRequest) -> Int {
@@ -207,21 +210,17 @@ final class KanbanTests: XCTestCase {
         return ProjectService(apiClient: client)
     }
 
-    /// The board capped every column at one page of cards. `x-pagination-total-pages`
-    /// cannot drive this loop: it counts buckets, so it says `1` even while a
-    /// bucket still has tasks on later pages. The bucket's own `count` does.
+    /// The board capped every column at one page of cards. The envelope cannot
+    /// drive this loop: its `total` counts buckets and it has no page count,
+    /// even while a bucket still has tasks on later pages. The bucket's own
+    /// `count` does.
     func testFetchBucketsPagesUntilEveryBucketReachesItsCount() async throws {
         let service = await makeBucketService()
         let page1 = try Self.bucketsJSON([BucketSpec(id: 2, title: "To-Do", count: 60, taskIds: Array(1 ... 50))])
         let page2 = try Self.bucketsJSON([BucketSpec(id: 2, title: "To-Do", count: 60, taskIds: Array(51 ... 60))])
 
         MockURLProtocol.requestHandler = { request in
-            // The header lies about task pages, exactly as the server sends it.
-            let response = MockURLProtocol.makeResponse(
-                statusCode: 200,
-                url: request.url,
-                headers: ["x-pagination-total-pages": "1"]
-            )
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             return (response, Self.pageParam(of: request) == 1 ? page1 : page2)
         }
 
@@ -317,7 +316,7 @@ final class KanbanTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertEqual(request.url?.path, VikunjaAPI.path("/projects/7/views/3/buckets/9/tasks"))
-            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.httpMethod, "PUT")
             return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), Data())
         }
 
@@ -332,7 +331,7 @@ final class KanbanTests: XCTestCase {
     // MARK: - AppState.fetchBuckets
 
     @MainActor
-    func testAppStateFetchBucketsSortsAndMergesTasks() async {
+    func testAppStateFetchBucketsSortsAndMergesTasks() async throws {
         let client = MockURLProtocol.mockClient()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         let appState = AppState(projectService: ProjectService(apiClient: client))
@@ -343,18 +342,21 @@ final class KanbanTests: XCTestCase {
             views: [ProjectView(id: 3, title: "Kanban", projectId: 7, viewKind: "kanban")]
         )
 
-        let bucketsJSON = """
+        let bucketsJSON = try XCTUnwrap("""
         [
             {"id": 2, "title": "Doing", "project_view_id": 3, "limit": 0, "count": 1, "position": 2.0, "tasks": [
                 {"id": 50, "title": "Ship it", "done": false, "priority": 0, "project_id": 7, "bucket_id": 2}
             ]},
             {"id": 1, "title": "Backlog", "project_view_id": 3, "limit": 0, "count": 0, "position": 1.0}
         ]
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
-            XCTAssertEqual(request.url?.path, VikunjaAPI.path("/projects/7/views/3/tasks"))
-            return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), bucketsJSON)
+            XCTAssertEqual(request.url?.path, VikunjaAPI.path("/projects/7/views/3/buckets/tasks"))
+            return (
+                MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
+                MockURLProtocol.page(bucketsJSON, totalPages: nil)
+            )
         }
 
         let buckets = await appState.fetchBuckets(project: project)
@@ -470,7 +472,9 @@ private extension URLRequest {
         defer { buffer.deallocate() }
         while stream.hasBytesAvailable {
             let read = stream.read(buffer, maxLength: bufferSize)
-            if read <= 0 { break }
+            if read <= 0 {
+                break
+            }
             data.append(buffer, count: read)
         }
         return data.isEmpty ? nil : data

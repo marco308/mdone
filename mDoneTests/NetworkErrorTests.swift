@@ -102,9 +102,9 @@ final class NetworkErrorTests: XCTestCase {
     // MARK: - APIError Model
 
     func testAPIErrorDecoding() throws {
-        let json = """
+        let json = try XCTUnwrap("""
         {"code": 404, "message": "Not found"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         let error = try JSONDecoder().decode(APIError.self, from: json)
         XCTAssertEqual(error.code, 404)
@@ -112,9 +112,9 @@ final class NetworkErrorTests: XCTestCase {
     }
 
     func testAPIErrorPartialDecoding() throws {
-        let json = """
+        let json = try XCTUnwrap("""
         {"message": "Something went wrong"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         let error = try JSONDecoder().decode(APIError.self, from: json)
         XCTAssertNil(error.code)
@@ -122,7 +122,7 @@ final class NetworkErrorTests: XCTestCase {
     }
 
     func testAPIErrorEmptyDecoding() throws {
-        let json = "{}".data(using: .utf8)!
+        let json = try XCTUnwrap("{}".data(using: .utf8))
 
         let error = try JSONDecoder().decode(APIError.self, from: json)
         XCTAssertNil(error.code)
@@ -157,15 +157,97 @@ final class NetworkErrorTests: XCTestCase {
     }
 
     func testLoginResponseDecoding() throws {
-        let json = """
+        let json = try XCTUnwrap("""
         {"token": "eyJhbGciOiJIUzI1NiJ9.test.signature"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         let response = try JSONDecoder().decode(LoginResponse.self, from: json)
         XCTAssertEqual(response.token, "eyJhbGciOiJIUzI1NiJ9.test.signature")
     }
 
     // MARK: - Endpoint Tests
+
+    // MARK: - Error bodies (#291)
+
+    private func decodeAPIError(_ json: String) throws -> APIError {
+        try JSONDecoder().decode(APIError.self, from: Data(json.utf8))
+    }
+
+    /// v2 refuses with RFC 9457 problem+json: the text is `detail`, and
+    /// Vikunja's own number is still `code`. Body captured from 2.8.0.
+    func testAPIErrorDecodesProblemJSON() throws {
+        let error = try decodeAPIError(
+            #"{"$schema":"https://x/api/v2/schemas/VikunjaErrorModel.json","title":"Not Found","status":404,"detail":"This task does not exist","code":4002}"#
+        )
+        XCTAssertEqual(error.code, 4002)
+        XCTAssertEqual(error.message, "This task does not exist")
+    }
+
+    /// A validation failure is a 422 with no Vikunja code at all.
+    func testAPIErrorDecodesProblemJSONWithoutACode() throws {
+        let error = try decodeAPIError(
+            #"{"title":"Unprocessable Entity","status":422,"detail":"validation failed","errors":[{"message":"expected length >= 1","location":"body.title","value":""}]}"#
+        )
+        XCTAssertNil(error.code)
+        XCTAssertEqual(error.message, "validation failed")
+    }
+
+    /// The auth middleware's 401, and every v1 route, still answer in the
+    /// older shape.
+    func testAPIErrorDecodesTheOlderCodeAndMessageShape() throws {
+        let error = try decodeAPIError(
+            #"{"code": 11, "message": "missing, malformed, expired or otherwise invalid token provided"}"#
+        )
+        XCTAssertEqual(error.code, 11)
+        XCTAssertEqual(error.message, "missing, malformed, expired or otherwise invalid token provided")
+    }
+
+    func testAPIErrorPrefersDetailWhenBothArePresent() throws {
+        let error = try decodeAPIError(#"{"code": 1, "message": "old", "detail": "new"}"#)
+        XCTAssertEqual(error.message, "new")
+    }
+
+    func testFromResponseMapsLoginRefusalsFromProblemJSON() throws {
+        let wrongPassword = try decodeAPIError(
+            #"{"title":"Forbidden","status":403,"detail":"Wrong username or password.","code":1011}"#
+        )
+        guard case .invalidCredentials = NetworkError.fromResponse(statusCode: 403, apiError: wrongPassword) else {
+            return XCTFail("403 with code 1011 is a wrong username or password")
+        }
+
+        let passcode = try decodeAPIError(
+            #"{"title":"Precondition Failed","status":412,"detail":"Invalid totp passcode.","code":1017}"#
+        )
+        guard case .invalidTOTPPasscode = NetworkError.fromResponse(statusCode: 412, apiError: passcode) else {
+            return XCTFail("412 with code 1017 is a two-factor passcode problem")
+        }
+
+        let missing =
+            try decodeAPIError(#"{"title":"Not Found","status":404,"detail":"This task does not exist","code":4002}"#)
+        guard case let .serverError(status, message) = NetworkError.fromResponse(statusCode: 404, apiError: missing)
+        else {
+            return XCTFail("anything else stays a server error")
+        }
+        XCTAssertEqual(status, 404)
+        XCTAssertEqual(message, "This task does not exist")
+    }
+
+    func testServerTooOldNamesTheVersionsAndIsCritical() throws {
+        let known = NetworkError.serverTooOld(version: VikunjaVersion(major: 2, minor: 3, patch: 1))
+        let knownText = try XCTUnwrap(known.errorDescription)
+        XCTAssertTrue(knownText.contains("2.3.1"))
+        XCTAssertTrue(knownText.contains("2.4.0"))
+
+        let unknown = NetworkError.serverTooOld(version: nil)
+        let unknownText = try XCTUnwrap(unknown.errorDescription)
+        XCTAssertTrue(unknownText.contains("2.4.0"))
+        XCTAssertNotEqual(unknownText, knownText)
+
+        XCTAssertTrue(known.isCritical)
+        XCTAssertFalse(known.isConnectivityFailure)
+        XCTAssertNotNil(known.recoverySuggestion)
+        XCTAssertEqual(known.iconName, "server.rack")
+    }
 
     func testLoginEndpoint() {
         let endpoint = Endpoint.login
@@ -189,7 +271,7 @@ final class NetworkErrorTests: XCTestCase {
     func testMarkNotificationReadEndpoint() {
         let endpoint = Endpoint.markNotificationRead(id: 42)
         XCTAssertEqual(endpoint.path, VikunjaAPI.path("/notifications/42"))
-        XCTAssertEqual(endpoint.method, .POST)
+        XCTAssertEqual(endpoint.method, .PUT)
     }
 
     func testMarkAllNotificationsReadEndpoint() {
@@ -213,8 +295,9 @@ final class NetworkErrorTests: XCTestCase {
 
     func testAllTasksEndpointWithSearch() {
         let endpoint = Endpoint.allTasks(search: "groceries")
-        let searchValue = endpoint.queryItems?.first(where: { $0.name == "s" })?.value
+        let searchValue = endpoint.queryItems?.first(where: { $0.name == "q" })?.value
         XCTAssertEqual(searchValue, "groceries")
+        XCTAssertNil(endpoint.queryItems?.first(where: { $0.name == "s" }), "v1 called this parameter s")
     }
 
     func testProjectTasksEndpoint() {
@@ -238,7 +321,7 @@ final class NetworkErrorTests: XCTestCase {
     func testUpdateTaskPositionEndpoint() {
         let endpoint = Endpoint.updateTaskPosition(taskId: 5)
         XCTAssertEqual(endpoint.path, VikunjaAPI.path("/tasks/5/position"))
-        XCTAssertEqual(endpoint.method, .POST)
+        XCTAssertEqual(endpoint.method, .PUT)
     }
 
     func testTaskEndpoint() {

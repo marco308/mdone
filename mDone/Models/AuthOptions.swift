@@ -1,6 +1,6 @@
 import Foundation
 
-/// What the setup screen should offer, derived from `GET /api/v1/info`.
+/// What the setup screen should offer, derived from `GET /info`.
 ///
 /// Kept as a plain value computed by a pure function so the rules can be tested
 /// without standing up a view. See `AuthOptionsTests`.
@@ -26,7 +26,7 @@ struct AuthOptions: Equatable {
         !showsCredentials && providers.isEmpty
     }
 
-    /// Conservative default for before `/api/v1/info` has been fetched, or when
+    /// Conservative default for before `/info` has been fetched, or when
     /// fetching it failed. Matches how the app behaved before issue #153: show
     /// the credentials form and no SSO.
     static let unknownServer = AuthOptions(showsCredentials: true, showsAPIToken: true, providers: [])
@@ -42,7 +42,7 @@ struct AuthOptions: Equatable {
         let auth = info.auth
 
         // Deliberately `||`, not just `local.enabled`. LDAP binds go through
-        // the same POST /api/v1/login with a username and password, so an
+        // the same POST /login with a username and password, so an
         // LDAP-only server still needs these fields even though mDone has no
         // LDAP-specific support yet (issue #156). Hiding them there would
         // leave the user with no way to sign in at all.

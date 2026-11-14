@@ -20,8 +20,15 @@ final class RefreshLatencyTests: XCTestCase {
         (try? JSONSerialization.data(withJSONObject: value)) ?? Data()
     }
 
-    private nonisolated static func tasksJSON(_ ids: [Int64]) -> Data {
-        json(ids.map { ["id": $0, "title": "Task \($0)", "done": false, "priority": 0, "project_id": 1] })
+    /// One page of tasks in the v2 list envelope.
+    private nonisolated static func tasksJSON(_ ids: [Int64], totalPages: Int = 1) -> Data {
+        MockURLProtocol.page(
+            ids
+                .map {
+                    ["id": $0, "title": "Task \($0)", "done": false, "priority": 0, "project_id": 1] as [String: Any]
+                },
+            totalPages: totalPages
+        )
     }
 
     private nonisolated static func page(of request: URLRequest) -> Int {
@@ -57,14 +64,15 @@ final class RefreshLatencyTests: XCTestCase {
         MockURLProtocol.asynchronousRequestHandler = { request, proto in
             server.begin()
             let page = Self.page(of: request)
-            let response = MockURLProtocol.makeResponse(
-                statusCode: 200, url: request.url, headers: ["x-pagination-total-pages": "9"]
-            )
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             // Later pages answer first.
             let delay = page == 1 ? 0 : Double(10 - page) * 0.01
             DispatchQueue.global().asyncAfter(deadline: .now() + delay) {
                 server.end()
-                proto.complete(response: response, data: Self.tasksJSON([Int64(page * 10), Int64(page * 10 + 1)]))
+                proto.complete(
+                    response: response,
+                    data: Self.tasksJSON([Int64(page * 10), Int64(page * 10 + 1)], totalPages: 9)
+                )
             }
         }
 
@@ -86,10 +94,8 @@ final class RefreshLatencyTests: XCTestCase {
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
         MockURLProtocol.requestHandler = { request in
             let status = Self.page(of: request) == 3 ? 404 : 200
-            let response = MockURLProtocol.makeResponse(
-                statusCode: status, url: request.url, headers: ["x-pagination-total-pages": "5"]
-            )
-            return (response, Self.tasksJSON([1]))
+            let response = MockURLProtocol.makeResponse(statusCode: status, url: request.url)
+            return (response, Self.tasksJSON([1], totalPages: 5))
         }
 
         do {
@@ -117,33 +123,28 @@ final class RefreshLatencyTests: XCTestCase {
         for id in projectIds {
             state.projectTaskCache[id] = []
         }
-        let projectsJSON = Self.json(projectIds.map {
+        let projectsJSON = MockURLProtocol.page(projectIds.map {
             [
                 "id": $0,
                 "title": "P\($0)",
                 "views": [["id": $0 * 10, "title": "List", "project_id": $0, "view_kind": "list"]],
-            ]
+            ] as [String: Any]
         })
         let server = Server()
         MockURLProtocol.asynchronousRequestHandler = { request, proto in
             server.begin()
             let path = request.url!.path
             let page = Self.page(of: request)
-            var body = Self.json([])
-            var pages = 1
+            var body = MockURLProtocol.page([Any]())
             if path == VikunjaAPI.path("/tasks") {
-                pages = 12
                 let start = Int64((page - 1) * 50)
-                body = Self.tasksJSON(Array(start + 1 ... start + 50))
+                body = Self.tasksJSON(Array(start + 1 ... start + 50), totalPages: 12)
             } else if path.hasSuffix("/projects") {
                 body = projectsJSON
             } else if path.contains("/views/") {
-                pages = 2
-                body = Self.tasksJSON([Int64(page)])
+                body = Self.tasksJSON([Int64(page)], totalPages: 2)
             }
-            let response = MockURLProtocol.makeResponse(
-                statusCode: 200, url: request.url, headers: ["x-pagination-total-pages": "\(pages)"]
-            )
+            let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             DispatchQueue.global().asyncAfter(deadline: .now() + latency) {
                 server.end()
                 proto.complete(response: response, data: body)

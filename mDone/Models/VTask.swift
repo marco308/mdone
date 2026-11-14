@@ -116,21 +116,27 @@ struct VTask: Codable, Identifiable, Hashable {
     /// Returns nil for Vikunja's zero-date sentinel (year 1)
     var effectiveDueDate: Date? {
         guard let dueDate else { return nil }
-        if Calendar.current.component(.year, from: dueDate) <= 1 { return nil }
+        if Calendar.current.component(.year, from: dueDate) <= 1 {
+            return nil
+        }
         return dueDate
     }
 
     /// Returns nil for Vikunja's zero-date sentinel (year 1).
     var effectiveStartDate: Date? {
         guard let startDate else { return nil }
-        if Calendar.current.component(.year, from: startDate) <= 1 { return nil }
+        if Calendar.current.component(.year, from: startDate) <= 1 {
+            return nil
+        }
         return startDate
     }
 
     /// Returns nil for Vikunja's zero-date sentinel (year 1).
     var effectiveEndDate: Date? {
         guard let endDate else { return nil }
-        if Calendar.current.component(.year, from: endDate) <= 1 { return nil }
+        if Calendar.current.component(.year, from: endDate) <= 1 {
+            return nil
+        }
         return endDate
     }
 
@@ -367,7 +373,7 @@ struct TaskUpdateRequest: Encodable {
 
     /// Carries every field this request doesn't set forward from `task`.
     ///
-    /// Vikunja's `POST /tasks/{id}` is a **full replace**: any field missing
+    /// Vikunja's `PUT /tasks/{id}` is a **full replace**: any field missing
     /// from the body is reset to its zero value. A partial request such as
     /// "just mark it done" therefore wipes whatever it doesn't mention.
     ///

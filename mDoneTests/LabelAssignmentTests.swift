@@ -104,7 +104,7 @@ final class LabelAssignmentTests: XCTestCase {
         XCTAssertEqual(appState.tasks[0].labels?.map(\.id), [7])
         let request = MockURLProtocol.capturedRequests.last
         XCTAssertEqual(request?.url?.path, VikunjaAPI.path("/tasks/1/labels"))
-        XCTAssertEqual(request?.httpMethod, "PUT")
+        XCTAssertEqual(request?.httpMethod, "POST")
         XCTAssertEqual(try jsonBody(of: request)["label_id"] as? Int, 7)
     }
 
@@ -189,7 +189,7 @@ final class LabelAssignmentTests: XCTestCase {
 
     // MARK: - createLabel
 
-    func testCreateLabelPutsToLabelsAndKeepsTheResult() async throws {
+    func testCreateLabelPostsToLabelsAndKeepsTheResult() async throws {
         let appState = await makeAppState()
         appState.labels = [urgent]
         MockURLProtocol.requestHandler = { request in
@@ -203,7 +203,7 @@ final class LabelAssignmentTests: XCTestCase {
         XCTAssertEqual(appState.labels.map(\.id), [7, 11], "The new label joins the loaded list for the picker")
         let request = MockURLProtocol.capturedRequests.last
         XCTAssertEqual(request?.url?.path, VikunjaAPI.path("/labels"))
-        XCTAssertEqual(request?.httpMethod, "PUT")
+        XCTAssertEqual(request?.httpMethod, "POST")
         let body = try jsonBody(of: request)
         XCTAssertEqual(body["title"] as? String, "Home", "The title is trimmed")
         XCTAssertEqual(body["hex_color"] as? String, "4772FA", "The colour is sent without the leading #")

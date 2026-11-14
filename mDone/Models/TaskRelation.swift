@@ -46,7 +46,7 @@ enum RelationKind: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-/// A single task relation as returned by `PUT /api/v1/tasks/{id}/relations`.
+/// A single task relation as returned by `POST /tasks/{id}/relations`.
 struct TaskRelation: Codable, Hashable {
     var taskId: Int64
     var otherTaskId: Int64
@@ -92,7 +92,9 @@ enum SubtaskLinkCandidates {
             .sorted { a, b in
                 let aInProject = a.projectId == parent.projectId
                 let bInProject = b.projectId == parent.projectId
-                if aInProject != bInProject { return aInProject }
+                if aInProject != bInProject {
+                    return aInProject
+                }
                 return a.title.localizedCompare(b.title) == .orderedAscending
             }
     }

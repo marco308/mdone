@@ -1,8 +1,8 @@
 import Foundation
 
 /// A Kanban column. In Vikunja, buckets belong to a project's *kanban* view and
-/// carry the tasks placed in that column. The view-tasks endpoint
-/// (`/views/{view}/tasks`) returns these buckets with their tasks embedded
+/// carry the tasks placed in that column. The buckets-with-tasks endpoint
+/// (`/views/{view}/buckets/tasks`) returns these buckets with their tasks embedded
 /// (`tasks`), so a single fetch is enough to render a board. `tasks` is omitted
 /// entirely for empty buckets (Vikunja marshals it with `omitempty`).
 ///
@@ -43,7 +43,7 @@ struct Bucket: Codable, Identifiable, Hashable {
 }
 
 /// Request body for moving a task into a bucket
-/// (`POST /api/v1/projects/{project}/views/{view}/buckets/{bucket}/tasks`).
+/// (`PUT /projects/{project}/views/{view}/buckets/{bucket}/tasks`).
 /// The bucket and view come from the URL path; only `taskId` is sent.
 struct TaskBucketRequest: Encodable {
     var taskId: Int64

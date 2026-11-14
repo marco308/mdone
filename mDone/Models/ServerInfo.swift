@@ -1,6 +1,6 @@
 import Foundation
 
-/// The parts of `GET /api/v1/info` the login screen cares about.
+/// The parts of `GET /info` the login screen cares about.
 ///
 /// Decoded with `APIClient`'s `convertFromSnakeCase` strategy, so `openid_connect`
 /// arrives as `openidConnect` and `auth_url` as `authUrl`.
@@ -79,7 +79,7 @@ struct ServerInfo: Decodable, Equatable {
     }
 }
 
-/// One configured OIDC provider, as advertised by `/api/v1/info`.
+/// One configured OIDC provider, as advertised by `/info`.
 struct OIDCProvider: Decodable, Equatable, Identifiable {
     /// Display name, e.g. "Authelia".
     var name: String

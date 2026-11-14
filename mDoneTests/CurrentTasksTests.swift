@@ -102,7 +102,7 @@ final class CurrentTasksTests: XCTestCase {
 
         XCTAssertTrue(appState.isCurrent(appState.tasks[0]))
         XCTAssertEqual(MockURLProtocol.capturedRequests.last?.url?.path, VikunjaAPI.path("/tasks/1/labels"))
-        XCTAssertEqual(MockURLProtocol.capturedRequests.last?.httpMethod, "PUT")
+        XCTAssertEqual(MockURLProtocol.capturedRequests.last?.httpMethod, "POST")
     }
 
     func testToggleCurrentRemovesLabel() async {

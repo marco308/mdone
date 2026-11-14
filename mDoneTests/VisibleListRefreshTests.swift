@@ -35,8 +35,8 @@ final class VisibleListRefreshTests: XCTestCase {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
         encoder.dateEncodingStrategy = .iso8601
-        let allData = try encoder.encode(all)
-        let memberData = try encoder.encode(members)
+        let allData = try MockURLProtocol.page(encoder.encode(all))
+        let memberData = try MockURLProtocol.page(encoder.encode(members))
         MockURLProtocol.requestHandler = { request in
             let data = request.url!.path.contains("/projects/") ? memberData : allData
             return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), data)

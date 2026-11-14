@@ -82,7 +82,7 @@ final class AddTaskIntentTests: XCTestCase {
 
         XCTAssertEqual(outcome, .created(taskTitle: "Buy milk", projectTitle: "Home", dueDate: nil))
         let request = try XCTUnwrap(MockURLProtocol.capturedRequests.first)
-        XCTAssertEqual(request.httpMethod, "PUT")
+        XCTAssertEqual(request.httpMethod, "POST")
         XCTAssertEqual(request.url?.path, VikunjaAPI.path("/projects/8/tasks"))
         let body = try XCTUnwrap(MockURLProtocol.bodyData(from: request))
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
@@ -112,7 +112,7 @@ final class AddTaskIntentTests: XCTestCase {
         MockURLProtocol.requestHandler = { request in
             if request.url?.path == VikunjaAPI.path("/projects") {
                 let json = #"[{"id": 3, "title": "Work", "is_archived": false, "is_favorite": false}]"#
-                return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), json.data(using: .utf8)!)
+                return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), MockURLProtocol.page(json))
             }
             return (
                 MockURLProtocol.makeResponse(statusCode: 201, url: request.url),
@@ -156,7 +156,7 @@ final class AddTaskIntentTests: XCTestCase {
         XCTAssertEqual(outcome, .queued(taskTitle: "Buy milk", projectTitle: "Home", dueDate: nil))
         let queued = try pendingOperations(in: container)
         XCTAssertEqual(queued.count, 1)
-        XCTAssertEqual(queued.first?.method, "PUT")
+        XCTAssertEqual(queued.first?.method, "POST")
         XCTAssertEqual(queued.first?.endpointPath, VikunjaAPI.path("/projects/8/tasks"))
         let body = try XCTUnwrap(queued.first?.bodyData)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
@@ -198,7 +198,7 @@ final class AddTaskIntentTests: XCTestCase {
 
         XCTAssertTrue(try pendingOperations(in: container).isEmpty, "the replayed create leaves the queue")
         let replay = try XCTUnwrap(MockURLProtocol.capturedRequests.first)
-        XCTAssertEqual(replay.httpMethod, "PUT")
+        XCTAssertEqual(replay.httpMethod, "POST")
         XCTAssertEqual(replay.url?.path, VikunjaAPI.path("/projects/8/tasks"))
     }
 

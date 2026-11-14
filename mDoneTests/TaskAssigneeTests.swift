@@ -185,7 +185,7 @@ final class TaskAssigneeTests: XCTestCase {
         XCTAssertTrue(saved)
         let request = MockURLProtocol.capturedRequests.last
         XCTAssertEqual(request?.url?.path, VikunjaAPI.path("/tasks/1/assignees/bulk"))
-        XCTAssertEqual(request?.httpMethod, "POST")
+        XCTAssertEqual(request?.httpMethod, "PUT")
         XCTAssertEqual(try assigneeIds(in: jsonBody(of: request)), [3])
         XCTAssertEqual(appState.tasks[0].assignees, [alice])
         XCTAssertEqual(appState.tasks[0].assignees?.first?.displayName, "Alice Smith")
@@ -222,7 +222,10 @@ final class TaskAssigneeTests: XCTestCase {
         let created = await appState.createTask(title: "New", projectId: 1, assignees: [alice])
 
         let requests = MockURLProtocol.capturedRequests
-        XCTAssertEqual(requests.map(\.url?.path), [VikunjaAPI.path("/projects/1/tasks"), VikunjaAPI.path("/tasks/9/assignees/bulk")])
+        XCTAssertEqual(
+            requests.map(\.url?.path),
+            [VikunjaAPI.path("/projects/1/tasks"), VikunjaAPI.path("/tasks/9/assignees/bulk")]
+        )
         XCTAssertNil(try jsonBody(of: requests.first)["assignees"], "One inaccessible user would refuse the create")
         XCTAssertEqual(try assigneeIds(in: jsonBody(of: requests.last)), [3])
         XCTAssertEqual(created?.assignees, [alice])
@@ -248,14 +251,15 @@ final class TaskAssigneeTests: XCTestCase {
         MockURLProtocol.requestHandler = { request in
             (
                 MockURLProtocol.makeResponse(statusCode: 200, url: request.url),
-                #"[{"id": 4, "username": "zed", "name": ""}, {"id": 3, "username": "amy", "name": "Amy"}]"#
-                    .data(using: .utf8)!
+                MockURLProtocol.page(
+                    #"[{"id": 4, "username": "zed", "name": ""}, {"id": 3, "username": "amy", "name": "Amy"}]"#
+                )
             )
         }
 
         let users = await appState.loadAssignableUsers(projectId: 12)
 
-        XCTAssertEqual(MockURLProtocol.capturedRequests.last?.url?.path, VikunjaAPI.path("/projects/12/projectusers"))
+        XCTAssertEqual(MockURLProtocol.capturedRequests.last?.url?.path, VikunjaAPI.path("/projects/12/users/search"))
         XCTAssertEqual(users.map(\.displayName), ["Amy", "zed"])
         XCTAssertEqual(appState.assignableUsers[12]?.map(\.id), [3, 4])
     }

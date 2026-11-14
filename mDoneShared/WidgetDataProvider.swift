@@ -134,11 +134,12 @@ final class WidgetDataProvider: @unchecked Sendable {
 
     /// Marks a task as done via the Vikunja API.
     ///
-    /// Vikunja's update replaces the whole task, so a bare `{"done": true}` blanks every field
+    /// Vikunja's `PUT` replaces the whole task, so a bare `{"done": true}` blanks every field
     /// it leaves out: a repeating task stops repeating and loses its description and priority
     /// (#283). Fetch the task first and send it back whole with only `done` changed. The JSON
     /// is edited as a dictionary rather than decoded, so fields this widget never models
-    /// survive too.
+    /// survive too. The server accepts the read-only extras a fetched task carries (checked
+    /// on 2.4.0 and 2.8.0). `PATCH` would do this in one request (#292).
     func completeTask(id: Int64) async throws {
         guard let serverURL, let apiToken else { return }
 
@@ -158,7 +159,7 @@ final class WidgetDataProvider: @unchecked Sendable {
         }
 
         var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiToken)", forHTTPHeaderField: "Authorization")
         request.httpBody = try Self.completionBody(from: taskData)
@@ -171,7 +172,7 @@ final class WidgetDataProvider: @unchecked Sendable {
         }
     }
 
-    /// The fetched task JSON with `done` set, ready to post back as the update.
+    /// The fetched task JSON with `done` set, ready to send back as the update.
     static func completionBody(from taskJSON: Data) throws -> Data {
         guard var task = try JSONSerialization.jsonObject(with: taskJSON) as? [String: Any] else {
             throw WidgetDataError.requestFailed
@@ -197,6 +198,11 @@ final class WidgetDataProvider: @unchecked Sendable {
         let dueDate: Date?
         let priority: Int64
         let projectId: Int64
+    }
+
+    /// The envelope v2 wraps a task list in. `items` can be `null` when empty.
+    private struct APITaskPage: Decodable {
+        let items: [APITask]?
     }
 
     private func fetchTasks(
@@ -231,7 +237,7 @@ final class WidgetDataProvider: @unchecked Sendable {
             throw WidgetDataError.requestFailed
         }
 
-        let apiTasks = try decoder.decode([APITask].self, from: data)
+        let apiTasks = try decoder.decode(APITaskPage.self, from: data).items ?? []
         let now = Date()
 
         return apiTasks.map { task in
@@ -257,7 +263,9 @@ final class WidgetDataProvider: @unchecked Sendable {
     /// Returns nil for Vikunja's zero-date sentinel (year <= 1).
     private func effectiveDate(_ date: Date?) -> Date? {
         guard let date else { return nil }
-        if Calendar.current.component(.year, from: date) <= 1 { return nil }
+        if Calendar.current.component(.year, from: date) <= 1 {
+            return nil
+        }
         return date
     }
 

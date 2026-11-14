@@ -1,6 +1,6 @@
 import Foundation
 
-/// Body of `POST /api/v1/login`.
+/// Body of `POST /login`.
 ///
 /// `totpPasscode` becomes `totp_passcode` through the client's
 /// `convertToSnakeCase` strategy. It is optional and omitted when nil: Vikunja
@@ -23,7 +23,7 @@ struct LoginResponse: Codable {
     var token: String
 }
 
-/// Body of `POST /api/v1/auth/openid/{key}/callback`.
+/// Body of `POST /api/v1/auth/openid/{key}/callback`, which v2 does not have.
 ///
 /// `redirectUrl` becomes `redirect_url` through the client's
 /// `convertToSnakeCase` strategy, so do not add `CodingKeys` here without
@@ -35,9 +35,37 @@ struct OIDCCallbackRequest: Encodable {
     var redirectUrl: String
 }
 
-struct APIError: Codable {
+/// The envelope v2 wraps every list in. v1 sent a bare array and put the page
+/// count in an `x-pagination-total-pages` header.
+///
+/// Both fields are optional on purpose. `items` is `null` rather than `[]` on
+/// some empty lists, and the kanban buckets route sends `total` but no
+/// `total_pages`.
+struct ListPage<Item: Decodable>: Decodable {
+    var items: [Item]?
+    var totalPages: Int?
+}
+
+/// The body of a refused request.
+///
+/// v2 answers with RFC 9457 `application/problem+json`, where the
+/// human-readable text is `detail` and Vikunja's own error number is still
+/// `code`. A 401 from the auth middleware, and anything from a v1 route, keeps
+/// the older `{code, message}` shape, so `message` is whichever one arrived.
+struct APIError: Decodable {
     var code: Int?
     var message: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case code, message, detail
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        code = try container.decodeIfPresent(Int.self, forKey: .code)
+        message = try container.decodeIfPresent(String.self, forKey: .detail)
+            ?? container.decodeIfPresent(String.self, forKey: .message)
+    }
 
     /// Vikunja error codes the app reacts to by name. The full list lives in
     /// `pkg/models/error.go` and `pkg/user/error.go` upstream.
@@ -65,6 +93,10 @@ enum NetworkError: LocalizedError {
     /// request needs. Distinct from `.unauthorized` so callers do not end the
     /// session over it (#178).
     case missingPermission
+    /// The server predates Vikunja's v2 API, which is the only one mDone
+    /// speaks (#291). `version` is nil when the server would not say and the
+    /// verdict comes from a v2 route answering 404.
+    case serverTooOld(version: VikunjaVersion?)
     case serverError(statusCode: Int, message: String?)
     case decodingError(Error)
     case networkUnavailable
@@ -91,6 +123,8 @@ enum NetworkError: LocalizedError {
             )
         case .missingPermission:
             String(localized: "Your API token doesn't have permission for this.")
+        case let .serverTooOld(version):
+            ServerUpdateNotice.message(for: version)
         case let .serverError(code, _):
             if code >= 500 {
                 String(localized: "The server is having trouble. Please try again in a moment.")
@@ -128,6 +162,8 @@ enum NetworkError: LocalizedError {
             String(
                 localized: "In Vikunja, create a new API token with every permission ticked, then sign in with it in Settings."
             )
+        case .serverTooOld:
+            String(localized: "Update your Vikunja server, then sign in again.")
         case let .serverError(code, _):
             if code >= 500 {
                 String(localized: "The server may be temporarily unavailable. Wait a moment and try again.")
@@ -162,6 +198,8 @@ enum NetworkError: LocalizedError {
             "lock.shield"
         case .missingPermission:
             "person.badge.key"
+        case .serverTooOld:
+            "server.rack"
         case .serverError:
             "exclamationmark.icloud"
         case .decodingError:
@@ -194,7 +232,7 @@ enum NetworkError: LocalizedError {
     /// Whether this error is critical and requires user action (should not auto-dismiss).
     var isCritical: Bool {
         switch self {
-        case .unauthorized, .invalidURL, .missingPermission:
+        case .unauthorized, .invalidURL, .missingPermission, .serverTooOld:
             true
         default:
             false

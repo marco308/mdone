@@ -154,7 +154,7 @@ final class TaskRelationTests: XCTestCase {
     func testRelationEndpoints() {
         let create = Endpoint.createTaskRelation(taskId: 7)
         XCTAssertEqual(create.path, VikunjaAPI.path("/tasks/7/relations"))
-        XCTAssertEqual(create.method, .PUT)
+        XCTAssertEqual(create.method, .POST)
 
         let delete = Endpoint.deleteTaskRelation(taskId: 7, relationKind: "subtask", otherTaskId: 9)
         XCTAssertEqual(delete.path, VikunjaAPI.path("/tasks/7/relations/subtask/9"))
@@ -173,14 +173,14 @@ final class TaskRelationTests: XCTestCase {
 
     func testCreateRelationSendsCorrectRequest() async throws {
         let service = await makeConfiguredService()
-        let responseJSON = """
+        let responseJSON = try XCTUnwrap("""
         {"task_id": 1, "other_task_id": 2, "relation_kind": "subtask",
          "created_by": {"id": 1, "username": "probe"}, "created": "2026-07-19T21:48:02.120342215Z"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertEqual(request.url?.path, VikunjaAPI.path("/tasks/1/relations"))
-            XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertEqual(request.httpMethod, "POST")
             if let body = MockURLProtocol.bodyData(from: request),
                let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any]
             {
@@ -404,8 +404,8 @@ final class TaskRelationTests: XCTestCase {
         let appState = await makeMockedAppState()
         appState.tasks = [makeTask(id: 1, title: "Parent"), makeTask(id: 2, title: "Child")]
 
-        let relationResponse = #"{"task_id": 1, "other_task_id": 2, "relation_kind": "subtask"}"#
-            .data(using: .utf8)!
+        let relationResponse = try XCTUnwrap(#"{"task_id": 1, "other_task_id": 2, "relation_kind": "subtask"}"#
+            .data(using: .utf8))
         let parentResponse = try XCTUnwrap(Self.taskJSON(
             id: 1, title: "Parent",
             relatedTasks: "{\"subtask\": [\(Self.taskJSON(id: 2, title: "Child"))]}"
@@ -418,7 +418,7 @@ final class TaskRelationTests: XCTestCase {
         MockURLProtocol.requestHandler = { request in
             let path = request.url?.path ?? ""
             switch (request.httpMethod, path) {
-            case ("PUT", VikunjaAPI.path("/tasks/1/relations")):
+            case ("POST", VikunjaAPI.path("/tasks/1/relations")):
                 return (MockURLProtocol.makeResponse(statusCode: 201, url: request.url), relationResponse)
             case ("GET", VikunjaAPI.path("/tasks/1")):
                 return (MockURLProtocol.makeResponse(statusCode: 200, url: request.url), parentResponse)
@@ -444,7 +444,7 @@ final class TaskRelationTests: XCTestCase {
         let parent = makeTask(id: 1, title: "Parent", relatedTasks: ["subtask": [makeTask(id: 2)]])
         appState.tasks = [parent, child]
 
-        let deleteResponse = #"{"message":"Successfully deleted."}"#.data(using: .utf8)!
+        let deleteResponse = try XCTUnwrap(#"{"message":"Successfully deleted."}"#.data(using: .utf8))
         let parentResponse = try XCTUnwrap(Self.taskJSON(id: 1, title: "Parent").data(using: .utf8))
         let childResponse = try XCTUnwrap(Self.taskJSON(id: 2, title: "Child").data(using: .utf8))
 
@@ -477,8 +477,8 @@ final class TaskRelationTests: XCTestCase {
 
         let newTaskResponse = try XCTUnwrap(Self.taskJSON(id: 99, title: "New subtask", projectId: 5)
             .data(using: .utf8))
-        let relationResponse = #"{"task_id": 1, "other_task_id": 99, "relation_kind": "subtask"}"#
-            .data(using: .utf8)!
+        let relationResponse = try XCTUnwrap(#"{"task_id": 1, "other_task_id": 99, "relation_kind": "subtask"}"#
+            .data(using: .utf8))
         let parentResponse = try XCTUnwrap(Self.taskJSON(
             id: 1, title: "Parent", projectId: 5,
             relatedTasks: "{\"subtask\": [\(Self.taskJSON(id: 99, title: "New subtask", projectId: 5))]}"
@@ -491,9 +491,9 @@ final class TaskRelationTests: XCTestCase {
         MockURLProtocol.requestHandler = { request in
             let path = request.url?.path ?? ""
             switch (request.httpMethod, path) {
-            case ("PUT", VikunjaAPI.path("/projects/5/tasks")):
+            case ("POST", VikunjaAPI.path("/projects/5/tasks")):
                 return (MockURLProtocol.makeResponse(statusCode: 201, url: request.url), newTaskResponse)
-            case ("PUT", VikunjaAPI.path("/tasks/1/relations")):
+            case ("POST", VikunjaAPI.path("/tasks/1/relations")):
                 if let requestBody = MockURLProtocol.bodyData(from: request),
                    let json = try? JSONSerialization.jsonObject(with: requestBody) as? [String: Any]
                 {
