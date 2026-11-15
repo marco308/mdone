@@ -1,6 +1,7 @@
 # Vikunja REST API -- Inventory
 
-> mDone talks to the **v2** API (`/api/v2`) and needs Vikunja **2.4.0** or newer.
+> mDone talks to the **v2** API (`/api/v2`) and needs Vikunja **2.5.0** or newer (2.4.0 has v2, but
+> its `PATCH` is broken for subscribed tasks: see "Task updates" below).
 > The v2 section below was verified 2026-11-13 against Vikunja **v2.4.0** and **v2.8.0**, from each server's
 > own `/api/v2/openapi.json` and by calling every route the app uses.
 > The v1 inventory that follows it was verified 2026-08-06 against v2.5.0 and is kept as the map of what
@@ -27,7 +28,7 @@ the server itself at `/api/v2/docs`, with the spec at `/api/v2/openapi.json`. It
 | Area | v1 | v2 |
 |------|----|----|
 | Create / update | `PUT` / `POST` | `POST` / `PUT` |
-| Partial update | none | `PATCH` (JSON merge patch). Not used yet, see #292. |
+| Partial update | none | `PATCH` (JSON merge patch). Every task update mDone sends (#292). |
 | Lists | bare array, `x-pagination-*` headers | `{items, total, page, per_page, total_pages}` |
 | Errors | `{code, message}` | `application/problem+json`: `{title, status, detail, code}` |
 | Validation failures | 412 | 422, with an `errors` array naming each field |
@@ -38,7 +39,7 @@ Things that did **not** change, each checked on a live server:
 
 - Models, snake_case keys, the zero date (`0001-01-01T00:00:00Z`), Bearer auth and the filter DSL.
 - `PUT /tasks/{id}` replaces the whole task exactly as v1's `POST` did: a field left out of the body
-  is cleared. The merge in `TaskUpdateRequest.preservingExistingValues(from:)` is still needed.
+  is cleared. mDone does not use it for tasks: see "Task updates".
 - A 401 from the auth middleware keeps the old `{code, message}` body, not problem+json.
   `APIError` reads `detail` and falls back to `message`.
 - TOTP login: a missing or wrong passcode is still 412 with `code` 1017. A wrong password is still
@@ -89,14 +90,35 @@ later server really does ignore `page`.
 
 ### Old servers
 
-Sign-in reads `/info` first and refuses a server that reports a version below 2.4.0 with
+Sign-in reads `/info` first and refuses a server that reports a version below 2.5.0 with
 `NetworkError.serverTooOld`. Someone already signed in to such a server when they update mDone gets an
 alert once per launch and a note in Settings. Requests queued offline by an older build hold v1 paths
 and methods; they are replayed as stored, which works because every server with v2 still serves v1.
 
+### Task updates (#292)
+
+Every task update is `PATCH /tasks/{id}` with only the fields that changed. Checked on 2.5.0, 2.6.0,
+2.7.0, 2.7.1 and 2.8.0 (2026-11-15):
+
+- A field left out is kept. `{"done": true}` on a repeating task keeps its repeat, description,
+  priority, colour, progress, reminders, labels and assignees, and rolls the due date forward.
+- `null` clears a field (`"start_date": null`). The zero date also clears it, but mDone sends `null`.
+- An array replaces the whole list: `"reminders": []` and `"assignees": []` clear them.
+- The response is the whole task as stored, assignees and labels included.
+
+**2.4.0 is broken.** A `PATCH` on any task with a subscription answers 422,
+`body.subscription.entity: expected integer`: the server validates its own read-back of the task.
+Assigning someone subscribes the task, and later servers subscribe every new task. Fixed in 2.5.0,
+which is why that is mDone's minimum (`VikunjaVersion.minimumSupported`) and the floor of the
+nightly integration run.
+
+The task editor fills in every field it shows, so `TaskUpdateRequest.onlyChanges(from:)` drops the ones
+that still match the task before sending. Offline edits are queued as that intent and replayed as the
+same `PATCH`, with no read first.
+
 ### Changes between 2.4.0 and 2.8.0 that touch these routes
 
-None in behaviour. The task path parameter was renamed in the spec (`{projecttask}` to `{task}`), and
+None in behaviour apart from the `PATCH` fix above. The task path parameter was renamed in the spec (`{projecttask}` to `{task}`), and
 2.8.0 added a trash (`/tasks/deleted`, `/tasks/{id}/restore`, `/tasks/{id}/permanent`), so
 `DELETE /tasks/{id}` there is recoverable from the web app.
 
@@ -808,8 +830,9 @@ Bulk assignee body: `{"assignees": [{"id": 1}, {"id": 2}]}` -- replaces all assi
 mDone uses the bulk endpoint for every assignee change (#272). It answers 7003 when a user cannot see
 the project, and echoes the ids back with blank names.
 
-**`POST /tasks/{id}` replaces assignees too.** A task update whose body has no `assignees` removes every
-assignee (verified on v2.4.0), so mDone carries the task's assignees in every update. A create with an
+**v1's `POST /tasks/{id}` and v2's `PUT` replace assignees too.** A full update whose body has no
+`assignees` removes every assignee (verified on v2.4.0). mDone's `PATCH` leaves them out unless they
+changed, which keeps them (#292). A create with an
 inaccessible assignee fails as a whole (7003), which is why mDone assigns after creating.
 
 ---

@@ -7,7 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
-- mDone now needs Vikunja 2.4.0 or newer. It has moved to Vikunja's newer v2 API, which older servers do not have. Signing in to an older server tells you which version it runs and asks you to update it. If you are already signed in to one, mDone says so each time it opens and in Settings, and cannot sync until the server is updated (#291).
+- mDone now needs Vikunja 2.5.0 or newer. It has moved to Vikunja's newer v2 API, which servers before 2.4.0 do not have, and 2.4.0 rejects changes to many tasks. Signing in to an older server tells you which version it runs and asks you to update it. If you are already signed in to one, mDone says so each time it opens and in Settings, and cannot sync until the server is updated (#291, #292).
+- Changing a task now sends only what you changed. Before, mDone sent the whole task back, so an edit could undo a change made to that task in the web app or another device in the meantime, and anything mDone did not know about the task was at risk. Ticking off a task, in the app, a widget or after being offline, now sends just that it is done (#292).
 
 ### Fixed
 - Repeating tasks now show on the calendar on every day they are due, not only on their next one. A daily task appears on each remaining day of the month and a weekly task on each week it falls in, so you can see what is coming. These future occurrences are drawn in a lighter shade with a dashed circle and cannot be ticked off, edited or deleted, because Vikunja keeps a single copy of a repeating task and moves it forward when you complete the real one (#35).

@@ -236,11 +236,11 @@ final class NetworkErrorTests: XCTestCase {
         let known = NetworkError.serverTooOld(version: VikunjaVersion(major: 2, minor: 3, patch: 1))
         let knownText = try XCTUnwrap(known.errorDescription)
         XCTAssertTrue(knownText.contains("2.3.1"))
-        XCTAssertTrue(knownText.contains("2.4.0"))
+        XCTAssertTrue(knownText.contains("2.5.0"))
 
         let unknown = NetworkError.serverTooOld(version: nil)
         let unknownText = try XCTUnwrap(unknown.errorDescription)
-        XCTAssertTrue(unknownText.contains("2.4.0"))
+        XCTAssertTrue(unknownText.contains("2.5.0"))
         XCTAssertNotEqual(unknownText, knownText)
 
         XCTAssertTrue(known.isCritical)

@@ -347,8 +347,7 @@ struct TaskDetailSheet: View {
     /// Ticks or unticks one checklist item in the description and saves that
     /// straight away, the way the web app does, so a tick survives Cancel.
     /// The rest of the form stays unsaved until Save: the request carries
-    /// only the description, and `updateTask` fills the other fields in
-    /// from the task as the server last had it.
+    /// only the description, and the server keeps every other field.
     private func toggleChecklistItem(_ index: Int) {
         guard let updated = DescriptionChecklist.toggling(itemAt: index, in: description) else { return }
         description = updated
@@ -376,8 +375,8 @@ struct TaskDetailSheet: View {
         // the task via the API. `apply` strips any prior marker first.
         let current = descriptionEdit?.storedDescription ?? description
         let body = current.isEmpty ? nil : current
-        // Empty string, not nil: preservingExistingValues treats nil as "keep
-        // the old text", so a cleared description must be sent explicitly.
+        // Empty string, not nil: a nil description is left out of the update
+        // and keeps the old text, so a cleared description is sent explicitly.
         let composedDescription = EstimateMarker.apply(estimateSeconds, to: body) ?? ""
         let request = TaskUpdateRequest(
             title: title,

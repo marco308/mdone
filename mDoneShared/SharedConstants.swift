@@ -76,8 +76,8 @@ enum SharedKeys {
 }
 
 /// The Vikunja REST API the app and its widgets talk to. The version lives
-/// here and nowhere else. mDone uses v2, which needs Vikunja 2.4.0 or newer
-/// (#291).
+/// here and nowhere else. mDone uses v2, which arrived in Vikunja 2.4.0
+/// (#291). mDone needs 2.5.0, see `VikunjaVersion.minimumSupported`.
 enum VikunjaAPI {
     static let basePath = "/api/v2"
 

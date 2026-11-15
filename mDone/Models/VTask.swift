@@ -301,7 +301,13 @@ struct TaskCreateRequest: Encodable {
     }
 }
 
-struct TaskUpdateRequest: Encodable {
+/// The body of a task update, sent as a JSON Merge Patch (#292).
+///
+/// A nil field is left out of the body, and the server keeps whatever the task
+/// has. Only what a caller sets reaches the server, so an update can never wipe
+/// a field it did not mean to touch, and never overwrites a change made in
+/// another client since the task was last read.
+struct TaskUpdateRequest: Encodable, Equatable {
     var title: String?
     var description: String?
     var done: Bool?
@@ -316,21 +322,17 @@ struct TaskUpdateRequest: Encodable {
     var reminders: [TaskReminder]?
     /// Completion progress, 0...1. Drives the Current section's progress bar.
     var percentDone: Double?
-    /// The app never sets a color itself; this exists so partial updates can
-    /// carry a color assigned in another client through Vikunja's full replace.
     var hexColor: String?
-    /// Same as `hexColor`: carried so completing a task in mDone doesn't drop
-    /// it from favorites lists in other clients.
     var isFavorite: Bool?
-    /// Who the task is assigned to. Vikunja's update **does** replace these:
-    /// leave them out and every assignee is removed, so completing a task
-    /// in mDone used to unassign it for the whole team. Encoded as ids only.
+    /// Who the task is assigned to, encoded as ids only. Only sent when the
+    /// assignees were changed: an empty list unassigns everyone.
     var assignees: [User]?
+    /// Sent as `null`, which clears the date.
     var clearDueDate: Bool?
     var clearStartDate: Bool?
     var clearEndDate: Bool?
 
-    struct LabelRef: Encodable {
+    struct LabelRef: Encodable, Equatable {
         var id: Int64
     }
 
@@ -345,17 +347,17 @@ struct TaskUpdateRequest: Encodable {
         try container.encodeIfPresent(description, forKey: .description)
         try container.encodeIfPresent(done, forKey: .done)
         if clearDueDate == true {
-            try container.encode(Date.distantPast, forKey: .dueDate)
+            try container.encodeNil(forKey: .dueDate)
         } else {
             try container.encodeIfPresent(dueDate, forKey: .dueDate)
         }
         if clearStartDate == true {
-            try container.encode(Date.distantPast, forKey: .startDate)
+            try container.encodeNil(forKey: .startDate)
         } else {
             try container.encodeIfPresent(startDate, forKey: .startDate)
         }
         if clearEndDate == true {
-            try container.encode(Date.distantPast, forKey: .endDate)
+            try container.encodeNil(forKey: .endDate)
         } else {
             try container.encodeIfPresent(endDate, forKey: .endDate)
         }
@@ -371,60 +373,80 @@ struct TaskUpdateRequest: Encodable {
         try container.encodeIfPresent(assignees?.map { UserRef(id: $0.id) }, forKey: .assignees)
     }
 
-    /// Carries every field this request doesn't set forward from `task`.
+    /// True when there is nothing to send.
+    var isEmpty: Bool {
+        self == TaskUpdateRequest()
+    }
+
+    /// Drops every field that already matches `task`, so that saving the task
+    /// editor, which fills in every field it shows, sends only what the user
+    /// changed (#292). A field that was not edited is left to the server, so a
+    /// change made to it in another client survives.
     ///
-    /// Vikunja's `PUT /tasks/{id}` is a **full replace**: any field missing
-    /// from the body is reset to its zero value. A partial request such as
-    /// "just mark it done" therefore wipes whatever it doesn't mention.
-    ///
-    /// This used to cover the schedule fields only, so completing, postponing
-    /// or re-progressing a task silently destroyed that task's description,
-    /// priority, progress, color and favorite flag on the server (issue #147).
-    ///
-    /// `title`, `labels` and `projectId` are deliberately **not** carried: the
-    /// server keeps those when they're omitted, so leaving them out avoids
-    /// overwriting a change made elsewhere with our local snapshot.
-    ///
-    /// Callers that mean "clear the description" must send an explicit empty
-    /// string; a nil description here means "keep what the task has".
-    func preservingExistingValues(from task: VTask) -> TaskUpdateRequest {
+    /// nil and empty count as the same value for the description, reminders
+    /// and assignees, as do nil and zero for the repeat fields, because Vikunja
+    /// reports an unset field either way.
+    func onlyChanges(from task: VTask) -> TaskUpdateRequest {
         var request = self
-        if request.description == nil {
-            request.description = task.description
+        if request.title == task.title {
+            request.title = nil
         }
-        if request.priority == nil {
-            request.priority = task.priority
+        if let description = request.description, description == (task.description ?? "") {
+            request.description = nil
         }
-        if request.percentDone == nil {
-            request.percentDone = task.percentDone
+        if request.done == task.done {
+            request.done = nil
         }
-        if request.hexColor == nil {
-            request.hexColor = task.hexColor
+        if request.priority == task.priority {
+            request.priority = nil
         }
-        if request.isFavorite == nil {
-            request.isFavorite = task.isFavorite
+        if request.projectId == task.projectId {
+            request.projectId = nil
         }
-        if request.dueDate == nil, request.clearDueDate != true {
-            request.dueDate = task.effectiveDueDate
+        if let repeatAfter = request.repeatAfter, repeatAfter == (task.repeatAfter ?? 0) {
+            request.repeatAfter = nil
         }
-        if request.startDate == nil, request.clearStartDate != true {
-            request.startDate = task.effectiveStartDate
+        if let repeatMode = request.repeatMode, repeatMode == (task.repeatMode ?? 0) {
+            request.repeatMode = nil
         }
-        if request.endDate == nil, request.clearEndDate != true {
-            request.endDate = task.effectiveEndDate
+        if let reminders = request.reminders, reminders == (task.reminders ?? []) {
+            request.reminders = nil
         }
-        if request.repeatAfter == nil {
-            request.repeatAfter = task.repeatAfter
+        if request.percentDone == task.percentDone
+            || (request.percentDone == 0 && task.percentDone == nil)
+        {
+            request.percentDone = nil
         }
-        if request.repeatMode == nil {
-            request.repeatMode = task.repeatMode
+        if request.hexColor == task.hexColor {
+            request.hexColor = nil
         }
-        if request.reminders == nil {
-            request.reminders = task.reminders
+        if request.isFavorite == task.isFavorite {
+            request.isFavorite = nil
         }
-        if request.assignees == nil {
-            request.assignees = task.assignees
+        if let assignees = request.assignees,
+           assignees.map(\.id) == (task.assignees ?? []).map(\.id)
+        {
+            request.assignees = nil
         }
+        Self.dropUnchangedDate(&request.dueDate, clear: &request.clearDueDate, current: task.effectiveDueDate)
+        Self.dropUnchangedDate(&request.startDate, clear: &request.clearStartDate, current: task.effectiveStartDate)
+        Self.dropUnchangedDate(&request.endDate, clear: &request.clearEndDate, current: task.effectiveEndDate)
         return request
+    }
+
+    /// Clearing a date the task does not have, or setting the one it has
+    /// already, is no change. A clear flag wins over a date, as in `encode`.
+    private static func dropUnchangedDate(_ date: inout Date?, clear: inout Bool?, current: Date?) {
+        if clear == true {
+            date = nil
+            if current == nil {
+                clear = nil
+            }
+            return
+        }
+        clear = nil
+        if let value = date, value == current {
+            date = nil
+        }
     }
 }

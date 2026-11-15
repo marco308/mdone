@@ -3,11 +3,10 @@ import Foundation
 /// A task edit made while offline, stored as the user's **intent** (only the
 /// fields they actually changed) rather than a ready-to-send request body.
 ///
-/// Storing intent is what makes replay safe. Vikunja's task update is a full
-/// replace, so a body built offline and replayed an hour later would overwrite
-/// every field with the values the task had when the device went offline,
-/// destroying anything changed elsewhere in the meantime. On replay the intent
-/// is merged onto a freshly-read copy of the task instead (issue #146).
+/// Storing intent is what makes replay safe. A whole task built offline and
+/// replayed an hour later would overwrite every field with the values the task
+/// had when the device went offline, destroying anything changed elsewhere in
+/// the meantime. Replay sends only the intent, as a `PATCH` (issues #146, #292).
 ///
 /// Labels are deliberately absent: they're managed through their own endpoints,
 /// not the task update, so marking a task Current offline isn't queueable here.
@@ -60,8 +59,7 @@ struct QueuedTaskEdit: Codable, Equatable {
         clearEndDate = request.clearEndDate
     }
 
-    /// Rebuilds the request. Still needs `preservingExistingValues(from:)`
-    /// applied against a fresh task before it goes on the wire (issue #147).
+    /// Rebuilds the request, ready to send as it is.
     var request: TaskUpdateRequest {
         var result = TaskUpdateRequest()
         result.done = done

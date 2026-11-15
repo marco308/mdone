@@ -93,22 +93,24 @@ final class TaskAssigneeTests: XCTestCase {
 
     // MARK: - Keeping assignees through updates
 
-    func testUpdatesCarryTheTasksAssigneesForward() {
-        // Vikunja's task update removes every assignee the body leaves out,
-        // so completing a task used to unassign it for the whole team.
+    func testUpdatesLeaveAssigneesToTheServer() {
+        // Task updates are a PATCH (#292): assignees left out are kept, so
+        // completing a task no longer has to carry them to avoid unassigning
+        // the whole team, and must not, or it would undo a change made
+        // elsewhere since the task was read.
         var task = VTask(id: 1, title: "x", done: false, priority: 0, projectId: 1)
         task.assignees = [alice, bob]
 
-        let request = TaskUpdateRequest(done: true).preservingExistingValues(from: task)
+        let request = TaskUpdateRequest(done: true).onlyChanges(from: task)
 
-        XCTAssertEqual(request.assignees, [alice, bob])
+        XCTAssertNil(request.assignees)
     }
 
-    func testAnExplicitAssigneeListWinsOverTheTasks() {
+    func testAnExplicitAssigneeListIsSent() {
         var task = VTask(id: 1, title: "x", done: false, priority: 0, projectId: 1)
         task.assignees = [alice, bob]
 
-        let request = TaskUpdateRequest(assignees: []).preservingExistingValues(from: task)
+        let request = TaskUpdateRequest(assignees: []).onlyChanges(from: task)
 
         XCTAssertEqual(request.assignees, [])
     }
@@ -145,8 +147,9 @@ final class TaskAssigneeTests: XCTestCase {
 
         await appState.toggleTaskDone(task)
 
+        // A PATCH leaves assignees out, so the server keeps them (#292).
         let body = try jsonBody(of: MockURLProtocol.capturedRequests.last)
-        XCTAssertEqual(assigneeIds(in: body), [3, 4])
+        XCTAssertNil(body["assignees"])
         XCTAssertTrue(appState.tasks[0].done)
         XCTAssertEqual(appState.tasks[0].assignees?.map(\.displayName), ["Alice Smith", "bob"])
     }

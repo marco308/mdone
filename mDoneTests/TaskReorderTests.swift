@@ -209,7 +209,7 @@ final class TaskReorderTests: XCTestCase {
             .data(using: .utf8))
         MockURLProtocol.requestHandler = { request in
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
-            if request.httpMethod == "PUT" {
+            if request.httpMethod == "PATCH" {
                 return (response, movedJSON)
             }
             // The server put the moved task first in Home's list view.
@@ -293,7 +293,7 @@ final class TaskReorderTests: XCTestCase {
 
         await state.updateTask(id: 1, request: TaskUpdateRequest(title: "Renamed"))
 
-        XCTAssertEqual(MockURLProtocol.capturedRequests.map(\.httpMethod), ["PUT"])
+        XCTAssertEqual(MockURLProtocol.capturedRequests.map(\.httpMethod), ["PATCH"])
         XCTAssertEqual(state.tasks.first { $0.id == 1 }?.title, "Renamed")
     }
 

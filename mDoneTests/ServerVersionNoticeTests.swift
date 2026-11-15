@@ -53,13 +53,20 @@ final class ServerVersionNoticeTests: XCTestCase {
     }
 
     func testOrdersByMajorThenMinorThenPatch() throws {
-        let v2API = VikunjaVersion.firstWithAPIv2
-        XCTAssertLessThan(try XCTUnwrap(VikunjaVersion("v2.3.9")), v2API)
-        XCTAssertLessThan(try XCTUnwrap(VikunjaVersion("v1.10.0")), v2API)
-        XCTAssertLessThan(try XCTUnwrap(VikunjaVersion("v0.24.6")), v2API)
-        XCTAssertGreaterThanOrEqual(try XCTUnwrap(VikunjaVersion("v2.4.0")), v2API)
-        XCTAssertGreaterThanOrEqual(try XCTUnwrap(VikunjaVersion("v2.10.0")), v2API)
-        XCTAssertGreaterThanOrEqual(try XCTUnwrap(VikunjaVersion("v3.0.0")), v2API)
+        let minimum = VikunjaVersion.minimumSupported
+        XCTAssertLessThan(try XCTUnwrap(VikunjaVersion("v2.3.9")), minimum)
+        XCTAssertLessThan(try XCTUnwrap(VikunjaVersion("v1.10.0")), minimum)
+        XCTAssertLessThan(try XCTUnwrap(VikunjaVersion("v0.24.6")), minimum)
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(VikunjaVersion("v2.5.0")), minimum)
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(VikunjaVersion("v2.10.0")), minimum)
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(VikunjaVersion("v3.0.0")), minimum)
+    }
+
+    /// 2.4.0 has the v2 API but rejects a `PATCH` on any subscribed task
+    /// with 422, and every task update is a `PATCH` (#292).
+    func testVikunja240IsBelowTheMinimum() throws {
+        XCTAssertLessThan(try XCTUnwrap(VikunjaVersion("v2.4.0")), VikunjaVersion.minimumSupported)
+        XCTAssertEqual(VikunjaVersion.minimumSupported.description, "2.5.0")
     }
 
     // MARK: - AppState
@@ -135,7 +142,7 @@ final class ServerVersionNoticeTests: XCTestCase {
 
     @MainActor
     func testCurrentServerRaisesNothing() async {
-        let appState = signedInAppState(serverReports: #"{"version": "v2.4.0"}"#)
+        let appState = signedInAppState(serverReports: #"{"version": "v2.5.0"}"#)
         await appState.loadServerVersionIfNeeded()
 
         XCTAssertFalse(appState.serverNeedsUpdate)
@@ -187,12 +194,12 @@ final class ServerVersionNoticeTests: XCTestCase {
     func testNoticeNamesBothVersions() {
         let message = ServerUpdateNotice.message(for: VikunjaVersion(major: 2, minor: 3, patch: 1))
         XCTAssertTrue(message.contains("2.3.1"))
-        XCTAssertTrue(message.contains("2.4.0"))
+        XCTAssertTrue(message.contains("2.5.0"))
     }
 
     func testNoticeForAnUnknownVersionStillNamesTheRequirement() {
         let message = ServerUpdateNotice.message(for: nil)
-        XCTAssertTrue(message.contains("2.4.0"))
+        XCTAssertTrue(message.contains("2.5.0"))
         XCTAssertFalse(message.isEmpty)
     }
 

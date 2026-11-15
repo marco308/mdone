@@ -32,11 +32,12 @@ jobs:
       fail-fast: false
       matrix:
         # `latest` is the canary: a failure there means upstream changed
-        # something. The pinned release is the oldest server mDone supports,
-        # the first with the v2 API (VikunjaVersion.firstWithAPIv2), so a
-        # failure there means *we* broke the floor. Values are GitHub release
-        # tags of go-vikunja/vikunja.
-        vikunja: ["latest", "v2.4.0"]
+        # something. The pinned release is the oldest server mDone supports
+        # (VikunjaVersion.minimumSupported), so a failure there means *we*
+        # broke the floor. Not v2.4.0, the first with the v2 API: it answers
+        # 422 to a PATCH on any subscribed task (#292). Values are GitHub
+        # release tags of go-vikunja/vikunja.
+        vikunja: ["latest", "v2.5.0"]
 
     steps:
       - name: Checkout

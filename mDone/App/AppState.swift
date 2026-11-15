@@ -171,10 +171,10 @@ final class AppState {
     /// Drives the "update your server" alert, shown once per launch.
     var showServerUpdateNotice = false
 
-    /// Whether the server predates Vikunja's v2 API, the only one mDone
-    /// speaks. An unknown version is never treated as old.
+    /// Whether the server is older than `VikunjaVersion.minimumSupported`.
+    /// An unknown version is never treated as old.
     var serverNeedsUpdate: Bool {
-        serverVersion.map { $0 < .firstWithAPIv2 } ?? false
+        serverVersion.map { $0 < .minimumSupported } ?? false
     }
 
     /// Left behind by the one-time notice of #290. Nothing reads it any more;
@@ -538,7 +538,7 @@ final class AppState {
         guard let url = URL(string: serverURL),
               let info = try? await serverInfoService.fetch(from: url),
               let version = info.version.flatMap(VikunjaVersion.init),
-              version < .firstWithAPIv2
+              version < .minimumSupported
         else { return }
         throw NetworkError.serverTooOld(version: version)
     }
@@ -943,10 +943,15 @@ final class AppState {
         if result.reminders == nil {
             result.reminders = request.reminders ?? existing?.reminders
         }
-        // Vikunja echoes assignees as bare ids with blank names, so the users
-        // that were sent (carried from the task, or picked) are the truth.
+        // Vikunja can echo assignees as bare ids with blank names, so the users
+        // that were picked are the truth. When the update did not touch them,
+        // the same people already on screen keep their names.
         if let assignees = request.assignees {
             result.assignees = assignees
+        } else if let shown = existing?.assignees,
+                  (result.assignees ?? []).map(\.id) == shown.map(\.id)
+        {
+            result.assignees = shown
         }
         return result
     }
@@ -1065,7 +1070,7 @@ final class AppState {
             return
         }
 
-        let request = intent.preservingExistingValues(from: current)
+        let request = intent
         do {
             let response = try await taskService.updateTask(id: task.id, request: request)
             let existing = taskSnapshot(id: response.id) ?? current
@@ -1128,7 +1133,7 @@ final class AppState {
         }
 
         do {
-            let request = intent.preservingExistingValues(from: current)
+            let request = intent
             _ = try await taskService.updateTask(id: target.id, request: request)
             // Restore from the freshest local snapshot rather than the update
             // response because Vikunja can omit fields such as the due date.
@@ -1478,7 +1483,7 @@ final class AppState {
             return
         }
 
-        let request = intent.preservingExistingValues(from: current)
+        let request = intent
 
         let originalDueDate: Date?
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
@@ -1523,7 +1528,7 @@ final class AppState {
             return
         }
 
-        let request = intent.preservingExistingValues(from: current)
+        let request = intent
         let originalDueDate: Date?
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
             originalDueDate = tasks[index].dueDate
@@ -1566,20 +1571,26 @@ final class AppState {
         defer { releaseTaskUpdateSlot(id: id) }
 
         let existing = taskSnapshot(id: id)
-
-        if let existing, queueOfflineEdit(request, for: existing) != nil {
+        // The editor fills in every field it shows. Send only the ones the
+        // user changed, so a field edited elsewhere in the meantime is kept
+        // (#292).
+        let changes = existing.map { request.onlyChanges(from: $0) } ?? request
+        if changes.isEmpty {
             return true
         }
 
-        let safeRequest = existing.map { request.preservingExistingValues(from: $0) } ?? request
+        if let existing, queueOfflineEdit(changes, for: existing) != nil {
+            return true
+        }
+
         do {
-            let response = try await taskService.updateTask(id: id, request: safeRequest)
+            let response = try await taskService.updateTask(id: id, request: changes)
             // Preserve relations from the latest local snapshot when Vikunja
-            // omits them; schedule intent remains authoritative via safeRequest.
+            // omits them; schedule intent remains authoritative via the request.
             let updated = Self.preservingSchedule(
                 existing: taskSnapshot(id: id) ?? existing,
                 response: response,
-                request: safeRequest
+                request: changes
             )
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
@@ -1885,7 +1896,7 @@ final class AppState {
             return
         }
 
-        let request = intent.preservingExistingValues(from: current)
+        let request = intent
         let original = current.percentDone
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
             tasks[index].percentDone = clamped

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-mDone is a native iOS/macOS task management app that connects to a self-hosted **Vikunja** server via its **v2** REST API (`/api/v2`, verified against Vikunja v2.4.0 and v2.8.0). Pure Swift with SwiftUI, no external dependencies. v2 arrived in Vikunja 2.4.0, so that is the oldest server mDone works with. The one request still made to `/api/v1` is the OIDC login callback, which v2 does not have. See `docs/vikunja-api-inventory.md`.
+mDone is a native iOS/macOS task management app that connects to a self-hosted **Vikunja** server via its **v2** REST API (`/api/v2`, verified against Vikunja v2.4.0 to v2.8.0). Pure Swift with SwiftUI, no external dependencies. v2 arrived in Vikunja 2.4.0, but 2.4.0's `PATCH` fails on subscribed tasks, so the oldest server mDone works with is 2.5.0 (`VikunjaVersion.minimumSupported`). The one request still made to `/api/v1` is the OIDC login callback, which v2 does not have. See `docs/vikunja-api-inventory.md`.
 
 Beyond plain task CRUD the app also covers: focus sessions with a Live Activity, Kanban boards, subtasks and task relations, calendar (EventKit) overlay, home/lock screen widgets, Shortcuts and Siri actions, and offline caching with a pending-operation queue.
 
@@ -57,13 +57,13 @@ Log in with `devuser` / `devpassword`. `./scripts/reset-dev-vikunja.sh` nukes an
 - **Siri adds tasks in the background**: `AddTaskIntent` (`App/AddTaskIntent.swift`) has no `openAppWhenRun`, which is what lets it run over CarPlay, AirPods and the Watch, where there is no screen to hand to. It calls `AppState.createTaskFromIntent`, which signs in from the Keychain on a cold launch, reads projects from the cache, and queues the create when offline. The UI deliberately does not queue creates (#146); the intent does, because its caller cannot see the list and losing the task is worse. `ProjectEntity` gives Siri the project names; `refreshAll` calls `updateAppShortcutParameters()` after every project fetch so that vocabulary stays current. A CarPlay app proper is off the table: Apple only grants the entitlement to fixed categories that exclude task managers.
 
 ### Vikunja API Notes
-- Creates are `POST`, updates are `PUT`, for tasks, projects and labels: `POST /api/v2/projects/{id}/tasks` creates a task, `PUT /api/v2/tasks/{id}` updates one. This is the reverse of v1, so do not copy verbs from old code or from the v1 half of the inventory.
-- `PUT` replaces the whole resource: a field left out of a task update is cleared. Merge onto the current task first (`TaskUpdateRequest.preservingExistingValues(from:)`). `PATCH` is the partial update and is not used yet (#292).
+- Creates are `POST`, full updates are `PUT`, for tasks, projects and labels: `POST /api/v2/projects/{id}/tasks` creates a task. This is the reverse of v1, so do not copy verbs from old code or from the v1 half of the inventory.
+- `PUT` replaces the whole resource: a field left out is cleared. Projects and labels still use it and send every field. Tasks never do: every task update is `PATCH /api/v2/tasks/{id}`, a JSON Merge Patch carrying only the fields that changed (`null` clears one). Build the request from what the user changed; the editor's full form goes through `TaskUpdateRequest.onlyChanges(from:)` (#292).
 - Every list comes in an envelope, `{items, total, page, per_page, total_pages}`. Use `APIClient.fetchAllPages` for paginated lists and `fetchList` for single-page ones; `fetch` is for single objects.
 - Errors are `application/problem+json` with the text in `detail` and Vikunja's number in `code`. Validation failures are 422.
 - Per-project task and bucket reads go through a **view**: fetch `/projects/{id}/views` first, then `/projects/{id}/views/{viewId}/tasks` for the list or `.../buckets/tasks` for the board. The board response embeds each bucket's tasks, so one fetch renders it, but it still pages the tasks inside each bucket: see `ProjectService.fetchBuckets`.
 - Relations: `POST /api/v2/tasks/{id}/relations` to create, `DELETE /api/v2/tasks/{id}/relations/{kind}/{otherId}` to remove. Kinds are lowercase with no underscores (`parenttask`, `duplicateof`, ...) so they survive snake-case key conversion untouched.
-- A server older than 2.4.0 has no v2. Sign-in refuses it with `NetworkError.serverTooOld`; `ServerInfoService` falls back to `/api/v1/info` only to learn that server's version.
+- A server older than 2.4.0 has no v2, and 2.4.0 answers 422 to a task `PATCH` once the task has a subscription. Sign-in refuses anything below 2.5.0 with `NetworkError.serverTooOld`; `ServerInfoService` falls back to `/api/v1/info` only to learn the version of a server with no v2.
 - `PendingOperation` rows store a path and method. Rows queued by a build that spoke v1 are replayed as stored, which works because every server with v2 still serves v1. Do not rewrite them.
 - Filtering uses Vikunja DSL syntax, e.g. `"priority = 3 && due_date > now && done = false"`
 - All IDs are `Int64`
