@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.23.0] - 2026-11-15
+
 ### Added
 - mDone now tells you, once, when your server is older than Vikunja 2.4.0, and Settings keeps a note of it. Nothing changes yet, but a future version of mDone will need Vikunja 2.4.0 or newer, so this is early notice to update your server (#290).
 

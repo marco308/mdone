@@ -109,6 +109,24 @@ Steps to test:
 
 This is a private test server maintained by the developer for App Store review purposes.
 
+## What's New (v1.23.0)
+
+### iPhone and iPad
+
+Repeating tasks on the calendar, and early notice for older servers.
+
+- Repeating tasks now show on the calendar on every day they are due, not only the next one. Monthly repeats are recognised as repeating too.
+- Ticking off a task in a widget no longer clears its description, priority or repeat.
+- If your Vikunja server is older than 2.4.0, mDone now tells you once. Nothing changes yet, but a future version will need Vikunja 2.4.0 or newer.
+
+### Mac
+
+Repeating tasks on the calendar, and early notice for older servers.
+
+- Repeating tasks now show on the calendar on every day they are due, not only the next one. Monthly repeats are recognised as repeating too.
+- Ticking off a task in a widget no longer clears its description, priority or repeat.
+- If your Vikunja server is older than 2.4.0, mDone now tells you once. Nothing changes yet, but a future version will need Vikunja 2.4.0 or newer.
+
 ## What's New (v1.22.0)
 
 ### iPhone and iPad
