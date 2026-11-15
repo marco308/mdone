@@ -1,0 +1,71 @@
+###############################################################################
+# A dev Vikunja with an lldap directory behind it, for work on issue #156
+# (LDAP / Active Directory login). Always started via:
+#
+#   ./scripts/dev-ldap-up.sh                  local auth on  + LDAP
+#   ./scripts/dev-ldap-up.sh --no-local-auth  local auth off + LDAP (LDAP-only)
+#
+# Standalone rather than an overlay on docker-compose.dev.yml, so it runs next
+# to the plain dev server instead of replacing it: its own project name, its
+# own data directory and port 3457. Point the app at http://localhost:3457.
+#
+# No TLS or nip.io, unlike the OIDC stack: the app never talks to the
+# directory. Vikunja binds against lldap over the compose network.
+#
+# Everything here is throwaway. The secrets below are dev-only and must never
+# be reused anywhere real.
+###############################################################################
+
+name: mdone-ldap-dev
+
+services:
+  lldap:
+    image: lldap/lldap:stable
+    container_name: mdone-lldap-dev
+    restart: unless-stopped
+    ports:
+      # Web UI, for poking at users by hand. LDAP (3890) stays on the compose
+      # network; only Vikunja needs it.
+      - "17170:17170"
+    environment:
+      LLDAP_JWT_SECRET: "dev-only-lldap-jwt-secret-not-real"
+      LLDAP_KEY_SEED: "dev-only-lldap-key-seed-not-real"
+      LLDAP_LDAP_BASE_DN: "dc=mdone,dc=dev"
+      LLDAP_LDAP_USER_PASS: "devadminpassword"
+    volumes:
+      - ./vikunja-dev-data/ldap/lldap:/data
+
+  vikunja:
+    image: vikunja/vikunja:latest
+    container_name: mdone-vikunja-ldap-dev
+    restart: unless-stopped
+    depends_on:
+      - lldap
+    ports:
+      - "3457:3456"
+    environment:
+      VIKUNJA_SERVICE_PUBLICURL: "http://localhost:3457"
+      VIKUNJA_SERVICE_JWTSECRET: "dev-only-not-a-real-secret-rotate-if-ever-exposed"
+      VIKUNJA_DATABASE_TYPE: "sqlite"
+      VIKUNJA_DATABASE_PATH: "/app/vikunja/files/vikunja.db"
+      VIKUNJA_LOG_LEVEL: "INFO"
+      VIKUNJA_AUTH_LOCAL_ENABLED: "${VIKUNJA_LOCAL_AUTH:-true}"
+      VIKUNJA_AUTH_LDAP_ENABLED: "true"
+      VIKUNJA_AUTH_LDAP_HOST: "lldap"
+      VIKUNJA_AUTH_LDAP_PORT: "3890"
+      VIKUNJA_AUTH_LDAP_USETLS: "false"
+      VIKUNJA_AUTH_LDAP_VERIFYTLS: "false"
+      VIKUNJA_AUTH_LDAP_BASEDN: "dc=mdone,dc=dev"
+      VIKUNJA_AUTH_LDAP_BINDDN: "uid=admin,ou=people,dc=mdone,dc=dev"
+      VIKUNJA_AUTH_LDAP_BINDPASSWORD: "devadminpassword"
+      VIKUNJA_AUTH_LDAP_USERFILTER: "(&(objectClass=person)(uid=%[1]s))"
+      VIKUNJA_AUTH_LDAP_ATTRIBUTE_USERNAME: "uid"
+      VIKUNJA_AUTH_LDAP_ATTRIBUTE_EMAIL: "mail"
+      VIKUNJA_AUTH_LDAP_ATTRIBUTE_DISPLAYNAME: "displayName"
+    volumes:
+      - ./vikunja-dev-data/ldap/files:/app/vikunja/files
+    healthcheck:
+      test: ["CMD", "/app/vikunja/vikunja", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

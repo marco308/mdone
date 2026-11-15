@@ -81,6 +81,7 @@ final class NetworkErrorTests: XCTestCase {
             .invalidURL,
             .unauthorized,
             .invalidCredentials,
+            .externalAccountRejected,
             .totpRequired,
             .invalidTOTPPasscode,
             .serverError(statusCode: 400, message: "Bad Request"),
@@ -220,6 +221,17 @@ final class NetworkErrorTests: XCTestCase {
         )
         guard case .invalidTOTPPasscode = NetworkError.fromResponse(statusCode: 412, apiError: passcode) else {
             return XCTFail("412 with code 1017 is a two-factor passcode problem")
+        }
+
+        // What Vikunja v2.8.0 sends for a wrong LDAP password (#156).
+        let notLocal = try decodeAPIError(
+            #"{"title":"Precondition Failed","status":412,"detail":"This account is managed by a third-party authentication provider.","code":1021}"#
+        )
+        guard case .externalAccountRejected = NetworkError.fromResponse(statusCode: 412, apiError: notLocal) else {
+            return XCTFail("412 with code 1021 is a password refused for a directory or SSO account")
+        }
+        guard case .serverError = NetworkError.fromResponse(statusCode: 403, apiError: notLocal) else {
+            return XCTFail("code 1021 under another status stays generic")
         }
 
         let missing =

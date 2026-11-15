@@ -284,6 +284,29 @@ gets from the provider's discovery document, so the app never builds it:
 With no provider configured, `providers` is `null` rather than `[]`, so decode
 it as an optional array.
 
+## LDAP dev stack (issue #156)
+
+A second, standalone Vikunja with an [lldap](https://github.com/lldap/lldap) directory behind it. It runs beside the plain dev server rather than replacing it: its own compose project, its own data in `vikunja-dev-data/ldap/`, and port **3457**.
+
+```bash
+./scripts/dev-ldap-up.sh                  # local auth on  + LDAP
+./scripts/dev-ldap-up.sh --no-local-auth  # local auth off + LDAP (LDAP-only)
+```
+
+The script creates the directory user `ldapuser` / `ldappassword`, prints the `auth` block from `/api/v1/info`, and signs in with curl to prove the round trip. In the app, use server URL `http://localhost:3457` with that pair. The lldap web UI is on `http://localhost:17170` (`admin` / `devadminpassword`) if you want more users.
+
+No TLS or nip.io is needed, unlike the OIDC stack, because the app never talks to the directory: Vikunja binds against lldap over the compose network.
+
+```bash
+docker compose -f docker-compose.ldap.yml down
+```
+
+### What it showed (Vikunja v2.8.0)
+
+- LDAP has no route of its own. `POST /api/v2/login` with a directory username and password returns the same `{token}` body and `vikunja_refresh_token` cookie as a local login. The first sign-in creates the Vikunja user from the directory entry.
+- A wrong password for a directory user is **not** the usual 403 / 1011. Vikunja answers `412` with code `1021`, "This account is managed by a third-party authentication provider." The app maps it to `NetworkError.externalAccountRejected`, whose message points at the directory password.
+- Turning local auth off (`local.enabled: false`) hides registration but does not stop an existing local user signing in with a password.
+
 ## Vikunja version pinning
 
 `docker-compose.dev.yml` currently uses `vikunja/vikunja:latest`. When you start noticing odd behaviour after a `docker compose pull`, check the [Vikunja release notes](https://kolaente.dev/vikunja/vikunja/-/releases) and pin to a known-good tag.

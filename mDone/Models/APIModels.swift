@@ -75,6 +75,12 @@ struct APIError: Decodable {
         /// `ErrCodeInvalidTOTPPasscode`, sent as HTTP 412. Vikunja uses the
         /// same code whether the passcode was wrong or never sent.
         static let invalidTOTPPasscode = 1017
+        /// `ErrCodeAccountIsNotLocal`, sent as HTTP 412. Vikunja answers this
+        /// when a password login names an account it did not create itself.
+        /// On an LDAP server that is what a wrong directory password looks
+        /// like (verified on v2.8.0, issue #156); for an account made through
+        /// single sign-on it means a password cannot be used at all.
+        static let accountNotLocal = 1021
     }
 }
 
@@ -83,6 +89,10 @@ enum NetworkError: LocalizedError {
     case unauthorized
     /// `POST /login` refused the username or password.
     case invalidCredentials
+    /// `POST /login` refused the password for an account that belongs to a
+    /// directory (LDAP) or a single sign-on provider. Vikunja cannot tell the
+    /// two apart in its answer, so the copy has to fit both (#156).
+    case externalAccountRejected
     /// `POST /login` wanted a two-factor passcode and none was sent. Vikunja
     /// reports this with the same error code as a wrong passcode; the split is
     /// made by the caller, which knows whether it sent one (issue #179).
@@ -113,6 +123,10 @@ enum NetworkError: LocalizedError {
             String(localized: "Your session has expired. Please log in again.")
         case .invalidCredentials:
             String(localized: "Wrong username or password.")
+        case .externalAccountRejected:
+            String(
+                localized: "That username and password weren't accepted. This account signs in through a directory such as LDAP or through single sign-on, so use that password, or the single sign-on button if your server shows one."
+            )
         case .totpRequired:
             String(
                 localized: "This account has two-factor authentication turned on. Enter the code from your authenticator app to sign in."
@@ -154,6 +168,10 @@ enum NetworkError: LocalizedError {
             String(localized: "Go to Settings and sign in with your credentials or a new API token.")
         case .invalidCredentials:
             String(localized: "Check your username and password and try again.")
+        case .externalAccountRejected:
+            String(
+                localized: "Check the password you use for your directory or single sign-on account, and try again."
+            )
         case .totpRequired:
             String(localized: "Open your authenticator app and enter the current six-digit code.")
         case .invalidTOTPPasscode:
@@ -192,7 +210,7 @@ enum NetworkError: LocalizedError {
             "link.badge.plus"
         case .unauthorized:
             "lock.slash"
-        case .invalidCredentials:
+        case .invalidCredentials, .externalAccountRejected:
             "person.badge.key"
         case .totpRequired, .invalidTOTPPasscode:
             "lock.shield"
@@ -242,10 +260,11 @@ enum NetworkError: LocalizedError {
     /// Turns a non-2xx response into the error the caller should see.
     ///
     /// Most responses become `.serverError`, which carries the status and the
-    /// server's message. The two Vikunja login refusals get their own cases so
+    /// server's message. The Vikunja login refusals get their own cases so
     /// the setup screen can react to them (issue #179): a 403 with code 1011 is
     /// a wrong username or password, a 412 with code 1017 is a two-factor
-    /// passcode problem. Both come only from `POST /login`. The status is part
+    /// passcode problem, and a 412 with code 1021 is a password refused for a
+    /// directory or single sign-on account. All come only from `POST /login`. The status is part
     /// of the match on purpose: the same code under a different status is not
     /// the response this was written for, and stays generic.
     static func fromResponse(statusCode: Int, apiError: APIError?) -> NetworkError {
@@ -254,6 +273,8 @@ enum NetworkError: LocalizedError {
             .invalidCredentials
         case (412, APIError.Code.invalidTOTPPasscode):
             .invalidTOTPPasscode
+        case (412, APIError.Code.accountNotLocal):
+            .externalAccountRejected
         default:
             .serverError(statusCode: statusCode, message: apiError?.message)
         }
