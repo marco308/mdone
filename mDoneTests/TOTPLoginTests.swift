@@ -160,7 +160,13 @@ final class TOTPLoginTests: XCTestCase {
         let credentials = try XCTUnwrap(NetworkError.invalidCredentials.errorDescription).lowercased()
         XCTAssertTrue(credentials.contains("password"), credentials)
 
-        for error in [NetworkError.totpRequired, .invalidTOTPPasscode, .invalidCredentials] {
+        let external = try XCTUnwrap(NetworkError.externalAccountRejected.errorDescription).lowercased()
+        XCTAssertTrue(external.contains("password"), external)
+        // The setup screen shows only the description, so it has to say which
+        // password is meant (#156).
+        XCTAssertTrue(external.contains("directory"), external)
+
+        for error in [NetworkError.totpRequired, .invalidTOTPPasscode, .invalidCredentials, .externalAccountRejected] {
             XCTAssertNotNil(error.recoverySuggestion)
             XCTAssertFalse(error.iconName.isEmpty)
             XCTAssertFalse(error.isConnectivityFailure)

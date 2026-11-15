@@ -1258,6 +1258,7 @@
         }
       }
     },
+    "Check the password you use for your directory or single sign-on account, and try again." : {},
     "Check your username and password and try again." : {
       "localizations" : {
         "zh-Hans" : {
@@ -4438,6 +4439,7 @@
         }
       }
     },
+    "That username and password weren't accepted. This account signs in through a directory such as LDAP or through single sign-on, so use that password, or the single sign-on button if your server shows one." : {},
     "The request timed out. Please check your connection and try again." : {
       "localizations" : {
         "zh-Hans" : {
