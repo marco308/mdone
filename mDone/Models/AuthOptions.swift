@@ -18,6 +18,22 @@ struct AuthOptions: Equatable {
     /// way, because the instance flag says nothing about whether this
     /// particular account has enrolled (issue #179).
     var showsTOTP: Bool
+    /// Whose username and password the credentials form takes, so the hint
+    /// under it can say so (issue #156).
+    var credentialAccounts: CredentialAccounts
+
+    /// Which accounts a username and password can belong to on this server.
+    /// Vikunja does not name the directory in `/info`, so this is as specific
+    /// as the hint can be.
+    enum CredentialAccounts: Equatable {
+        /// Local Vikunja accounts only, or a server that has not said.
+        case vikunja
+        /// Local accounts and an LDAP directory, both signed in through
+        /// `POST /login`.
+        case vikunjaOrDirectory
+        /// An LDAP directory with local sign-in turned off.
+        case directory
+    }
 
     /// True when the server offers neither password nor SSO login, leaving an
     /// API token as the only way in. Worth saying out loud in the UI rather
@@ -31,22 +47,34 @@ struct AuthOptions: Equatable {
     /// the credentials form and no SSO.
     static let unknownServer = AuthOptions(showsCredentials: true, showsAPIToken: true, providers: [])
 
-    init(showsCredentials: Bool, showsAPIToken: Bool, providers: [OIDCProvider], showsTOTP: Bool = false) {
+    init(
+        showsCredentials: Bool,
+        showsAPIToken: Bool,
+        providers: [OIDCProvider],
+        showsTOTP: Bool = false,
+        credentialAccounts: CredentialAccounts = .vikunja
+    ) {
         self.showsCredentials = showsCredentials
         self.showsAPIToken = showsAPIToken
         self.providers = providers
         self.showsTOTP = showsTOTP
+        self.credentialAccounts = credentialAccounts
     }
 
     init(info: ServerInfo) {
         let auth = info.auth
 
         // Deliberately `||`, not just `local.enabled`. LDAP binds go through
-        // the same POST /login with a username and password, so an
-        // LDAP-only server still needs these fields even though mDone has no
-        // LDAP-specific support yet (issue #156). Hiding them there would
-        // leave the user with no way to sign in at all.
+        // the same POST /login with a username and password (verified on
+        // v2.8.0, issue #156), so an LDAP-only server still needs these
+        // fields. Hiding them there would leave no way to sign in at all.
         showsCredentials = auth.local.enabled || auth.ldap.enabled
+
+        credentialAccounts = switch (auth.local.enabled, auth.ldap.enabled) {
+        case (_, false): .vikunja
+        case (true, true): .vikunjaOrDirectory
+        case (false, true): .directory
+        }
 
         showsAPIToken = true
 
@@ -55,5 +83,25 @@ struct AuthOptions: Equatable {
         providers = auth.openidConnect.enabled ? (auth.openidConnect.providers ?? []) : []
 
         showsTOTP = info.totpEnabled
+    }
+
+    /// The line under the username and password form. Written out in full
+    /// for each case rather than assembled, so each reads naturally and
+    /// translates as one sentence.
+    var credentialsHint: String {
+        switch credentialAccounts {
+        case .vikunja:
+            String(
+                localized: "Sign in with your Vikunja username and password. If your account has two-factor authentication turned on, enter the code from your authenticator app as well."
+            )
+        case .vikunjaOrDirectory:
+            String(
+                localized: "Sign in with your Vikunja username and password, or with your directory account if your server uses LDAP or Active Directory. If your account has two-factor authentication turned on, enter the code from your authenticator app as well."
+            )
+        case .directory:
+            String(
+                localized: "This server signs you in through a directory such as LDAP or Active Directory. Use the username and password you have there. If your account has two-factor authentication turned on, enter the code from your authenticator app as well."
+            )
+        }
     }
 }

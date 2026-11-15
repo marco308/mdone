@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Signing in to a Vikunja server that uses LDAP or Active Directory is now spelled out on the sign-in screen. When the server signs people in through a directory, the hint under the form says to use the username and password from that directory (#156).
+
 ### Changed
 - mDone now needs Vikunja 2.5.0 or newer. It has moved to Vikunja's newer v2 API, which servers before 2.4.0 do not have, and 2.4.0 rejects changes to many tasks. Signing in to an older server tells you which version it runs and asks you to update it. If you are already signed in to one, mDone says so each time it opens and in Settings, and cannot sync until the server is updated (#291, #292).
 - Changing a task now sends only what you changed. Before, mDone sent the whole task back, so an edit could undo a change made to that task in the web app or another device in the meantime, and anything mDone did not know about the task was at risk. Ticking off a task, in the app, a widget or after being offline, now sends just that it is done (#292).

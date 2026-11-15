@@ -168,6 +168,54 @@ final class AuthOptionsTests: XCTestCase {
         XCTAssertTrue(AuthOptions(info: info).showsCredentials)
     }
 
+    // MARK: - Credential accounts and hint (#156)
+
+    private func accounts(local: Bool, ldap: Bool) throws -> AuthOptions {
+        try AuthOptions(info: decode("""
+        {
+          "auth": {
+            "local": { "enabled": \(local) },
+            "ldap": { "enabled": \(ldap) },
+            "openid_connect": { "enabled": false, "providers": null }
+          }
+        }
+        """))
+    }
+
+    func testCredentialAccountsFollowLocalAndLDAP() throws {
+        XCTAssertEqual(try accounts(local: true, ldap: false).credentialAccounts, .vikunja)
+        XCTAssertEqual(try accounts(local: true, ldap: true).credentialAccounts, .vikunjaOrDirectory)
+        XCTAssertEqual(try accounts(local: false, ldap: true).credentialAccounts, .directory)
+        // No form is shown at all here; the value only has to be harmless.
+        XCTAssertEqual(try accounts(local: false, ldap: false).credentialAccounts, .vikunja)
+    }
+
+    func testOlderServerWithoutLDAPKeyIsVikunjaAccounts() throws {
+        let info = try decode(#"{ "auth": { "local": { "enabled": true } } }"#)
+        XCTAssertEqual(AuthOptions(info: info).credentialAccounts, .vikunja)
+        XCTAssertEqual(AuthOptions.unknownServer.credentialAccounts, .vikunja)
+    }
+
+    func testHintNamesTheDirectoryOnlyWhenLDAPIsOn() throws {
+        let local = try accounts(local: true, ldap: false).credentialsHint
+        let both = try accounts(local: true, ldap: true).credentialsHint
+        let directory = try accounts(local: false, ldap: true).credentialsHint
+
+        XCTAssertFalse(local.contains("LDAP"), local)
+        XCTAssertTrue(local.contains("Vikunja username"), local)
+
+        XCTAssertTrue(both.contains("LDAP"), both)
+        XCTAssertTrue(both.contains("Vikunja username"), both)
+
+        // An LDAP-only server has no Vikunja passwords to speak of.
+        XCTAssertTrue(directory.contains("LDAP"), directory)
+        XCTAssertFalse(directory.contains("Vikunja username"), directory)
+
+        for hint in [local, both, directory] {
+            XCTAssertTrue(hint.contains("two-factor"), hint)
+        }
+    }
+
     func testNoPasswordAndNoSSOLeavesOnlyAPIToken() throws {
         let info = try decode("""
         {
