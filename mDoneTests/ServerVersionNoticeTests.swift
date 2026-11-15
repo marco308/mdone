@@ -46,13 +46,13 @@ final class ServerVersionNoticeTests: XCTestCase {
     }
 
     func testOrdersByMajorThenMinorThenPatch() throws {
-        let v2API = VikunjaVersion.firstWithAPIv2
-        XCTAssertLessThan(try XCTUnwrap(VikunjaVersion("v2.3.9")), v2API)
-        XCTAssertLessThan(try XCTUnwrap(VikunjaVersion("v1.10.0")), v2API)
-        XCTAssertLessThan(try XCTUnwrap(VikunjaVersion("v0.24.6")), v2API)
-        XCTAssertGreaterThanOrEqual(try XCTUnwrap(VikunjaVersion("v2.4.0")), v2API)
-        XCTAssertGreaterThanOrEqual(try XCTUnwrap(VikunjaVersion("v2.10.0")), v2API)
-        XCTAssertGreaterThanOrEqual(try XCTUnwrap(VikunjaVersion("v3.0.0")), v2API)
+        let minimum = VikunjaVersion.minimumSupported
+        XCTAssertLessThan(try XCTUnwrap(VikunjaVersion("v2.4.9")), minimum)
+        XCTAssertLessThan(try XCTUnwrap(VikunjaVersion("v1.10.0")), minimum)
+        XCTAssertLessThan(try XCTUnwrap(VikunjaVersion("v0.24.6")), minimum)
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(VikunjaVersion("v2.5.0")), minimum)
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(VikunjaVersion("v2.10.0")), minimum)
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(VikunjaVersion("v3.0.0")), minimum)
     }
 
     // MARK: - AppState
@@ -87,9 +87,20 @@ final class ServerVersionNoticeTests: XCTestCase {
         XCTAssertFalse(relaunched.showServerUpdateNotice)
     }
 
+    /// 2.4.0 has the v2 API but rejects PATCH on a task with a subscription,
+    /// so it gets the notice too.
+    @MainActor
+    func testVikunja240RaisesTheNotice() async {
+        let appState = signedInAppState(serverReports: #"{"version": "v2.4.0"}"#)
+        await appState.loadServerVersionIfNeeded()
+
+        XCTAssertTrue(appState.serverNeedsUpdate)
+        XCTAssertTrue(appState.showServerUpdateNotice)
+    }
+
     @MainActor
     func testCurrentServerRaisesNothing() async {
-        let appState = signedInAppState(serverReports: #"{"version": "v2.4.0"}"#)
+        let appState = signedInAppState(serverReports: #"{"version": "v2.5.0"}"#)
         await appState.loadServerVersionIfNeeded()
 
         XCTAssertFalse(appState.serverNeedsUpdate)
@@ -139,8 +150,8 @@ final class ServerVersionNoticeTests: XCTestCase {
     }
 
     func testNoticeNamesBothVersions() {
-        let message = ServerUpdateNotice.message(for: VikunjaVersion(major: 2, minor: 3, patch: 1))
-        XCTAssertTrue(message.contains("2.3.1"))
+        let message = ServerUpdateNotice.message(for: VikunjaVersion(major: 2, minor: 4, patch: 0))
         XCTAssertTrue(message.contains("2.4.0"))
+        XCTAssertTrue(message.contains("2.5.0"))
     }
 }

@@ -11,8 +11,11 @@ struct VikunjaVersion: Comparable, Equatable, CustomStringConvertible {
     let minor: Int
     let patch: Int
 
-    /// The first release with the v2 API, which a future mDone will need (#289).
-    static let firstWithAPIv2 = VikunjaVersion(major: 2, minor: 4, patch: 0)
+    /// The oldest release a future mDone will support (#289). The v2 API
+    /// arrived in 2.4.0, but 2.4.0 answers 422 to a PATCH on any task with a
+    /// subscription, which mDone's partial updates (#292) need, so the floor is
+    /// 2.5.0.
+    static let minimumSupported = VikunjaVersion(major: 2, minor: 5, patch: 0)
 
     init(major: Int, minor: Int, patch: Int) {
         self.major = major
@@ -49,7 +52,7 @@ struct VikunjaVersion: Comparable, Equatable, CustomStringConvertible {
 /// one-time alert and the row in Settings.
 enum ServerUpdateNotice {
     static func message(for version: VikunjaVersion) -> String {
-        let required = VikunjaVersion.firstWithAPIv2.description
+        let required = VikunjaVersion.minimumSupported.description
         // swiftformat:disable:next wrap
         return String(
             localized: "Your server runs Vikunja \(version.description). A future version of mDone will need Vikunja \(required) or newer. mDone keeps working for now, but please update your server before then."

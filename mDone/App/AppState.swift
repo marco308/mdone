@@ -171,10 +171,10 @@ final class AppState {
     /// Drives the one-time "update your server" alert.
     var showServerUpdateNotice = false
 
-    /// Whether the server predates Vikunja's v2 API. An unknown version is
-    /// never treated as old.
+    /// Whether the server is older than the oldest release a future mDone
+    /// will support. An unknown version is never treated as old.
     var serverNeedsUpdate: Bool {
-        serverVersion.map { $0 < .firstWithAPIv2 } ?? false
+        serverVersion.map { $0 < .minimumSupported } ?? false
     }
 
     private static let serverUpdateNoticeSeenKey = "serverUpdateNoticeSeen"
