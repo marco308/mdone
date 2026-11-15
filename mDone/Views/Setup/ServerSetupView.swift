@@ -207,9 +207,8 @@ struct ServerSetupView: View {
                     // warned that tokens could not reorder tasks, which stopped
                     // being true when the position endpoint opened to them.
                     if authMode == .credentials {
-                        Text(
-                            "Sign in with your Vikunja username and password. If your account has two-factor authentication turned on, enter the code from your authenticator app as well."
-                        )
+                        // Names the directory when the server uses LDAP (#156).
+                        Text(authOptions.credentialsHint)
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                             .multilineTextAlignment(.center)

@@ -57,7 +57,7 @@ Things that did **not** change, each checked on a live server:
 | Purpose | Method | Route | Notes |
 |---------|--------|-------|-------|
 | Instance info | GET | `/info` | Unauthenticated. On 404 the app asks `/api/v1/info` once, to read the version of a server too old for v2. |
-| Password login | POST | `/login` | 404 when local sign-in is disabled, same as v1. |
+| Password login | POST | `/login` | Local and LDAP accounts alike: see "LDAP sign-in". 404 only when local sign-in and LDAP are both off. |
 | Refresh JWT | POST | `/user/token/refresh` | Takes the refresh cookie, not a Bearer token. |
 | OIDC callback | POST | **`/api/v1`**`/auth/openid/{provider}/callback` | Not in v2 as of 2.8.0. The JWT it returns works on v2. |
 | Current user | GET | `/user` | |
@@ -79,6 +79,26 @@ Things that did **not** change, each checked on a live server:
 | Notifications | GET | `/notifications` | Envelope. |
 | Mark one read | PUT | `/notifications/{id}` | Body `{read: true}`. |
 | Mark all read | POST | `/notifications` | No body needed; one is tolerated. |
+
+### LDAP sign-in (#156)
+
+Checked on 2.8.0 (2026-11-15) against an lldap directory, using the dev stack in
+`docker-compose.ldap.yml` (see `docs/dev-setup.md`).
+
+- There is no LDAP route. `POST /login` takes a directory username and password and answers exactly as
+  for a local account: `{token}` in the body and the `vikunja_refresh_token` cookie, which refreshes
+  the same way. The first sign-in creates the Vikunja user from the directory entry.
+- `/info` reports it as `auth.ldap.enabled`. Older servers may leave the key out, which the app reads
+  as off. It does not name the directory, so the login hint can only say "LDAP or Active Directory".
+- With local sign-in off and LDAP on, `/login` still works, for directory accounts and, as it turns
+  out, for existing local accounts too. Only registration goes away.
+- A wrong password for a directory account is **not** 403 / 1011. It is 412 with `code` 1021, "This
+  account is managed by a third-party authentication provider", the same answer a password gets on an
+  account created through OIDC. The app shows `NetworkError.externalAccountRejected` for it. An unknown
+  username is still 403 / 1011.
+
+How the setup screen uses this: `AuthOptions` shows the username and password form when local sign-in
+or LDAP is on, and `credentialsHint` names the directory when LDAP is on.
 
 ### Kanban paging
 

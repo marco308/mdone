@@ -1258,7 +1258,16 @@
         }
       }
     },
-    "Check the password you use for your directory or single sign-on account, and try again." : {},
+    "Check the password you use for your directory or single sign-on account, and try again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请检查目录账户或单点登录账户的密码，然后重试。"
+          }
+        }
+      }
+    },
     "Check your username and password and try again." : {
       "localizations" : {
         "zh-Hans" : {
@@ -3999,6 +4008,16 @@
         }
       }
     },
+    "Sign in with your Vikunja username and password, or with your directory account if your server uses LDAP or Active Directory. If your account has two-factor authentication turned on, enter the code from your authenticator app as well." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Vikunja 用户名和密码登录；如果服务器使用 LDAP 或 Active Directory，也可以使用目录账户登录。如果账户已启用双重认证，还需输入身份验证器应用中的验证码。"
+          }
+        }
+      }
+    },
     "Sign in with your Vikunja username and password. If your account has two-factor authentication turned on, enter the code from your authenticator app as well." : {
       "localizations" : {
         "zh-Hans" : {
@@ -4439,7 +4458,16 @@
         }
       }
     },
-    "That username and password weren't accepted. This account signs in through a directory such as LDAP or through single sign-on, so use that password, or the single sign-on button if your server shows one." : {},
+    "That username and password weren't accepted. This account signs in through a directory such as LDAP or through single sign-on, so use that password, or the single sign-on button if your server shows one." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户名和密码未被接受。此账户通过 LDAP 等目录服务或单点登录进行登录，请使用该处的密码；如果服务器提供单点登录按钮，也可以使用该按钮。"
+          }
+        }
+      }
+    },
     "The request timed out. Please check your connection and try again." : {
       "localizations" : {
         "zh-Hans" : {
@@ -4621,6 +4649,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此项目尚无看板分栏"
+          }
+        }
+      }
+    },
+    "This server signs you in through a directory such as LDAP or Active Directory. Use the username and password you have there. If your account has two-factor authentication turned on, enter the code from your authenticator app as well." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此服务器通过 LDAP 或 Active Directory 等目录服务登录。请使用你在该目录中的用户名和密码。如果账户已启用双重认证，还需输入身份验证器应用中的验证码。"
           }
         }
       }
