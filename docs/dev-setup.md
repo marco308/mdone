@@ -290,7 +290,7 @@ it as an optional array.
 
 If you're chasing a bug that may be Vikunja-side, pin your dev compose file to the same version your prod instance runs to ensure the API shape matches.
 
-The nightly integration workflow tests two tags: `latest`, which tells us upstream changed something, and a pinned floor (`2.4.0`, the oldest server mDone supports and the first with the v2 API), which tells us we did. The pin moves only if the minimum supported server does.
+The nightly integration workflow tests two tags: `latest`, which tells us upstream changed something, and a pinned floor (`2.5.0`, the oldest server mDone supports: 2.4.0 has the v2 API but its task `PATCH` is broken), which tells us we did. The pin moves only if the minimum supported server does.
 
 ## When to update the Apple Review test server
 

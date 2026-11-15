@@ -242,12 +242,12 @@ actor SyncService {
         }
     }
 
-    /// Replays an offline edit against the task as it stands on the server *now*.
+    /// Replays an offline edit as a `PATCH` of only the fields the user changed.
     ///
-    /// The queued body is the user's intent, not a finished request: it holds
-    /// only the fields they changed. Reading the task first and merging onto it
-    /// means an edit made offline no longer clobbers whatever else changed while
-    /// the device was away (issue #146).
+    /// The queued body is the user's intent, not a whole task, so whatever else
+    /// changed on the server while the device was away is kept (issues #146,
+    /// #292). Rows queued by a build that sent `PUT` replay the same way: the
+    /// stored method is not used for edits.
     @MainActor
     private func replayTaskEdit(_ operation: PendingOperation) async throws {
         guard let taskId = operation.taskId,
@@ -261,9 +261,7 @@ actor SyncService {
             )
         }
 
-        let fresh = try await taskService.fetchTask(id: taskId)
-        let request = edit.request.preservingExistingValues(from: fresh)
-        _ = try await taskService.updateTask(id: taskId, request: request)
+        _ = try await taskService.updateTask(id: taskId, request: edit.request)
     }
 
     /// Failures that no amount of retrying will fix.

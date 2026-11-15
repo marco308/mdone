@@ -73,43 +73,20 @@ final class VikunjaAPIContractTests: VikunjaIntegrationCase {
         XCTAssertTrue(viewTasks.contains { $0.id == created.id }, "Created task missing from the project's list view")
     }
 
-    // MARK: - Full-replace update semantics (issue #147)
+    // MARK: - Partial update semantics (#147, #292)
 
-    /// The behaviour that caused #147: `PUT /tasks/{id}` replaces the whole
-    /// task, so a body that omits a field resets it. A failure here is not
-    /// automatically bad news, it means the server switched to partial updates
-    /// and `preservingExistingValues(from:)` may no longer be needed.
-    func testUpdateWithoutMergeStillWipesOmittedFields() async throws {
+    /// Task updates are a `PATCH`: a body that leaves fields out keeps them.
+    /// With v1's full replace this wiped the description, priority and
+    /// progress (#147), so a failure here means that came back.
+    func testPatchKeepsFieldsItLeavesOut() async throws {
         let created = try await makeTask(
-            TaskCreateRequest(title: "full replace", description: "carry me", priority: 4)
+            TaskCreateRequest(title: "partial update", description: "keep me", priority: 4)
         )
-        XCTAssertEqual(created.description, "carry me")
-
-        let updated = try await tasks.updateTask(id: created.id, request: TaskUpdateRequest(done: true))
-
-        XCTAssertTrue(updated.done)
-        XCTAssertTrue(
-            (updated.description ?? "").isEmpty,
-            "Server kept the description through a partial update: semantics changed, revisit the #147 workaround"
-        )
-        XCTAssertEqual(updated.priority, 0, "Server kept the priority through a partial update: semantics changed")
-    }
-
-    /// And the fix: merging the existing task in first survives the replace.
-    func testMergedUpdateKeepsDescriptionPriorityAndProgress() async throws {
-        let created = try await makeTask(
-            TaskCreateRequest(title: "merged update", description: "keep me", priority: 4)
-        )
-        let withProgress = try await tasks.updateTask(
-            id: created.id,
-            request: TaskUpdateRequest(percentDone: 0.5).preservingExistingValues(from: created)
-        )
+        let withProgress = try await tasks.updateTask(id: created.id, request: TaskUpdateRequest(percentDone: 0.5))
         XCTAssertEqual(withProgress.percentDone, 0.5)
+        XCTAssertEqual(withProgress.priority, 4, "Setting progress wiped the priority")
 
-        let completed = try await tasks.updateTask(
-            id: created.id,
-            request: TaskUpdateRequest(done: true).preservingExistingValues(from: withProgress)
-        )
+        let completed = try await tasks.updateTask(id: created.id, request: TaskUpdateRequest(done: true))
 
         XCTAssertTrue(completed.done)
         XCTAssertEqual(completed.description, "keep me")
@@ -129,8 +106,8 @@ final class VikunjaAPIContractTests: VikunjaIntegrationCase {
     }
 
     /// Round-trips a due date, then clears it the way the app does: by sending
-    /// the zero date back.
-    func testDueDateSetThenClearedWithTheZeroDate() async throws {
+    /// `null`, which a merge patch reads as "clear this field".
+    func testDueDateSetThenClearedWithNull() async throws {
         let due = Date(timeIntervalSince1970: 1_800_000_000)
         let created = try await makeTask(TaskCreateRequest(title: "has a due date", dueDate: due))
         XCTAssertEqual(
@@ -142,9 +119,9 @@ final class VikunjaAPIContractTests: VikunjaIntegrationCase {
 
         let cleared = try await tasks.updateTask(
             id: created.id,
-            request: TaskUpdateRequest(clearDueDate: true).preservingExistingValues(from: created)
+            request: TaskUpdateRequest(clearDueDate: true)
         )
-        XCTAssertEqual(cleared.dueDate, .distantPast, "Sending the zero date no longer clears a due date")
+        XCTAssertNil(cleared.effectiveDueDate, "Sending null no longer clears a due date")
     }
 
     // MARK: - Filter DSL
@@ -156,7 +133,7 @@ final class VikunjaAPIContractTests: VikunjaIntegrationCase {
         let done = try await makeTask(TaskCreateRequest(title: "filter: already done"))
         _ = try await tasks.updateTask(
             id: done.id,
-            request: TaskUpdateRequest(done: true).preservingExistingValues(from: done)
+            request: TaskUpdateRequest(done: true)
         )
         let open = try await makeTask(TaskCreateRequest(title: "filter: still open", priority: 3))
 
@@ -386,35 +363,60 @@ final class VikunjaAPIContractTests: VikunjaIntegrationCase {
         )
     }
 
-    /// The widget ticks a task off by fetching it and sending the whole JSON
-    /// back with `done` set, read-only fields included. The server has to take
-    /// that body, and the task's other fields have to survive (#283).
-    func testWidgetCompletionRoundTripKeepsTheTask() async throws {
+    /// The widget ticks a task off with a `PATCH` of `{"done": true}` alone.
+    /// On a repeating, assigned task the server has to roll the due date
+    /// forward and keep everything else. Assigning subscribes the task, which
+    /// is what made 2.4.0 answer 422 (#283, #292).
+    func testWidgetCompletionPatchKeepsTheTask() async throws {
         let created = try await makeTask(
-            TaskCreateRequest(title: "tick me off in a widget", description: "keep me", priority: 3)
+            TaskCreateRequest(
+                title: "tick me off in a widget",
+                description: "keep me",
+                dueDate: Date(timeIntervalSinceNow: 86400),
+                priority: 3
+            )
         )
+        _ = try await tasks.updateTask(id: created.id, request: TaskUpdateRequest(repeatAfter: 86400))
+        let users = try await UserService(apiClient: client).fetchProjectUsers(projectId: scratchProject.id)
+        let owner = try XCTUnwrap(users.first { $0.username == config.username })
+        try await tasks.setAssignees(taskId: created.id, userIds: [owner.id])
+        let before = try await tasks.fetchTask(id: created.id)
+
         let token = try await IntegrationSession.shared.token(for: config)
         let url = try XCTUnwrap(URL(string: config.serverURL + Endpoint.task(id: created.id).path))
-
-        var fetch = URLRequest(url: url)
-        fetch.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let (fetched, _) = try await URLSession.shared.data(for: fetch)
-
         var update = URLRequest(url: url)
-        update.httpMethod = Endpoint.updateTask(id: created.id).method.rawValue
+        update.httpMethod = "PATCH"
         update.setValue("application/json", forHTTPHeaderField: "Content-Type")
         update.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        update.httpBody = try WidgetDataProvider.completionBody(from: fetched)
+        update.httpBody = WidgetDataProvider.completionBody
         let (_, response) = try await URLSession.shared.data(for: update)
-        XCTAssertEqual(
-            (response as? HTTPURLResponse)?.statusCode,
-            200,
-            "The server refused a fetched task sent back whole"
-        )
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200, "The server refused the completion")
 
         let after = try await tasks.fetchTask(id: created.id)
-        XCTAssertTrue(after.done)
+        XCTAssertFalse(after.done, "A repeating task comes back undone, moved to its next date")
+        XCTAssertEqual(after.repeatAfter, 86400, "Completing stopped the task repeating")
+        XCTAssertGreaterThan(
+            try XCTUnwrap(after.effectiveDueDate),
+            try XCTUnwrap(before.effectiveDueDate),
+            "The due date did not roll forward"
+        )
         XCTAssertEqual(after.priority, 3)
-        XCTAssertFalse((after.description ?? "").isEmpty, "Completing from a widget wiped the description")
+        XCTAssertEqual(after.description, before.description, "Completing from a widget changed the description")
+        XCTAssertEqual(after.assignees?.map(\.id), [owner.id], "Completing from a widget unassigned the task")
+    }
+
+    /// A merge patch's `null` clears a date, and leaves the other dates alone.
+    func testPatchNullClearsOnlyThatDate() async throws {
+        let created = try await makeTask(
+            TaskCreateRequest(title: "clear my start date", dueDate: Date(timeIntervalSinceNow: 86400))
+        )
+        let start = Date(timeIntervalSinceNow: 3600)
+        _ = try await tasks.updateTask(id: created.id, request: TaskUpdateRequest(startDate: start))
+        let cleared = try await tasks.updateTask(id: created.id, request: TaskUpdateRequest(clearStartDate: true))
+
+        XCTAssertNil(cleared.effectiveStartDate)
+        let after = try await tasks.fetchTask(id: created.id)
+        XCTAssertNil(after.effectiveStartDate)
+        XCTAssertNotNil(after.effectiveDueDate, "Clearing the start date cleared the due date too")
     }
 }

@@ -190,10 +190,13 @@ struct Endpoint {
         Endpoint(api: "/projects/\(projectId)/tasks", method: .POST)
     }
 
-    /// Replaces the whole task: a field left out of the body is cleared, as it
-    /// was with v1's update. PATCH is the partial update (#292).
+    /// A JSON Merge Patch: the server changes only the fields in the body and
+    /// keeps the rest, and `null` clears a field (#292). The `PUT` on the same
+    /// path replaces the whole task and wipes anything left out, which is why
+    /// the app never uses it. Needs Vikunja 2.5.0: 2.4.0 answers 422 for any
+    /// task with a subscription.
     static func updateTask(id: Int64) -> Endpoint {
-        Endpoint(api: "/tasks/\(id)", method: .PUT)
+        Endpoint(api: "/tasks/\(id)", method: .PATCH)
     }
 
     static func deleteTask(id: Int64) -> Endpoint {

@@ -134,12 +134,9 @@ final class WidgetDataProvider: @unchecked Sendable {
 
     /// Marks a task as done via the Vikunja API.
     ///
-    /// Vikunja's `PUT` replaces the whole task, so a bare `{"done": true}` blanks every field
-    /// it leaves out: a repeating task stops repeating and loses its description and priority
-    /// (#283). Fetch the task first and send it back whole with only `done` changed. The JSON
-    /// is edited as a dictionary rather than decoded, so fields this widget never models
-    /// survive too. The server accepts the read-only extras a fetched task carries (checked
-    /// on 2.4.0 and 2.8.0). `PATCH` would do this in one request (#292).
+    /// A `PATCH` with only `done`, which the server merges onto the task, so a
+    /// repeating task keeps repeating and rolls forward, and its description,
+    /// priority, colour and progress are untouched (#283, #292).
     func completeTask(id: Int64) async throws {
         guard let serverURL, let apiToken else { return }
 
@@ -147,22 +144,11 @@ final class WidgetDataProvider: @unchecked Sendable {
             + VikunjaAPI.path("/tasks/\(id)")
         guard let url = URL(string: urlString) else { return }
 
-        var fetch = URLRequest(url: url)
-        fetch.httpMethod = "GET"
-        fetch.setValue("Bearer \(apiToken)", forHTTPHeaderField: "Authorization")
-
-        let (taskData, fetchResponse) = try await session.data(for: fetch)
-        guard let httpResponse = fetchResponse as? HTTPURLResponse,
-              (200 ... 299).contains(httpResponse.statusCode)
-        else {
-            throw WidgetDataError.requestFailed
-        }
-
         var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
+        request.httpMethod = "PATCH"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiToken)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try Self.completionBody(from: taskData)
+        request.httpBody = Self.completionBody
 
         let (_, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse,
@@ -172,14 +158,8 @@ final class WidgetDataProvider: @unchecked Sendable {
         }
     }
 
-    /// The fetched task JSON with `done` set, ready to send back as the update.
-    static func completionBody(from taskJSON: Data) throws -> Data {
-        guard var task = try JSONSerialization.jsonObject(with: taskJSON) as? [String: Any] else {
-            throw WidgetDataError.requestFailed
-        }
-        task["done"] = true
-        return try JSONSerialization.data(withJSONObject: task)
-    }
+    /// The whole body of a completion: nothing else is sent, so nothing else changes.
+    static let completionBody = Data(#"{"done":true}"#.utf8)
 
     // MARK: - Caching
 

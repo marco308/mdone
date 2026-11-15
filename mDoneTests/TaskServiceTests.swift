@@ -643,7 +643,7 @@ final class TaskServiceTests: XCTestCase {
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/tasks/10")) == true)
-            XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertEqual(request.httpMethod, "PATCH")
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             return (response, responseJSON)
         }
@@ -654,53 +654,27 @@ final class TaskServiceTests: XCTestCase {
         XCTAssertEqual(task.title, "Updated Task")
     }
 
-    func testToggleRequestCarriesScheduleFields() async throws {
+    /// Ticking off a repeating task sends `done` and nothing else: the server
+    /// keeps its schedule and rolls it forward (#292).
+    func testToggleRequestSendsOnlyDone() async throws {
         let (service, client) = makeTestService()
         await client.configure(serverURL: "https://mock.vikunja.io", token: "test-token")
 
-        let due = Date(timeIntervalSince1970: 1_800_000_000)
-        let start = Date(timeIntervalSince1970: 1_799_900_000)
-        let end = Date(timeIntervalSince1970: 1_800_100_000)
-        let originalTask = VTask(
-            id: 7,
-            title: "Toggle Me",
-            done: false,
-            dueDate: due,
-            startDate: start,
-            endDate: end,
-            priority: 1,
-            projectId: 1,
-            repeatAfter: 86400,
-            repeatMode: 1
-        )
-
         let responseJSON = try XCTUnwrap("""
-        {"id": 7, "title": "Toggle Me", "done": true, "priority": 1, "project_id": 1, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-20T10:00:00Z"}
+        {"id": 7, "title": "Toggle Me", "done": false, "priority": 1, "project_id": 1, "repeat_after": 86400, "created": "2026-03-15T08:00:00Z", "updated": "2026-03-20T10:00:00Z"}
         """.data(using: .utf8))
 
         MockURLProtocol.requestHandler = { request in
             XCTAssertTrue(request.url?.path.contains(VikunjaAPI.path("/tasks/7")) == true)
-            XCTAssertEqual(request.httpMethod, "PUT")
-
-            // Verify the body contains done: true (toggled from false)
-            guard let bodyJSON = request.decodedJSONBody else {
-                XCTFail("Expected a JSON request body")
-                return (MockURLProtocol.makeResponse(statusCode: 500, url: request.url), Data())
-            }
-            XCTAssertEqual(bodyJSON["done"] as? Bool, true)
-            XCTAssertNotNil(bodyJSON["due_date"])
-            XCTAssertNotNil(bodyJSON["start_date"])
-            XCTAssertNotNil(bodyJSON["end_date"])
-            XCTAssertEqual(bodyJSON["repeat_after"] as? Int, 86400)
-            XCTAssertEqual(bodyJSON["repeat_mode"] as? Int, 1)
-
+            XCTAssertEqual(request.httpMethod, "PATCH")
+            XCTAssertEqual(request.decodedJSONBody?.keys.sorted(), ["done"])
+            XCTAssertEqual(request.decodedJSONBody?["done"] as? Bool, true)
             let response = MockURLProtocol.makeResponse(statusCode: 200, url: request.url)
             return (response, responseJSON)
         }
 
-        let request = TaskUpdateRequest(done: !originalTask.done).preservingExistingValues(from: originalTask)
-        let toggled = try await service.updateTask(id: originalTask.id, request: request)
-        XCTAssertTrue(toggled.done)
+        let toggled = try await service.updateTask(id: 7, request: TaskUpdateRequest(done: true))
+        XCTAssertEqual(toggled.repeatAfter, 86400)
     }
 
     func testToggleRequestFlipsFromDoneToUndone() async throws {
@@ -724,7 +698,7 @@ final class TaskServiceTests: XCTestCase {
             return (response, responseJSON)
         }
 
-        let request = TaskUpdateRequest(done: !originalTask.done).preservingExistingValues(from: originalTask)
+        let request = TaskUpdateRequest(done: !originalTask.done)
         let toggled = try await service.updateTask(id: originalTask.id, request: request)
         XCTAssertFalse(toggled.done)
     }
@@ -839,8 +813,8 @@ final class TaskServiceTests: XCTestCase {
         let data = try encoder.encode(request)
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
 
-        // When clearDueDate is true, due_date should be encoded as distantPast
-        XCTAssertNotNil(json?["due_date"])
+        // A merge patch clears a field with null.
+        XCTAssertTrue(json?["due_date"] is NSNull)
     }
 
     func testTaskUpdateRequestEncodesStartAndEndDates() throws {
@@ -857,7 +831,7 @@ final class TaskServiceTests: XCTestCase {
         XCTAssertNotNil(json?["end_date"])
     }
 
-    func testTaskUpdateRequestClearsStartAndEndDatesWithVikunjaZeroDate() throws {
+    func testTaskUpdateRequestClearsStartAndEndDatesWithNull() throws {
         let request = TaskUpdateRequest(clearStartDate: true, clearEndDate: true)
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
@@ -865,36 +839,16 @@ final class TaskServiceTests: XCTestCase {
         let data = try encoder.encode(request)
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
 
-        XCTAssertEqual(json?["start_date"] as? String, "0001-01-01T00:00:00Z")
-        XCTAssertEqual(json?["end_date"] as? String, "0001-01-01T00:00:00Z")
+        XCTAssertTrue(json?["start_date"] is NSNull)
+        XCTAssertTrue(json?["end_date"] is NSNull)
     }
 
-    func testTaskUpdateRequestPreservesExistingSchedule() {
-        let due = Date(timeIntervalSince1970: 1_800_000_000)
-        let start = Date(timeIntervalSince1970: 1_799_900_000)
-        let end = Date(timeIntervalSince1970: 1_800_100_000)
-        let reminder = TaskReminder(reminder: due, relativePeriod: nil, relativeTo: nil)
-        let task = VTask(
-            id: 1,
-            title: "Scheduled",
-            done: false,
-            dueDate: due,
-            startDate: start,
-            endDate: end,
-            priority: 0,
-            projectId: 1,
-            repeatAfter: 86400,
-            repeatMode: 1,
-            reminders: [reminder]
-        )
+    func testCompletingLeavesTheScheduleOutOfTheBody() throws {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let data = try encoder.encode(TaskUpdateRequest(done: true))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
-        let request = TaskUpdateRequest(done: true).preservingExistingValues(from: task)
-
-        XCTAssertEqual(request.dueDate, due)
-        XCTAssertEqual(request.startDate, start)
-        XCTAssertEqual(request.endDate, end)
-        XCTAssertEqual(request.repeatAfter, 86400)
-        XCTAssertEqual(request.repeatMode, 1)
-        XCTAssertEqual(request.reminders, [reminder])
+        XCTAssertEqual(json.keys.sorted(), ["done"])
     }
 }

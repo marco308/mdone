@@ -900,8 +900,9 @@ final class AppStateTests: XCTestCase {
             appState.tasks.first(where: { $0.id == parent.id })?
                 .relatedTasks?["subtask"]?.first
         )
-        XCTAssertEqual(capturedBody?["repeat_mode"] as? Int, 1)
-        XCTAssertNotNil(capturedBody?["reminders"])
+        // A PATCH leaves the untouched repeat mode and reminders to the server (#292).
+        XCTAssertNil(capturedBody?["repeat_mode"])
+        XCTAssertNil(capturedBody?["reminders"])
         XCTAssertEqual(updated.startDate, start)
         XCTAssertEqual(updated.endDate, end)
         XCTAssertEqual(updated.repeatAfter, 2_592_000)
@@ -972,11 +973,8 @@ final class AppStateTests: XCTestCase {
 
         await appState.updateTask(id: task.id, request: TaskUpdateRequest(title: "Updated"))
 
-        XCTAssertNotNil(capturedBody?["due_date"])
-        XCTAssertNotNil(capturedBody?["start_date"])
-        XCTAssertNotNil(capturedBody?["end_date"])
-        XCTAssertEqual(capturedBody?["repeat_after"] as? Int, 86400)
-        XCTAssertEqual(capturedBody?["repeat_mode"] as? Int, 1)
+        // Only the title is sent; the server keeps the schedule (#292).
+        XCTAssertEqual(capturedBody?.keys.sorted(), ["title"])
         XCTAssertEqual(appState.tasks.first?.dueDate, due)
         XCTAssertEqual(appState.tasks.first?.startDate, start)
         XCTAssertEqual(appState.tasks.first?.endDate, end)

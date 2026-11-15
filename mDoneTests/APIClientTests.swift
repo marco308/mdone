@@ -181,7 +181,7 @@ final class APIClientTests: XCTestCase {
 
         let updateTask = Endpoint.updateTask(id: 10)
         XCTAssertEqual(updateTask.path, VikunjaAPI.path("/tasks/10"))
-        XCTAssertEqual(updateTask.method, .PUT)
+        XCTAssertEqual(updateTask.method, .PATCH)
 
         let deleteTask = Endpoint.deleteTask(id: 3)
         XCTAssertEqual(deleteTask.path, VikunjaAPI.path("/tasks/3"))
