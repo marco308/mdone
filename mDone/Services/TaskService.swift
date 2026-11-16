@@ -13,6 +13,13 @@ actor TaskService {
         }, perPage: perPage)
     }
 
+    /// What the server's task list looks like from the outside: how many tasks
+    /// there are and which changed last. See `TaskChangeMarker`.
+    func fetchChangeMarker() async throws -> TaskChangeMarker {
+        let (items, total): ([VTask], Int?) = try await apiClient.fetchPageWithTotal(Endpoint.taskChangeProbe())
+        return TaskChangeMarker(total: total, tasks: items)
+    }
+
     func fetchTask(id: Int64) async throws -> VTask {
         try await apiClient.fetch(Endpoint.task(id: id))
     }

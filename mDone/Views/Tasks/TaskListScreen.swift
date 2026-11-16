@@ -122,9 +122,13 @@ struct TaskListScreen: View {
             }
             .task(id: LiveRefreshKey(projectId: projectFilter?.id, isActive: liveRefreshActive)) {
                 guard liveRefreshActive else { return }
-                await LiveListRefresh.poll {
+                // The list only polls while the app is in front, so the
+                // pace depends on power and network alone.
+                await LiveListRefresh.poll(pace: {
+                    .current(inFront: true, constrained: LivePollPace.isConstrained(network: networkMonitor))
+                }, refresh: {
                     await appState.refreshVisibleList(project: projectFilter) { Self.nothingPresented }
-                }
+                })
             }
             .task {
                 await appState.requestCalendarAccess()

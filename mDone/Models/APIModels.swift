@@ -43,6 +43,7 @@ struct OIDCCallbackRequest: Encodable {
 /// `total_pages`.
 struct ListPage<Item: Decodable>: Decodable {
     var items: [Item]?
+    var total: Int?
     var totalPages: Int?
 }
 

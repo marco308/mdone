@@ -564,6 +564,14 @@ actor APIClient {
         try await fetchPage(endpoint).0
     }
 
+    /// Fetches one page and the envelope's `total`, the number of items across
+    /// every page. Live refresh reads a one-item page this way to learn
+    /// whether anything changed without downloading the list (#241).
+    func fetchPageWithTotal<T: Decodable>(_ endpoint: Endpoint) async throws -> (items: [T], total: Int?) {
+        let page: ListPage<T> = try await decodePage(endpoint)
+        return (page.items ?? [], page.total)
+    }
+
     /// Fetches all pages of a paginated endpoint and returns the combined results.
     ///
     /// The first page says how many there are; the rest are then read a few
@@ -605,11 +613,15 @@ actor APIClient {
     static let maxConcurrentPages = 4
 
     private func fetchPage<T: Decodable>(_ endpoint: Endpoint) async throws -> ([T], Int) {
+        let page: ListPage<T> = try await decodePage(endpoint)
+        return (page.items ?? [], page.totalPages ?? 1)
+    }
+
+    private func decodePage<T: Decodable>(_ endpoint: Endpoint) async throws -> ListPage<T> {
         let (data, httpResponse) = try await executeWithRefresh { try self.buildRequest(for: endpoint) }
         let responseData = try handleResponse(data: data, httpResponse: httpResponse)
         do {
-            let page = try decoder.decode(ListPage<T>.self, from: responseData)
-            return (page.items ?? [], page.totalPages ?? 1)
+            return try decoder.decode(ListPage<T>.self, from: responseData)
         } catch {
             throw NetworkError.decodingError(error)
         }

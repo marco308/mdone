@@ -10,7 +10,12 @@ import UIKit
 @Observable
 final class AppState {
     var isAuthenticated: Bool = false {
-        didSet { listRevision &+= 1 }
+        didSet {
+            listRevision &+= 1
+            // A marker from another account or server must not vouch for
+            // this one's list.
+            liveChangeMarker = nil
+        }
     }
 
     var isLoading: Bool = false
@@ -113,6 +118,16 @@ final class AppState {
     /// instead of putting older rows back. See `refreshVisibleList`.
     @ObservationIgnored private var listRevision: UInt64 = 0
     @ObservationIgnored private let liveListRefresh = LiveListRefresh()
+    /// The server's task list as of the last full quiet read; `nil` until one
+    /// has run. See `refreshVisibleList`.
+    @ObservationIgnored private var liveChangeMarker: TaskChangeMarker?
+    @ObservationIgnored private var lastFullListRead: Date = .distantPast
+    /// How long live refresh may trust the change check alone before reading
+    /// the full list anyway, for the changes that do not bump a task's
+    /// `updated` time, such as a reorder (see `TaskChangeMarker`).
+    static let fullListReadInterval: TimeInterval = 5 * 60
+    /// The clock live refresh reads. Tests move it forward.
+    @ObservationIgnored var now: () -> Date = Date.init
 
     /// Sort choices changed this session, keyed by list. Lives here rather
     /// than in view state so it survives navigation and so every screen
@@ -2051,31 +2066,68 @@ final class AppState {
     /// so only the view says which tasks belong to it, and an empty view is a
     /// real answer.
     ///
+    /// Each tick first reads a one-task change check (`TaskChangeMarker`,
+    /// about 1 KB). The full list, roughly 0.7 KB a task over several pages,
+    /// is downloaded only when that check has moved, when `force` asks for
+    /// it, when this project's membership has never been read, or when the
+    /// last full read is older than `fullListReadInterval`.
+    ///
     /// Unlike `refreshAll` this is silent: no loading state, no error banner,
     /// and nothing changes when the server has nothing new. A failed read
-    /// leaves the list as it was for the next tick to try again.
+    /// leaves the list as it was for the next tick to try again. The outcome
+    /// tells the caller's schedule whether to speed up or back off.
     @MainActor
-    func refreshVisibleList(project: Project?, isEnabled: () -> Bool = { true }) async {
+    @discardableResult
+    func refreshVisibleList(
+        project: Project?,
+        force: Bool = false,
+        isEnabled: () -> Bool = { true }
+    ) async -> LiveRefreshOutcome {
         let viewId = project?.listViewId
-        await liveListRefresh.refresh(
+        let knownMarker = liveChangeMarker
+        let membersUnknown = project.map { viewId != nil && projectTaskCache[$0.id] == nil } ?? false
+        let fullReadDue = force || knownMarker == nil || membersUnknown
+            || now().timeIntervalSince(lastFullListRead) >= Self.fullListReadInterval
+        return await liveListRefresh.refresh(
             isEnabled: { isEnabled() && canRefreshQuietly },
             revision: { listRevision },
-            fetch: { () async throws -> ([VTask], [VTask]?) in
+            fetch: { () async throws -> QuietRefreshSnapshot? in
+                let marker = try await taskService.fetchChangeMarker()
+                guard fullReadDue || marker != knownMarker else { return nil }
                 async let all = taskService.fetchAllTasks(perPage: 200)
                 var members: [VTask]?
                 if let project, let viewId {
                     members = try await taskService.fetchProjectTasks(projectId: project.id, viewId: viewId)
                 }
-                return try await (all, members)
+                return try await QuietRefreshSnapshot(marker: marker, all: all, members: members)
             },
-            apply: { all, members in
-                applyQuietRefresh(all: all, members: members, projectId: project?.id)
+            apply: { snapshot in
+                // The marker is stored only once the list it describes is
+                // applied, so a dropped read is retried on the next tick.
+                liveChangeMarker = snapshot.marker
+                lastFullListRead = now()
+                let listsChanged = applyQuietRefresh(
+                    all: snapshot.all,
+                    members: snapshot.members,
+                    projectId: project?.id
+                )
+                // Activity on the server, even our own edits coming back,
+                // keeps the pace up for a while.
+                let serverMoved = knownMarker != nil && snapshot.marker != knownMarker
+                return listsChanged || serverMoved
             }
         )
     }
 
+    private struct QuietRefreshSnapshot {
+        let marker: TaskChangeMarker
+        let all: [VTask]
+        let members: [VTask]?
+    }
+
+    /// Returns whether the lists changed.
     @MainActor
-    private func applyQuietRefresh(all: [VTask], members: [VTask]?, projectId: Int64?) {
+    private func applyQuietRefresh(all: [VTask], members: [VTask]?, projectId: Int64?) -> Bool {
         if isShowingCachedData {
             isShowingCachedData = false
         }
@@ -2087,7 +2139,7 @@ final class AppState {
         let membersChanged = projectId.map { id in members != nil && members != projectTaskCache[id] } ?? false
         // Most ticks find nothing new. Leave the lists alone then, so SwiftUI
         // does not re-render and the cache and widgets are not rewritten.
-        guard latest != tasks || membersChanged else { return }
+        guard latest != tasks || membersChanged else { return false }
 
         tasks = latest
         if let projectId, let members {
@@ -2100,6 +2152,7 @@ final class AppState {
             let snapshot = tasks
             Task { await notificationService.scheduleReminders(for: snapshot) }
         }
+        return true
     }
 
     /// Returns the input with duplicate `id`s removed, preserving the first occurrence.
