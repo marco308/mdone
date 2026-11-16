@@ -8,6 +8,10 @@ final class NetworkMonitor {
 
     var isConnected: Bool = true
     var connectionType: ConnectionType = .unknown
+    /// Cellular or a personal hotspot. Live refresh polls less often then.
+    var isExpensive: Bool = false
+    /// Low Data Mode is on for this network.
+    var isConstrained: Bool = false
 
     enum ConnectionType {
         case wifi, cellular, wired, unknown
@@ -18,6 +22,8 @@ final class NetworkMonitor {
             DispatchQueue.main.async {
                 self?.isConnected = path.status == .satisfied
                 self?.connectionType = self?.getConnectionType(path) ?? .unknown
+                self?.isExpensive = path.isExpensive
+                self?.isConstrained = path.isConstrained
             }
         }
         monitor.start(queue: queue)

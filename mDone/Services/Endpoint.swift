@@ -178,6 +178,14 @@ struct Endpoint {
         return Endpoint(api: "/tasks", queryItems: items)
     }
 
+    /// The most recently changed task, alone, plus the envelope's total: what
+    /// live refresh reads each tick to decide whether the full list is worth
+    /// downloading (#241). About 1 KB, against roughly 0.7 KB per task for
+    /// the full list.
+    static func taskChangeProbe() -> Endpoint {
+        allTasks(page: 1, perPage: 1, sortBy: "updated", orderBy: "desc")
+    }
+
     static func projectTasks(projectId: Int64, viewId: Int64, page: Int = 1, perPage: Int = 50) -> Endpoint {
         Endpoint(api: "/projects/\(projectId)/views/\(viewId)/tasks", queryItems: [
             URLQueryItem(name: "page", value: "\(page)"),

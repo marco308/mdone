@@ -2,9 +2,17 @@ import SwiftUI
 
 struct MacTaskListView: View {
     @Environment(AppState.self) private var appState
+    @Environment(NetworkMonitor.self) private var networkMonitor
+    @Environment(\.scenePhase) private var scenePhase
     let section: MacContentView.SidebarSection?
     @Binding var selectedTask: VTask?
     @State private var showAdvancedFilter = false
+    #if os(macOS)
+    /// mDone is the frontmost app. Behind other apps the list polls far less.
+    @State private var appIsFrontmost = NSApplication.shared.isActive
+    /// Some of mDone's window is on screen: not minimised, hidden or covered.
+    @State private var appIsVisible = NSApplication.shared.occlusionState.contains(.visible)
+    #endif
     @AppStorage("calmMode") private var calmMode = false
 
     private var sortScope: TaskSortScope {
@@ -30,6 +38,60 @@ struct MacTaskListView: View {
         return project.id >= 0
             && sortPreference.order == .manual
             && !appState.isFiltering
+    }
+
+    /// Whether the list keeps itself up to date with changes made on another
+    /// device (#241), the way the iOS list does. A Mac window often stays on
+    /// screen beside other apps, so it keeps polling there, slowly; once no
+    /// part of it can be seen, polling stops. The advanced filter popover
+    /// pauses it, as on iOS. Changing this restarts or stops the polling task.
+    private var liveRefreshActive: Bool {
+        sectionShowsTasks && scenePhase != .background && appState.isAuthenticated
+            && networkMonitor.isConnected && !showAdvancedFilter && appOnScreen
+    }
+
+    private var appOnScreen: Bool {
+        #if os(macOS)
+        appIsVisible
+        #else
+        true
+        #endif
+    }
+
+    private var appInFront: Bool {
+        #if os(macOS)
+        appIsFrontmost
+        #else
+        true
+        #endif
+    }
+
+    private var pollPace: LivePollPace {
+        .current(inFront: appInFront, constrained: LivePollPace.isConstrained(network: networkMonitor))
+    }
+
+    private var sectionShowsTasks: Bool {
+        switch section {
+        case .inbox, .today, .tomorrow, .thisWeek, .upcoming, .overdue, .noDate, .project:
+            return true
+        case .archived, .notifications, .calendar, .settings, .none:
+            return false
+        }
+    }
+
+    /// Coming to the front restarts the loop, so a long wait picked while
+    /// behind other apps does not carry over.
+    private struct LiveRefreshKey: Equatable {
+        let projectId: Int64?
+        let isActive: Bool
+        let inFront: Bool
+    }
+
+    /// One quiet read of the visible list. `nil` reads the tasks behind the
+    /// Inbox and the date sections; a project also reads its list view.
+    /// `force` skips the change check and reads the full list.
+    private func refreshVisibleList(force: Bool = false) async -> LiveRefreshOutcome {
+        await appState.refreshVisibleList(project: selectedProject, force: force) { liveRefreshActive }
     }
 
     var body: some View {
@@ -60,6 +122,30 @@ struct MacTaskListView: View {
                 await appState.fetchProjectTasks(project: selectedProject)
             }
         }
+        .task(id: LiveRefreshKey(projectId: selectedProject?.id, isActive: liveRefreshActive, inFront: appInFront)) {
+            guard liveRefreshActive else { return }
+            await LiveListRefresh.poll(pace: { pollPace }, refresh: {
+                await refreshVisibleList()
+            })
+        }
+        #if os(macOS)
+        // On the Mac the scene stays active while another app is in front,
+        // so coming back to mDone never changes `scenePhase` and the app-wide
+        // refresh on activation does not run. Catch up straight away, with a
+        // full read: the change check misses reorders made elsewhere.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            appIsFrontmost = true
+            Task { await refreshVisibleList(force: true) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
+            appIsFrontmost = false
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSApplication.didChangeOcclusionStateNotification
+        )) { _ in
+            appIsVisible = NSApplication.shared.occlusionState.contains(.visible)
+        }
+        #endif
     }
 
     private var selectedProject: Project? {

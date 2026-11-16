@@ -65,12 +65,99 @@ final class VisibleListRefreshTests: XCTestCase {
             var changed = added
             changed.dueDate = Date()
             changed.done = id == -2
+            // As on a real server, the edit stamps the task, which is what
+            // the change check sees.
+            changed.updated = Date()
             try serve(all: [original, changed], members: [])
             await state.refreshVisibleList(project: filter)
             XCTAssertTrue(state.tasksForProject(id).isEmpty)
             XCTAssertFalse(state.isLoading)
             XCTAssertTrue(MockURLProtocol.capturedRequests.allSatisfy { $0.httpMethod == "GET" })
         }
+    }
+
+    // MARK: - Change check
+
+    private func task(_ id: Int64, _ title: String, updatedAt seconds: TimeInterval) -> VTask {
+        var task = task(id, title)
+        task.updated = Date(timeIntervalSince1970: seconds)
+        return task
+    }
+
+    private func isProbe(_ request: URLRequest) -> Bool {
+        let items = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        return items.contains(URLQueryItem(name: "per_page", value: "1"))
+            && items.contains(URLQueryItem(name: "sort_by", value: "updated"))
+    }
+
+    /// The point of the check: a quiet tick costs one small request, not the
+    /// whole list.
+    func testQuietTickOnlyReadsTheChangeCheck() async throws {
+        let state = await makeAppState()
+        try serve(all: [task(1, "A", updatedAt: 100), task(2, "B", updatedAt: 200)])
+        let first = await state.refreshVisibleList(project: nil)
+        XCTAssertEqual(first, .changed)
+
+        let before = MockURLProtocol.capturedRequests.count
+        let second = await state.refreshVisibleList(project: nil)
+
+        XCTAssertEqual(second, .unchanged)
+        let tick = MockURLProtocol.capturedRequests.dropFirst(before)
+        XCTAssertEqual(tick.count, 1)
+        XCTAssertTrue(tick.allSatisfy(isProbe))
+    }
+
+    func testEditElsewhereMovesTheCheckAndIsDownloaded() async throws {
+        let state = await makeAppState()
+        try serve(all: [task(1, "A", updatedAt: 100), task(2, "B", updatedAt: 200)])
+        await state.refreshVisibleList(project: nil)
+
+        try serve(all: [task(1, "Renamed", updatedAt: 300), task(2, "B", updatedAt: 200)])
+        let outcome = await state.refreshVisibleList(project: nil)
+
+        XCTAssertEqual(outcome, .changed)
+        XCTAssertEqual(state.tasks.first { $0.id == 1 }?.title, "Renamed")
+    }
+
+    /// A deleted task leaves nothing behind to stamp, but the count drops.
+    func testDeletionElsewhereChangesTheCount() async throws {
+        let state = await makeAppState()
+        try serve(all: [task(1, "Deleted", updatedAt: 100), task(2, "Kept", updatedAt: 200)])
+        await state.refreshVisibleList(project: nil)
+
+        try serve(all: [task(2, "Kept", updatedAt: 200)])
+        await state.refreshVisibleList(project: nil)
+
+        XCTAssertEqual(state.tasks.map(\.id), [2])
+    }
+
+    /// A change that does not stamp the task (a reorder on a real server;
+    /// here a label, with the stamp held still) is invisible to the check.
+    /// A forced read (returning to the app) and the periodic full read see it.
+    func testForcedAndPeriodicReadsCatchWhatTheCheckMisses() async throws {
+        let state = await makeAppState()
+        var clock = Date(timeIntervalSince1970: 1_000_000)
+        state.now = { clock }
+        try serve(all: [task(1, "A", updatedAt: 100)])
+        await state.refreshVisibleList(project: nil)
+
+        var relabelled = task(1, "A", updatedAt: 100)
+        relabelled.labels = [VLabel(id: 9, title: "Urgent", hexColor: "ff0000")]
+        try serve(all: [relabelled])
+        await state.refreshVisibleList(project: nil)
+        XCTAssertNil(state.tasks[0].labels, "the check alone cannot see an unstamped change")
+
+        await state.refreshVisibleList(project: nil, force: true)
+        XCTAssertEqual(state.tasks[0].labels?.map(\.id), [9])
+
+        relabelled.labels = []
+        try serve(all: [relabelled])
+        clock += AppState.fullListReadInterval - 1
+        await state.refreshVisibleList(project: nil)
+        XCTAssertEqual(state.tasks[0].labels?.map(\.id), [9])
+        clock += 1
+        await state.refreshVisibleList(project: nil)
+        XCTAssertEqual(state.tasks[0].labels?.map(\.id), [])
     }
 
     func testInboxPicksUpEditsAndDeletionsFromElsewhere() async throws {
