@@ -8,9 +8,13 @@ final class LiveListRefreshTests: XCTestCase {
     func testExternalChangesReplaceRowsAndCanEmptyTheList() async {
         let refresh = LiveListRefresh()
         var rows = [1]
-        await refresh.refresh(isEnabled: { true }, revision: { 0 }, fetch: { [2, 3] }, apply: { rows = $0; return true })
+        await refresh.refresh(isEnabled: { true }, revision: { 0 }, fetch: { [2, 3] }, apply: { rows = $0
+            return true
+        })
         XCTAssertEqual(rows, [2, 3])
-        await refresh.refresh(isEnabled: { true }, revision: { 0 }, fetch: { [Int]() }, apply: { rows = $0; return true })
+        await refresh.refresh(isEnabled: { true }, revision: { 0 }, fetch: { [Int]() }, apply: { rows = $0
+            return true
+        })
         XCTAssertTrue(rows.isEmpty)
     }
 
@@ -32,7 +36,9 @@ final class LiveListRefreshTests: XCTestCase {
             title = "Saved locally"
             revision += 1
             return "Older server snapshot"
-        }, apply: { title = $0; return true })
+        }, apply: { title = $0
+            return true
+        })
         XCTAssertEqual(title, "Saved locally")
     }
 
@@ -43,7 +49,9 @@ final class LiveListRefreshTests: XCTestCase {
         await refresh.refresh(isEnabled: { enabled }, revision: { 0 }, fetch: {
             enabled = false
             return [2]
-        }, apply: { rows = $0; return true })
+        }, apply: { rows = $0
+            return true
+        })
         XCTAssertEqual(rows, [1])
     }
 
@@ -56,9 +64,13 @@ final class LiveListRefreshTests: XCTestCase {
             await refresh.refresh(isEnabled: { true }, revision: { 0 }, fetch: {
                 requests += 1
                 return [99]
-            }, apply: { rows = $0; return true })
+            }, apply: { rows = $0
+                return true
+            })
             return [1]
-        }, apply: { rows = $0; return true })
+        }, apply: { rows = $0
+            return true
+        })
         XCTAssertEqual(requests, 1)
         XCTAssertEqual(rows, [1])
     }
@@ -68,9 +80,13 @@ final class LiveListRefreshTests: XCTestCase {
         var rows = [1]
         await refresh.refresh(isEnabled: { true }, revision: { 0 }, fetch: { () throws -> [Int] in
             throw URLError(.notConnectedToInternet)
-        }, apply: { rows = $0; return true })
+        }, apply: { rows = $0
+            return true
+        })
         XCTAssertEqual(rows, [1])
-        await refresh.refresh(isEnabled: { true }, revision: { 0 }, fetch: { [2] }, apply: { rows = $0; return true })
+        await refresh.refresh(isEnabled: { true }, revision: { 0 }, fetch: { [2] }, apply: { rows = $0
+            return true
+        })
         XCTAssertEqual(rows, [2])
     }
 
@@ -86,7 +102,9 @@ final class LiveListRefreshTests: XCTestCase {
                     reachedFetch.fulfill()
                 }
                 return [2]
-            }, apply: { rows = $0; return true })
+            }, apply: { rows = $0
+                return true
+            })
         }
         await fulfillment(of: [reachedFetch], timeout: 2)
         request.cancel()
@@ -115,10 +133,21 @@ final class LiveListRefreshTests: XCTestCase {
     func testOutcomeSaysWhetherAnythingChanged() async {
         let refresh = LiveListRefresh()
         let nothingToDownload = await refresh.refresh(
-            isEnabled: { true }, revision: { 0 }, fetch: { [Int]?.none }, apply: { _ in XCTFail(); return true }
+            isEnabled: { true },
+            revision: { 0 },
+            fetch: { [Int]?.none },
+            apply: { _ in
+                XCTFail("A nil fetch has nothing to apply")
+                return true
+            }
         )
         XCTAssertEqual(nothingToDownload, .unchanged)
-        let sameRows = await refresh.refresh(isEnabled: { true }, revision: { 0 }, fetch: { [1] }, apply: { _ in false })
+        let sameRows = await refresh.refresh(
+            isEnabled: { true },
+            revision: { 0 },
+            fetch: { [1] },
+            apply: { _ in false }
+        )
         XCTAssertEqual(sameRows, .unchanged)
         let newRows = await refresh.refresh(isEnabled: { true }, revision: { 0 }, fetch: { [2] }, apply: { _ in true })
         XCTAssertEqual(newRows, .changed)
