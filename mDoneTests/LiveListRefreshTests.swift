@@ -207,6 +207,18 @@ final class LiveListRefreshTests: XCTestCase {
         }
     }
 
+    /// Cellular, a hotspot or Low Data Mode each count as constrained. The
+    /// unconstrained answer is not asserted: it also depends on whether the
+    /// host happens to be in Low Power Mode.
+    func testExpensiveOrConstrainedNetworkSlowsThePace() {
+        let network = NetworkMonitor(stubbedConnection: true)
+        network.isExpensive = true
+        XCTAssertTrue(LivePollPace.isConstrained(network: network))
+        network.isExpensive = false
+        network.isConstrained = true
+        XCTAssertTrue(LivePollPace.isConstrained(network: network))
+    }
+
     func testPollWaitsLongerAfterEachQuietTick() async {
         var waits: [Duration] = []
         var outcomes: [LiveRefreshOutcome] = [.unchanged, .unchanged, .changed, .unchanged]
