@@ -109,6 +109,44 @@ Steps to test:
 
 This is a private test server maintained by the developer for App Store review purposes.
 
+## What's New (v1.24.0)
+
+### iPhone and iPad
+
+Lighter syncing, safer edits, and Vikunja's newer API.
+
+- mDone now needs Vikunja 2.5.0 or newer. It uses Vikunja's v2 API, and tells you if your server needs updating.
+- Changing a task now sends only what you changed, so an edit no longer undoes changes made elsewhere in the meantime.
+- Lists stay up to date using far less data and battery, and check less often in Low Power Mode or on cellular.
+- Clearer sign-in for servers that use LDAP or Active Directory.
+
+### Mac
+
+Lists that keep themselves up to date, and Vikunja's newer API.
+
+- Task lists now update on their own when tasks change in the web app or on another device, and catch up as soon as you switch back to mDone.
+- mDone now needs Vikunja 2.5.0 or newer. It uses Vikunja's v2 API, and tells you if your server needs updating.
+- Changing a task now sends only what you changed, so an edit no longer undoes changes made elsewhere in the meantime.
+- Clearer sign-in for servers that use LDAP or Active Directory.
+
+## What's New (v1.23.0)
+
+### iPhone and iPad
+
+Repeating tasks on the calendar, and early notice for older servers.
+
+- Repeating tasks now show on the calendar on every day they are due, not only the next one. Monthly repeats are recognised as repeating too.
+- Ticking off a task in a widget no longer clears its description, priority or repeat.
+- If your Vikunja server is older than 2.5.0, mDone now tells you once. Nothing changes yet, but a future version will need Vikunja 2.5.0 or newer.
+
+### Mac
+
+Repeating tasks on the calendar, and early notice for older servers.
+
+- Repeating tasks now show on the calendar on every day they are due, not only the next one. Monthly repeats are recognised as repeating too.
+- Ticking off a task in a widget no longer clears its description, priority or repeat.
+- If your Vikunja server is older than 2.5.0, mDone now tells you once. Nothing changes yet, but a future version will need Vikunja 2.5.0 or newer.
+
 ## What's New (v1.22.0)
 
 ### iPhone and iPad
