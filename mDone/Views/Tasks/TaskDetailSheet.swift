@@ -20,6 +20,8 @@ struct TaskDetailSheet: View {
     #endif
     let task: VTask
     var presentation: TaskDetailPresentation = .sheet
+    var showsCompletionAction = false
+    @State private var isCompleting = false
 
     @State private var title: String
     @State private var description: String
@@ -39,9 +41,10 @@ struct TaskDetailSheet: View {
     @State private var estimateSeconds: TimeInterval?
     @State private var percentDone: Double
 
-    init(task: VTask, presentation: TaskDetailPresentation = .sheet) {
+    init(task: VTask, presentation: TaskDetailPresentation = .sheet, showsCompletionAction: Bool = false) {
         self.task = task
         self.presentation = presentation
+        self.showsCompletionAction = showsCompletionAction
         let initialDescription = task.userVisibleDescription ?? ""
         _title = State(initialValue: task.title)
         _description = State(initialValue: initialDescription)
@@ -149,6 +152,15 @@ struct TaskDetailSheet: View {
         !title.isEmpty && TaskScheduleEditor.isValid(startDate: startDate, endDate: endDate)
     }
 
+    private var hasUnsavedChanges: Bool {
+        title != task
+            .title || (descriptionEdit?.storedDescription ?? description) != (task.userVisibleDescription ?? "")
+            || dueDate != task.effectiveDueDate || startDate != task.effectiveStartDate
+            || endDate != task.effectiveEndDate || priority != task.priority || selectedProjectId != task.projectId
+            || repeatInterval != (task.repeatAfter ?? 0) || reminders != (task.reminders ?? [])
+            || estimateSeconds != task.estimatedSeconds || percentDone != (task.percentDone ?? 0)
+    }
+
     /// Leaves the detail view the way it was shown: dismissing the sheet, or
     /// telling the hosting screen to clear the pane.
     private func close() {
@@ -162,6 +174,33 @@ struct TaskDetailSheet: View {
 
     private var form: some View {
         Form {
+            if showsCompletionAction {
+                Section {
+                    let current = appState.tasks.first(where: { $0.id == task.id }) ?? task
+                    Button {
+                        isCompleting = true
+                        appState.activeError = nil
+                        Task { @MainActor in
+                            await appState.toggleTaskDone(current)
+                            isCompleting = false
+                            if appState.activeError == nil {
+                                close()
+                            }
+                        }
+                    } label: {
+                        Label(
+                            current.done ? "Mark Undone" : "Mark Done",
+                            systemImage: current.done ? "arrow.uturn.backward.circle" : "checkmark.circle"
+                        )
+                    }
+                    .disabled(isCompleting || hasUnsavedChanges)
+                    if hasUnsavedChanges {
+                        Text("Save your edits before changing completion.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
             Section {
                 TextField("Task title", text: $title)
                     .font(.headline)
