@@ -5,6 +5,7 @@ import SwiftUI
 struct mDoneApp: App {
     private let dependencies: AppDependencies
     @State private var appState: AppState
+    @State private var taskLinkRouter = TaskLinkRouter()
     @Environment(\.scenePhase) private var scenePhase
     #if os(iOS)
     @State private var focusManager: FocusManager
@@ -54,7 +55,6 @@ struct mDoneApp: App {
         }
     }
 
-    @ViewBuilder
     private var appContent: some View {
         Group {
             if appState.isAuthenticated {
@@ -67,13 +67,33 @@ struct mDoneApp: App {
                 ServerSetupView()
             }
         }
-        .environment(appState)
-        .environment(dependencies.networkMonitor)
-        #if os(iOS)
-        .environment(focusManager)
-        .environment(focusOutbox)
-        #endif
-        .modelContainer(dependencies.modelContainer)
+        .safeAreaInset(edge: .top) {
+            if taskLinkRouter.isPresented, !appState.isAuthenticated {
+                HStack {
+                    Text(taskLinkRouter.message ?? TaskLinkFailure.signIn.localizedDescription)
+                    Button("Cancel") { taskLinkRouter.dismiss() }
+                }
+                .padding()
+                .background(.regularMaterial)
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { taskLinkRouter.isPresented && appState.isAuthenticated },
+            set: {
+                if !$0, appState.isAuthenticated {
+                    taskLinkRouter.dismiss()
+                }
+            }
+        )) {
+            LinkedTaskView(router: taskLinkRouter)
+        }
+        .task(id: "\(taskLinkRouter.revision)-\(appState.isAuthenticated)") {
+            await taskLinkRouter.resolve(
+                authenticated: appState.isAuthenticated,
+                serverURL: AuthService.shared.getServerURL(),
+                fetch: { try await appState.loadLinkedTask($0) }
+            )
+        }
         .onAppear {
             #if os(iOS)
             appState.onTaskCompleted = { taskId in
@@ -139,7 +159,10 @@ struct mDoneApp: App {
         }
         #if os(iOS)
         .onOpenURL { url in
-            guard url.scheme == "mdone" else { return }
+            if taskLinkRouter.receive(url) {
+                return
+            }
+            guard url.scheme == TaskDeepLink.scheme else { return }
             switch url.host {
             case "focus":
                 if focusManager.currentSession != nil {
@@ -155,12 +178,22 @@ struct mDoneApp: App {
         .onOpenURL { url in
             // The widgets' Add Task links (#240). Focus has no Mac UI, so
             // mdone://focus has nothing to open here.
-            guard url.scheme == "mdone", url.host == "create" else { return }
+            if taskLinkRouter.receive(url) {
+                return
+            }
+            guard url.scheme == TaskDeepLink.scheme, url.host == "create" else { return }
             appState.quickAddTrigger = UUID()
         }
         // Hand the URL to the open window instead of letting WindowGroup
         // spawn a second one for it.
         .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
         #endif
+        .environment(appState)
+        .environment(dependencies.networkMonitor)
+        #if os(iOS)
+        .environment(focusManager)
+        .environment(focusOutbox)
+        #endif
+        .modelContainer(dependencies.modelContainer)
     }
 }

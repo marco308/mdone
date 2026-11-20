@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Open an existing task through a server-qualified app link, including after signing in or when the task is not in the loaded list. The task can be edited or explicitly completed in its details. Links never change the connected server.
+
 ## [1.24.0] - 2026-11-17
 
 ### Added

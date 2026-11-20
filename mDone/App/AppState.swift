@@ -12,11 +12,14 @@ final class AppState {
     var isAuthenticated: Bool = false {
         didSet {
             listRevision &+= 1
+            authRevision = UUID()
             // A marker from another account or server must not vouch for
             // this one's list.
             liveChangeMarker = nil
         }
     }
+
+    @ObservationIgnored private var authRevision = UUID()
 
     var isLoading: Bool = false
     var errorMessage: String?
@@ -429,6 +432,45 @@ final class AppState {
             }
         }
         isAuthenticated = authenticated
+    }
+
+    /// Read through the configured API client only. The link cannot select a
+    /// destination for credentials, even while another request changes auth.
+    @MainActor
+    func loadLinkedTask(_ link: TaskDeepLink) async throws -> VTask {
+        guard isAuthenticated else { throw TaskLinkFailure.signIn }
+        guard link.matches(serverURL: authService.getServerURL()) else { throw TaskLinkFailure.wrongServer }
+        guard !isOffline else { throw TaskLinkFailure.offline }
+        let session = authRevision
+        let task: VTask
+        do {
+            task = try await taskService.fetchTask(id: link.taskID)
+        } catch let error as NetworkError {
+            switch error {
+            case .serverError(statusCode: 404, message: _), .serverError(statusCode: 403, message: _),
+                 .missingPermission:
+                throw TaskLinkFailure.unavailable
+            case .networkUnavailable, .serverUnreachable, .timeout:
+                throw TaskLinkFailure.offline
+            default: throw error
+            }
+        }
+        try Task.checkCancellation()
+        guard isAuthenticated, authRevision == session, link.matches(serverURL: authService.getServerURL()) else {
+            throw TaskLinkFailure.changedSession
+        }
+        guard task.id == link.taskID else { throw TaskLinkFailure.unavailable }
+        // Keep the existing store as the single source of truth for editing.
+        // Never replace a pending local edit with this navigation read.
+        if hasPendingChanges(task.id), let local = tasks.first(where: { $0.id == task.id }) {
+            return local
+        }
+        if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+            tasks[index] = task
+        } else {
+            tasks.append(task)
+        }
+        return task
     }
 
     func configureAPIClient() async {
