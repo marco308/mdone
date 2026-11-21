@@ -291,6 +291,16 @@ private struct BoardTaskCard: View {
                     )
                 }
 
+                Button {
+                    Task {
+                        if await appState.duplicateTask(task) != nil {
+                            await onChanged()
+                        }
+                    }
+                } label: {
+                    Label("Duplicate", systemImage: "plus.square.on.square")
+                }
+
                 if !otherBuckets.isEmpty {
                     Menu {
                         ForEach(otherBuckets) { bucket in

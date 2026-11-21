@@ -190,6 +190,12 @@ struct TaskRow: View {
                 }
 
                 Button {
+                    Task { await appState.duplicateTask(task) }
+                } label: {
+                    Label("Duplicate", systemImage: "plus.square.on.square")
+                }
+
+                Button {
                     Task { await appState.setFavorite(task, task.isFavorite != true) }
                 } label: {
                     Label(

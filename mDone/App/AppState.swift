@@ -2150,6 +2150,32 @@ final class AppState {
         }
     }
 
+    /// Copies a task into its own project (#22) and returns the copy. Both
+    /// tasks are read back: the copy for its labels, which the duplicate
+    /// answer leaves out, and the original for its new `copiedto` relation. Needs a connection: a copy has no id until the server makes
+    /// it, so there is nothing to queue.
+    @MainActor
+    @discardableResult
+    func duplicateTask(_ task: VTask) async -> VTask? {
+        if isEffectivelyOffline {
+            rejectOffline("Duplicating a task")
+            return nil
+        }
+        do {
+            let copy = try await taskService.duplicateTask(id: task.id)
+            await refreshTasksAfterRelationChange(ids: [copy.id, task.id])
+            await refetchProjectOrder(of: copy)
+            #if os(iOS)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
+            WidgetCenter.shared.reloadAllTimelines()
+            return tasks.first(where: { $0.id == copy.id }) ?? copy
+        } catch {
+            handleError(error)
+            return nil
+        }
+    }
+
     func tasksForProject(_ projectId: Int64) -> [VTask] {
         // Vikunja's Favorites pseudo-project has no views in the v2 API, so
         // there is nothing to fetch for it. Every task is already in `tasks`

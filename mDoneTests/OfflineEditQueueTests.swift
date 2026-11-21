@@ -227,6 +227,27 @@ final class OfflineEditQueueTests: XCTestCase {
         XCTAssertEqual(sync.pendingOperationCount(), 1)
     }
 
+    /// A copy has no id until the server makes it, so duplicating offline is
+    /// refused with a message rather than queued (#22).
+    func testDuplicatingOfflineIsRefusedWithoutARequest() async throws {
+        let container = try makeContainer()
+        let sync = await makeSyncService(container: container)
+        let state = await makeAppState(sync: sync, connected: false)
+        state.tasks = [sampleTask()]
+        MockURLProtocol.requestHandler = { request in
+            XCTFail("Unexpected request: \(request.httpMethod ?? "?") \(request.url?.path ?? "")")
+            return (MockURLProtocol.makeResponse(statusCode: 500, url: request.url), Data())
+        }
+
+        let copy = await state.duplicateTask(state.tasks[0])
+
+        XCTAssertNil(copy)
+        XCTAssertEqual(state.tasks.map(\.id), [1])
+        XCTAssertEqual(sync.pendingOperationCount(), 0)
+        XCTAssertNotNil(state.errorMessage)
+        XCTAssertTrue(MockURLProtocol.capturedRequests.isEmpty)
+    }
+
     /// Starring offline queues the change and shows the Favorites list at
     /// once, the same as starring online (#16).
     func testStarringOfflineQueuesAndShowsFavorites() async throws {
