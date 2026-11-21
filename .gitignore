@@ -41,6 +41,10 @@ playground.xcworkspace
 # Generated Xcode project (regenerate with xcodegen)
 mDone.xcodeproj/
 
+# A contributor's own signing setup (team, bundle ID prefix). See
+# Config/Local.xcconfig.example and docs/dev-setup.md (#154).
+Config/Local.xcconfig
+
 # Screenshot debug output
 screenshots/ipad-debug/
 
