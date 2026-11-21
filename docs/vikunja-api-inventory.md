@@ -65,7 +65,7 @@ Things that did **not** change, each checked on a live server:
 | Project | GET / POST / PUT / DELETE | `/projects`, `/projects/{id}` | |
 | Project views | GET | `/projects/{id}/views` | Envelope, one page. |
 | Assignable users | GET | `/projects/{id}/users/search` | Replaces v1's `/projectusers`. Envelope, one page. |
-| All tasks | GET | `/tasks` | Paginated. `filter`, `q`, `sort_by`, `order_by`, `expand=subtasks`. |
+| All tasks | GET | `/tasks` | Paginated. `filter`, `q`, `sort_by`, `order_by`, `expand=subtasks`, `expand=comment_count` (adds `comment_count` to each task; single-task reads and update answers have none). |
 | Tasks of a view | GET | `/projects/{id}/views/{view}/tasks` | Paginated, in stored view order. In v2 this is always a flat task list. |
 | Kanban board | GET | `/projects/{id}/views/{view}/buckets/tasks` | `{items, total}`, no `total_pages`. See below. |
 | Move card | PUT | `/projects/{id}/views/{view}/buckets/{bucket}/tasks` | Body `{task_id}`. |
@@ -73,6 +73,8 @@ Things that did **not** change, each checked on a live server:
 | Create task | POST | `/projects/{id}/tasks` | |
 | Duplicate task | POST | `/tasks/{id}/duplicate` | Body `{}`. Answers `{duplicated_task}` in the same project, linked by `copiedfrom` / `copiedto`. The embedded copy has `labels: null` even when they were copied, so the app reads it back (#22). |
 | Task position | PUT | `/tasks/{id}/position` | Body `{position, project_view_id}`. |
+| Comments | GET / POST | `/tasks/{id}/comments` | Paginated, oldest first. Body `{comment}`, HTML; the server sets `author` (#2). |
+| Comment | PATCH / DELETE | `/tasks/{id}/comments/{comment}` | Only the author may change one. `created` and `updated` differ by microseconds on a new comment. |
 | Relations | POST / DELETE | `/tasks/{id}/relations`, `/tasks/{id}/relations/{kind}/{other}` | |
 | Assignees | PUT | `/tasks/{id}/assignees/bulk` | Body `{assignees: [{id}]}`. |
 | Labels | GET / POST | `/labels` | Paginated. |

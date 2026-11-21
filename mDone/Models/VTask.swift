@@ -28,6 +28,10 @@ struct VTask: Codable, Identifiable, Hashable {
     var updated: Date?
     var bucketId: Int64?
     var coverImageAttachmentId: Int64?
+    /// How many comments the task has. Only list reads ask for it
+    /// (`expand=comment_count`); a single task or an update answer leaves it
+    /// out, which is why `AppState.commentCounts` keeps its own copy (#2).
+    var commentCount: Int64?
     /// Tasks related to this one, keyed by the raw relation kind (`"subtask"`,
     /// `"parenttask"`, `"blocking"`, …). Kept as raw strings so a kind added
     /// by a future server version can't fail decoding. The embedded tasks are

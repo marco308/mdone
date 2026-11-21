@@ -177,6 +177,40 @@
         }
       }
     },
+    "%lld comments" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld comment"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld comments"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 条评论"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld days before due" : {
       "localizations" : {
         "en" : {
@@ -753,6 +787,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加任务"
+          }
+        }
+      }
+    },
+    "Add a comment" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加评论"
           }
         }
       }
@@ -1349,6 +1393,36 @@
         }
       }
     },
+    "Comment actions" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "评论操作"
+          }
+        }
+      }
+    },
+    "Comments" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "评论"
+          }
+        }
+      }
+    },
+    "Comments could not be loaded." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法加载评论。"
+          }
+        }
+      }
+    },
     "Compact" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1651,6 +1725,16 @@
         }
       }
     },
+    "Delete Comment?" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除评论？"
+          }
+        }
+      }
+    },
     "Delete Project" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1848,6 +1932,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "编辑负责人"
+          }
+        }
+      }
+    },
+    "Edit Comment" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑评论"
           }
         }
       }
@@ -2600,6 +2694,16 @@
         }
       }
     },
+    "Loading comments…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在加载评论…"
+          }
+        }
+      }
+    },
     "Loading..." : {
       "localizations" : {
         "zh-Hans" : {
@@ -3006,6 +3110,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "没有分栏"
+          }
+        }
+      }
+    },
+    "No comments yet" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂无评论"
           }
         }
       }
@@ -3825,6 +3939,16 @@
         }
       }
     },
+    "Retry" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试"
+          }
+        }
+      }
+    },
     "Saturday" : {
       "localizations" : {
         "zh-Hans" : {
@@ -3901,6 +4025,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择一个任务"
+          }
+        }
+      }
+    },
+    "Send comment" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送评论"
           }
         }
       }
@@ -4608,6 +4742,16 @@
         }
       }
     },
+    "This comment has formatting mDone can't edit, so it is shown as HTML." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此评论包含 mDone 无法编辑的格式，因此以 HTML 显示。"
+          }
+        }
+      }
+    },
     "This description has formatting mDone cannot edit, so it is shown as HTML." : {},
     "This permanently deletes the project and all %lld tasks in it, including any sub-projects. This can't be undone." : {
       "localizations" : {
@@ -5231,6 +5375,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "截止于%@"
+          }
+        }
+      }
+    },
+    "edited" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已编辑"
           }
         }
       }

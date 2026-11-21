@@ -323,6 +323,8 @@ struct TaskDetailSheet: View {
 
             TaskAssigneesSection(task: task)
 
+            TaskCommentsSection(task: task)
+
             Section {
                 Button("Delete Task", role: .destructive) {
                     showDeleteConfirm = true
