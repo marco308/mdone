@@ -49,6 +49,10 @@ Things that did **not** change, each checked on a live server:
   the cookie by hand, so the path attribute does not matter to it.
 - Pseudo-projects (negative ids) are still appended to every page of `/projects` and left out of
   `total`, so `ProjectService.fetchProjects` still de-duplicates.
+- The Favorites pseudo-project (`-1`) is listed while anything is starred, but `/projects/-1/views` is
+  empty, so there is no view to read its tasks from (checked on 2.4.0). Every task carries its own
+  `is_favorite`, and `/tasks` does not accept it in a filter (400, code 4016), so the app builds the
+  Favorites list from the tasks it already has. Starring is `PATCH /tasks/{id}` with `{"is_favorite": true}` (#16).
 - `items` is `[]` on an empty list in everything tested, but the schema allows `null`, so
   `ListPage` treats a missing or null `items` as empty. An empty list reports `total_pages: 0`.
 

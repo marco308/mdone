@@ -248,6 +248,22 @@ final class OfflineEditQueueTests: XCTestCase {
         XCTAssertTrue(MockURLProtocol.capturedRequests.isEmpty)
     }
 
+    /// Starring offline queues the change and shows the Favorites list at
+    /// once, the same as starring online (#16).
+    func testStarringOfflineQueuesAndShowsFavorites() async throws {
+        let container = try makeContainer()
+        let sync = await makeSyncService(container: container)
+        let state = await makeAppState(sync: sync, connected: false)
+        state.tasks = [sampleTask()]
+
+        await state.setFavorite(state.tasks[0], true)
+
+        XCTAssertEqual(state.tasks[0].isFavorite, true)
+        XCTAssertEqual(sync.pendingOperationCount(), 1)
+        XCTAssertTrue(state.projects.contains { $0.id == Project.favoritesId })
+        XCTAssertEqual(state.tasksForProject(Project.favoritesId).map(\.id), [1])
+    }
+
     /// Repeated edits of one task collapse into a single queued operation, so
     /// ticking on and off five times replays once, at the final state.
     func testRepeatedOfflineEditsCoalesceIntoOneOperation() async throws {

@@ -33,6 +33,10 @@ struct Project: Codable, Identifiable, Hashable {
         HexColor.normalized(hexColor)
     }
 
+    /// Vikunja's Favorites pseudo-project. The server lists it while the user
+    /// has starred any task or project; it holds the starred tasks.
+    static let favoritesId: Int64 = -1
+
     var listViewId: Int64? {
         views?.first(where: { $0.viewKind == "list" })?.id
     }

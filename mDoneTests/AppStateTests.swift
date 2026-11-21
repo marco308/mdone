@@ -392,7 +392,7 @@ final class AppStateTests: XCTestCase {
     }
 
     func testTasksForProjectVirtualProjectExcludesDoneAndUsesLatestData() {
-        let filterId: Int64 = -1
+        let filterId: Int64 = -2 // saved filter 1; -1 is Favorites, which reads from the tasks (#16)
         let appState = AppState()
 
         appState.tasks = [

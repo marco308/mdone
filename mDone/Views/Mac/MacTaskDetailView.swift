@@ -234,6 +234,9 @@ struct MacTaskDetailView: View {
         .navigationTitle(task.title)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
+                TaskFavoriteButton(task: task)
+            }
+            ToolbarItem(placement: .primaryAction) {
                 TaskShareMenu(task: task)
             }
             ToolbarItem(placement: .primaryAction) {

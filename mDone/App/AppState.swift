@@ -2060,6 +2060,61 @@ final class AppState {
         }
     }
 
+    /// Stars or unstars a task (#16). Favorites are per user on the server, so
+    /// this changes nothing for anyone else the project is shared with. Queued
+    /// like any other edit when offline.
+    @MainActor
+    func setFavorite(_ task: VTask, _ favorite: Bool) async {
+        guard await acquireTaskUpdateSlot(id: task.id) else { return }
+        defer { releaseTaskUpdateSlot(id: task.id) }
+
+        let current = taskSnapshot(id: task.id) ?? task
+        guard (current.isFavorite ?? false) != favorite else { return }
+        let intent = TaskUpdateRequest(isFavorite: favorite)
+
+        if queueOfflineEdit(intent, for: current) != nil {
+            if favorite {
+                showFavoritesList()
+            }
+            return
+        }
+
+        let original = current.isFavorite
+        if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+            tasks[index].isFavorite = favorite
+            syncService?.updateCachedTask(tasks[index])
+        }
+        do {
+            _ = try await taskService.updateTask(id: task.id, request: intent)
+            if favorite {
+                showFavoritesList()
+            }
+            #if os(iOS)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
+        } catch {
+            if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+                tasks[index].isFavorite = original
+                syncService?.updateCachedTask(tasks[index])
+            }
+            handleError(error)
+        }
+    }
+
+    /// The open tasks the user has starred, across every project.
+    var favoriteTasks: [VTask] {
+        tasks.filter { $0.isFavorite == true && !$0.done }
+    }
+
+    /// Vikunja lists its Favorites pseudo-project only once something is
+    /// starred, so the first star would not show it until the next refresh.
+    /// Add the same entry the server will send rather than waiting for it.
+    @MainActor
+    private func showFavoritesList() {
+        guard !projects.contains(where: { $0.id == Project.favoritesId }) else { return }
+        projects.append(Project(id: Project.favoritesId, title: "Favorites", isFavorite: true))
+    }
+
     @MainActor
     func deleteTask(_ task: VTask) async {
         let taskId = task.id
@@ -2122,6 +2177,13 @@ final class AppState {
     }
 
     func tasksForProject(_ projectId: Int64) -> [VTask] {
+        // Vikunja's Favorites pseudo-project has no views in the v2 API, so
+        // there is nothing to fetch for it. Every task is already in `tasks`
+        // with its own `is_favorite`, which is the same list (#16).
+        if projectId == Project.favoritesId {
+            return favoriteTasks
+        }
+
         // Saved filters appear as virtual projects with negative IDs; their tasks keep
         // their real (positive) home project's ID, so a `projectId ==` filter always
         // comes back empty. The cache from the view fetch is the only membership source
