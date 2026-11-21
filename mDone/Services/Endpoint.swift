@@ -175,6 +175,8 @@ struct Endpoint {
         // Vikunja (2.x) populates `related_tasks` in list responses anyway,
         // but versions that gate it behind `expand` need this to be explicit.
         items.append(URLQueryItem(name: "expand", value: "subtasks"))
+        // The count behind each row's comment badge (#2).
+        items.append(URLQueryItem(name: "expand", value: "comment_count"))
         return Endpoint(api: "/tasks", queryItems: items)
     }
 
@@ -191,6 +193,7 @@ struct Endpoint {
             URLQueryItem(name: "page", value: "\(page)"),
             URLQueryItem(name: "per_page", value: "\(perPage)"),
             URLQueryItem(name: "expand", value: "subtasks"),
+            URLQueryItem(name: "expand", value: "comment_count"),
         ])
     }
 
@@ -213,6 +216,30 @@ struct Endpoint {
 
     static func task(id: Int64) -> Endpoint {
         Endpoint(api: "/tasks/\(id)")
+    }
+
+    // MARK: - Task Comments (#2)
+
+    /// A task's comments, oldest first. Paginated.
+    static func taskComments(taskId: Int64, page: Int = 1, perPage: Int = 50) -> Endpoint {
+        Endpoint(api: "/tasks/\(taskId)/comments", queryItems: [
+            URLQueryItem(name: "page", value: "\(page)"),
+            URLQueryItem(name: "per_page", value: "\(perPage)"),
+        ])
+    }
+
+    /// Body `{comment}`, HTML. The server sets the author.
+    static func createTaskComment(taskId: Int64) -> Endpoint {
+        Endpoint(api: "/tasks/\(taskId)/comments", method: .POST)
+    }
+
+    /// Body `{comment}`. Only the author may change a comment.
+    static func updateTaskComment(taskId: Int64, commentId: Int64) -> Endpoint {
+        Endpoint(api: "/tasks/\(taskId)/comments/\(commentId)", method: .PATCH)
+    }
+
+    static func deleteTaskComment(taskId: Int64, commentId: Int64) -> Endpoint {
+        Endpoint(api: "/tasks/\(taskId)/comments/\(commentId)", method: .DELETE)
     }
 
     // MARK: - Task Relations
