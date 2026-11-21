@@ -200,6 +200,8 @@ struct MacTaskDetailView: View {
 
             TaskAssigneesSection(task: task)
 
+            TaskCommentsSection(task: task)
+
             FocusHistoryGate(taskId: task.id) {
                 Section("Focus") {
                     FocusHistoryRow(taskId: task.id)

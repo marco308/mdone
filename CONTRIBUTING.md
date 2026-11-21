@@ -42,6 +42,8 @@ xcodebuild -project mDone.xcodeproj -scheme mDone-macOS build
 xcodebuild -project mDone.xcodeproj -scheme mDone -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' test
 ```
 
+To run on your own device, sign with your own team (a free Personal Team works) through an untracked `Config/Local.xcconfig`, never by editing `project.yml` or the entitlements: see [Building with your own Apple team](docs/dev-setup.md#building-with-your-own-apple-team).
+
 ## Code Style
 
 This project uses **SwiftLint** and **SwiftFormat** to enforce consistent code style. Configs are in `.swiftlint.yml` and `.swiftformat` respectively.

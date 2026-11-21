@@ -1,0 +1,5 @@
+// Debug builds: mDone's identity from Identity.xcconfig, then anything set in
+// Config/Local.xcconfig, if you have one. The `?` makes the include optional,
+// so a checkout without the file builds exactly as before.
+#include "Identity.xcconfig"
+#include? "Local.xcconfig"

@@ -15,7 +15,7 @@ struct VNotification: Codable, Identifiable {
         var doer: User?
         var task: VTask?
         var project: Project?
-        var comment: TaskComment?
+        var comment: NotificationComment?
     }
 
     /// Vikunja reports read state through `read_at` alone: an unread notification
@@ -90,7 +90,9 @@ struct MarkNotificationReadRequest: Encodable {
     let read: Bool
 }
 
-struct TaskComment: Codable {
+/// The comment a notification is about. Looser than `TaskComment`: every
+/// field is optional, so a payload missing one still decodes.
+struct NotificationComment: Codable {
     var id: Int64?
     var comment: String?
     var author: User?

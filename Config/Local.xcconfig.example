@@ -1,0 +1,21 @@
+// Your own signing setup for Debug builds. Copy this file to
+// Config/Local.xcconfig, which git ignores, and fill it in:
+//
+//     cp Config/Local.xcconfig.example Config/Local.xcconfig
+//
+// Xcode reads it at build time, so there is no need to run
+// `xcodegen generate` again after changing it. Release builds ignore it.
+
+// Your team ID: Xcode > Settings > Accounts, select the team. A Personal Team
+// works. Leave it empty to pick the team in Signing & Capabilities instead,
+// although that choice is lost each time the project is generated.
+DEVELOPMENT_TEAM = ABCDE12345
+
+// A reverse-DNS prefix that is yours, so the bundle IDs and the App Group are
+// not mDone's. With this value the Debug app is com.example.mdone.app.dev and
+// its App Group is group.com.example.mdone.app.dev.
+MDONE_BUNDLE_PREFIX = com.example.mdone
+
+// A Personal Team cannot sign the push notification entitlement. mDone does
+// not use push yet, so building without it loses nothing.
+MDONE_IOS_ENTITLEMENTS = mDone/mDone-NoPush.entitlements

@@ -140,9 +140,16 @@ final class AppState {
 
     // MARK: Team features (#272)
 
-    /// The signed-in user, read only while Team features is on. Drives the
-    /// "Assigned to me" filter; nil until loaded, and after sign-out.
+    /// The signed-in user. Read while Team features is on, for the "Assigned
+    /// to me" filter, and when a task's comments open, to know which comments
+    /// are the user's own. Nil until loaded, and after sign-out.
     private(set) var currentUser: User?
+
+    /// Each task's comment count, from the list reads that carry one (#2).
+    /// Kept apart from `tasks` because a single-task read or an update answer
+    /// has no count in it, and replacing the task would otherwise drop the
+    /// badge until the next full refresh.
+    private(set) var commentCounts: [Int64: Int64] = [:]
 
     /// Who each project's tasks can be assigned to, read when the assignee
     /// picker opens and kept for the session.
@@ -164,13 +171,15 @@ final class AppState {
         projectService: ProjectService = ProjectService(),
         labelService: LabelService = LabelService(),
         userService: UserService = UserService(),
-        serverInfoService: ServerInfoService = ServerInfoService()
+        serverInfoService: ServerInfoService = ServerInfoService(),
+        commentService: CommentService = CommentService()
     ) {
         self.taskService = taskService
         self.projectService = projectService
         self.labelService = labelService
         self.userService = userService
         self.serverInfoService = serverInfoService
+        self.commentService = commentService
         AppState.shared = self
     }
 
@@ -179,6 +188,7 @@ final class AppState {
     private let labelService: LabelService
     private let userService: UserService
     private let serverInfoService: ServerInfoService
+    private let commentService: CommentService
 
     /// The signed-in server's Vikunja version. Nil until `/info` has answered,
     /// and when its version string has no number in it.
@@ -629,6 +639,7 @@ final class AppState {
         labels = []
         notifications = []
         currentUser = nil
+        commentCounts = [:]
         assignableUsers = [:]
         serverVersion = nil
         showServerUpdateNotice = false
@@ -748,6 +759,7 @@ final class AppState {
             async let fetchedLabels = labelService.fetchLabels()
 
             tasks = try await fetchedTasks
+            recordCommentCounts(from: tasks)
             await updateRetryState()
             #if DEBUG
             print("[mDone] refreshAll: got \(tasks.count) tasks")
@@ -1271,6 +1283,125 @@ final class AppState {
             print("[mDone] loadCurrentUserIfNeeded failed: \(error)")
             #endif
         }
+    }
+
+    // MARK: - Comments (#2)
+
+    /// Reads the signed-in user if nothing has yet, whatever the Team features
+    /// setting. Comments need it to tell the user's own from everyone else's.
+    @MainActor
+    func loadSignedInUserIfNeeded() async {
+        guard isAuthenticated, currentUser == nil, !isOffline else { return }
+        currentUser = try? await userService.fetchCurrentUser()
+    }
+
+    /// The task's comment count for its row badge, `0` when unknown.
+    func commentCount(for taskId: Int64) -> Int64 {
+        commentCounts[taskId] ?? 0
+    }
+
+    /// Keeps the counts from a list read. Tasks without one (a read that did
+    /// not ask for it) leave the stored count alone.
+    @MainActor
+    private func recordCommentCounts(from list: [VTask]) {
+        var counts = commentCounts
+        for task in list {
+            if let count = task.commentCount {
+                counts[task.id] = count
+            }
+        }
+        if counts != commentCounts {
+            commentCounts = counts
+        }
+    }
+
+    /// Every comment on the task, oldest first, or `nil` when they could not
+    /// be read. Comments are not kept offline, so this needs a connection;
+    /// the caller shows that inline rather than as an error alert.
+    @MainActor
+    func loadComments(taskId: Int64) async -> [TaskComment]? {
+        guard !isEffectivelyOffline else { return nil }
+        do {
+            let comments = try await commentService.fetchComments(taskId: taskId)
+            setCommentCount(Int64(comments.count), for: taskId)
+            return comments
+        } catch {
+            #if DEBUG
+            print("[mDone] loadComments failed: \(error)")
+            #endif
+            return nil
+        }
+    }
+
+    /// Posts `text`, written in the same light markup as a description, as a
+    /// comment. Returns the stored comment, or `nil` after reporting why not.
+    @MainActor
+    func addComment(taskId: Int64, text: String) async -> TaskComment? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if isEffectivelyOffline {
+            rejectOffline("Commenting")
+            return nil
+        }
+        do {
+            let comment = try await commentService.createComment(
+                taskId: taskId,
+                html: DescriptionMarkup.html(fromEditableText: trimmed)
+            )
+            setCommentCount(commentCount(for: taskId) + 1, for: taskId)
+            #if os(iOS)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
+            return comment
+        } catch {
+            handleError(error)
+            return nil
+        }
+    }
+
+    /// Replaces a comment's text. `text` is the edit form's markup, or raw
+    /// HTML when `isHTML` (a comment the light markup cannot represent).
+    @MainActor
+    func editComment(taskId: Int64, commentId: Int64, text: String, isHTML: Bool = false) async -> TaskComment? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if isEffectivelyOffline {
+            rejectOffline("Editing a comment")
+            return nil
+        }
+        do {
+            return try await commentService.updateComment(
+                taskId: taskId,
+                commentId: commentId,
+                html: isHTML ? trimmed : DescriptionMarkup.html(fromEditableText: trimmed)
+            )
+        } catch {
+            handleError(error)
+            return nil
+        }
+    }
+
+    /// Deletes a comment. Returns `true` when the server removed it.
+    @MainActor
+    func deleteComment(taskId: Int64, commentId: Int64) async -> Bool {
+        if isEffectivelyOffline {
+            rejectOffline("Deleting a comment")
+            return false
+        }
+        do {
+            try await commentService.deleteComment(taskId: taskId, commentId: commentId)
+            setCommentCount(max(commentCount(for: taskId) - 1, 0), for: taskId)
+            return true
+        } catch {
+            handleError(error)
+            return false
+        }
+    }
+
+    @MainActor
+    private func setCommentCount(_ count: Int64, for taskId: Int64) {
+        guard commentCounts[taskId] != count else { return }
+        commentCounts[taskId] = count
     }
 
     // MARK: - Server version (#290, #291)
@@ -2091,6 +2222,7 @@ final class AppState {
     private func applyProjectTasks(_ viewTasks: [VTask], projectId: Int64) {
         projectTaskCache[projectId] = viewTasks
         tasks = Self.merging(viewTasks, into: tasks)
+        recordCommentCounts(from: viewTasks)
     }
 
     /// `tasks` with each view task replacing its row, or appended when new.
@@ -2204,6 +2336,7 @@ final class AppState {
         guard latest != tasks || membersChanged else { return false }
 
         tasks = latest
+        recordCommentCounts(from: latest)
         if let projectId, let members {
             projectTaskCache[projectId] = members
         }

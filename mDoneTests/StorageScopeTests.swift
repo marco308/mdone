@@ -40,10 +40,40 @@ final class StorageScopeTests: XCTestCase {
         XCTAssertEqual(StorageScope.appGroupID, "group." + bundleID)
     }
 
-    func testDebugBuildsAreNotTheShippedApp() {
+    /// A Debug build is mDone Dev. The prefix is not checked, because a
+    /// contributor's `Config/Local.xcconfig` may replace `com.mdone` (#154).
+    func testDebugBuildsAreNotTheShippedApp() throws {
         #if DEBUG
-        XCTAssertEqual(StorageScope.appGroupID, "group.com.mdone.app.dev")
-        XCTAssertEqual(Bundle.main.bundleIdentifier, "com.mdone.app.dev")
+        let bundleID = try XCTUnwrap(Bundle.main.bundleIdentifier)
+        XCTAssertTrue(bundleID.hasSuffix(".app.dev"), bundleID)
+        XCTAssertNotEqual(bundleID, "com.mdone.app")
+        XCTAssertNotEqual(StorageScope.appGroupID, "group.com.mdone.app")
         #endif
+    }
+
+    /// The group comes from the build's Info.plist, where it is
+    /// `$(MDONE_APP_GROUP)`, the same setting the entitlements use.
+    func testAppGroupComesFromTheBuild() {
+        let fromPlist = Bundle.main.object(forInfoDictionaryKey: StorageScope.appGroupInfoKey) as? String
+        XCTAssertEqual(StorageScope.appGroupID, fromPlist)
+    }
+
+    func testAppGroupIsReadFromTheInfoDictionary() {
+        let info: [String: Any] = [
+            "MDoneAppGroup": "group.com.example.mdone.app.dev",
+            "CFBundleIdentifier": "com.example.mdone.app.dev.widgets",
+        ]
+        XCTAssertEqual(StorageScope.resolveAppGroupID(from: info), "group.com.example.mdone.app.dev")
+    }
+
+    /// Without the key, or with a value Xcode did not expand, the group must
+    /// never be the shipped app's.
+    func testAMissingAppGroupNeverFallsBackToTheShippedApp() {
+        let unexpanded: [String: Any] = ["MDoneAppGroup": "$(MDONE_APP_GROUP)", "CFBundleIdentifier": "com.mdone.app"]
+        for info in [nil, [:], ["CFBundleIdentifier": "com.mdone.app"], unexpanded] as [[String: Any]?] {
+            let group = StorageScope.resolveAppGroupID(from: info)
+            XCTAssertNotEqual(group, "group.com.mdone.app")
+            XCTAssertNotEqual(group, "group.com.mdone.app.dev")
+        }
     }
 }

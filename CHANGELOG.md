@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Task comments. A task's details now show its comments with who wrote each and when, and you can add one, or edit and delete your own, on iPhone, iPad and Mac. Comments use the same formatting as descriptions (**bold**, *italic*, links and lists), and tasks with comments show how many in the list (#2).
 - Star a task to add it to Favorites, from its context menu or the star at the top of the task. Starred tasks show a star in every list, and the Favorites list gathers them from every project. Favorites are your own: starring a task in a shared project does not change it for anyone else (#16).
 
 ### Fixed

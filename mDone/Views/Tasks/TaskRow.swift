@@ -342,6 +342,16 @@ struct TaskRow: View {
                             .font(density.metadataFont)
                     }
 
+                    if commentCount > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "bubble.left")
+                            Text("\(commentCount)")
+                                .monospacedDigit()
+                        }
+                        .font(density.metadataFont)
+                        .foregroundStyle(.secondary)
+                    }
+
                     if let labels = task.labels, !labels.isEmpty {
                         HStack(spacing: 4) {
                             ForEach(labels.prefix(3)) { label in
@@ -392,6 +402,10 @@ struct TaskRow: View {
         .accessibilityLabel(taskAccessibilityLabel)
     }
 
+    private var commentCount: Int64 {
+        appState.commentCount(for: task.id)
+    }
+
     private var taskAccessibilityLabel: String {
         var parts: [String] = []
         parts.append(task.title)
@@ -409,6 +423,9 @@ struct TaskRow: View {
         }
         if task.isFavorite == true {
             parts.append(String(localized: "favorite"))
+        }
+        if commentCount > 0 {
+            parts.append(String(localized: "\(commentCount) comments"))
         }
         if task.priority > 0 {
             parts.append("priority \(task.priorityLevel.label)")
