@@ -58,7 +58,9 @@ App Store or TestFlight copy and neither sees the other's login or data. Release
 what gets archived and shipped, are still `com.mdone.app`.
 
 The three values live in `project.yml` (`MDONE_BUNDLE_ID`, `MDONE_APP_GROUP`, `MDONE_DISPLAY_NAME`),
-and `StorageScope.appGroupID` in `mDoneShared/SharedConstants.swift` has to match the group.
+built from `MDONE_BUNDLE_PREFIX` in `Config/Identity.xcconfig`. The group is always `group.` plus the
+app's bundle ID. The code does not hardcode it: `StorageScope.appGroupID` reads the `MDoneAppGroup`
+key that the app's and widgets' Info.plists set to `$(MDONE_APP_GROUP)`.
 
 Unit tests go one step further. `StorageScope` gives the test host scratch copies of the server URL,
 the shared defaults and the keychain items, emptied at the start of every run, so a test that signs
@@ -67,6 +69,51 @@ out or saves a fake token cannot touch even the dev app's login.
 Both apps register the `mdone://` URL scheme. Widgets and SSO are unaffected, because those hand the
 link straight to their own app, but `open mdone://create` from a terminal goes to whichever copy
 macOS picks.
+
+## Building with your own Apple team
+
+The Simulator needs no signing setup: `xcodegen generate` and run. To run on your own iPhone, iPad or Mac
+you have to sign with your own team, and a free Personal Team works. mDone's bundle IDs
+(`com.mdone.*`) and App Group belong to mDone's team, so you need your own prefix as well. None of
+this means editing a tracked file (#154):
+
+```bash
+cp Config/Local.xcconfig.example Config/Local.xcconfig   # gitignored
+```
+
+Then set three values in `Config/Local.xcconfig`:
+
+| Setting | What to put | Default |
+|---|---|---|
+| `DEVELOPMENT_TEAM` | Your team ID, from Xcode > Settings > Accounts | mDone's team |
+| `MDONE_BUNDLE_PREFIX` | A reverse-DNS prefix of your own, e.g. `com.example.mdone` | `com.mdone` |
+| `MDONE_IOS_ENTITLEMENTS` | `mDone/mDone-NoPush.entitlements` on a Personal Team | `mDone/mDone.entitlements` |
+
+With the prefix `com.example.mdone`, Debug builds become `com.example.mdone.app.dev`, the widget
+`com.example.mdone.app.dev.widgets`, and the App Group `group.com.example.mdone.app.dev`, in the
+entitlements and in the code alike. The test bundles move to the same prefix.
+
+A Personal Team cannot sign push notifications (`aps-environment`), so the third line swaps the iOS
+app onto a copy of its entitlements without them. mDone does not use push yet, so nothing is lost.
+
+Xcode reads the file at build time, so it takes effect on the next build, with no need to run
+`xcodegen generate` again, and it survives every later `xcodegen generate`. `git status` stays clean.
+
+Two limits, both deliberate:
+
+- **Only Debug reads it.** Release always signs as mDone (`Config/Identity.xcconfig`), so an archive
+  can never pick up somebody's local setup. Run and Test use Debug, so this costs nothing day to day.
+- **Do not change the values in `Config/Identity.xcconfig` or `project.yml` in a pull request.**
+  Those are the App Store identity; changing them moves every existing user to a different app.
+
+For a one-off build from the command line, the same settings work as `xcodebuild` arguments, with no
+file at all:
+
+```bash
+xcodebuild -project mDone.xcodeproj -scheme mDone -destination 'generic/platform=iOS' \
+  -allowProvisioningUpdates DEVELOPMENT_TEAM=ABCDE12345 MDONE_BUNDLE_PREFIX=com.example.mdone \
+  MDONE_IOS_ENTITLEMENTS=mDone/mDone-NoPush.entitlements build
+```
 
 ## Switching mDone between environments
 

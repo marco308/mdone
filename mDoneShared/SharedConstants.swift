@@ -19,13 +19,27 @@ enum StorageScope {
     /// runner, so UI tests and the widget extension stay on the real stores.
     static let isHostingUnitTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
-    // The app group shared by the app and its widget extension. Must match
-    // `MDONE_APP_GROUP` in `project.yml`, which is what the entitlements use.
-    #if DEBUG
-    static let appGroupID = "group.com.mdone.app.dev"
-    #else
-    static let appGroupID = "group.com.mdone.app"
-    #endif
+    /// The app group shared by the app and its widget extension. It comes from
+    /// the build, not from code: the app's and the extensions' Info.plists
+    /// carry `MDoneAppGroup = $(MDONE_APP_GROUP)`, the same setting the
+    /// entitlements use, so the two cannot drift. That is
+    /// `group.com.mdone.app` for Release, `group.com.mdone.app.dev` for Debug,
+    /// and follows `MDONE_BUNDLE_PREFIX` when a contributor overrides it (#154).
+    static let appGroupID = resolveAppGroupID(from: Bundle.main.infoDictionary)
+
+    static let appGroupInfoKey = "MDoneAppGroup"
+
+    /// The group named in `info`. A bundle without the key (the unhosted
+    /// widget render tests) gets a group of its own derived from its bundle
+    /// ID, which is never a real app's, rather than falling back to the
+    /// shipped app's group.
+    static func resolveAppGroupID(from info: [String: Any]?) -> String {
+        if let group = info?[appGroupInfoKey] as? String, !group.isEmpty, !group.contains("$(") {
+            return group
+        }
+        let bundleID = info?["CFBundleIdentifier"] as? String ?? "unknown"
+        return "group." + bundleID + ".missing-app-group"
+    }
 
     /// Defaults shared between the app and its widgets.
     static let sharedDefaults: UserDefaults = isHostingUnitTests
