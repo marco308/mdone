@@ -5235,6 +5235,16 @@
         }
       }
     },
+    "favorite" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已收藏"
+          }
+        }
+      }
+    },
     "https://focus.example.com" : {
       "localizations" : {
         "zh-Hans" : {

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Star a task to add it to Favorites, from its context menu or the star at the top of the task. Starred tasks show a star in every list, and the Favorites list gathers them from every project. Favorites are your own: starring a task in a shared project does not change it for anyone else (#16).
+
+### Fixed
+- The Favorites list Vikunja adds to your projects now shows your starred tasks. It used to open empty (#16).
+
 ## [1.24.0] - 2026-11-17
 
 ### Added

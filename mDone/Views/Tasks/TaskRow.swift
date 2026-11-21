@@ -189,6 +189,15 @@ struct TaskRow: View {
                     )
                 }
 
+                Button {
+                    Task { await appState.setFavorite(task, task.isFavorite != true) }
+                } label: {
+                    Label(
+                        task.isFavorite == true ? "Remove from Favorites" : "Add to Favorites",
+                        systemImage: task.isFavorite == true ? "star.slash" : "star"
+                    )
+                }
+
                 if appState.isCurrent(task) {
                     Menu {
                         ForEach(Self.progressSteps, id: \.self) { pct in
@@ -353,6 +362,13 @@ struct TaskRow: View {
                 AssigneeStack(users: visibleAssignees)
             }
 
+            if task.isFavorite == true {
+                Image(systemName: "star.fill")
+                    .font(.caption)
+                    .foregroundStyle(.yellow)
+                    .accessibilityHidden(true)
+            }
+
             if task.priority > 0 {
                 PriorityBadge(priority: task.priorityLevel)
             }
@@ -390,6 +406,9 @@ struct TaskRow: View {
         }
         if let counts = task.checklistCounts {
             parts.append("\(counts.done) of \(counts.total) checklist items done")
+        }
+        if task.isFavorite == true {
+            parts.append(String(localized: "favorite"))
         }
         if task.priority > 0 {
             parts.append("priority \(task.priorityLevel.label)")

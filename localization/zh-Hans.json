@@ -560,6 +560,7 @@
     "date range %@ to %@" : "日期范围：%@至%@",
     "due %@" : "截止于%@",
     "ends %@" : "结束于%@",
+    "favorite" : "已收藏",
     "https://focus.example.com" : "https://focus.example.com",
     "https://vikunja.example.com" : "https://vikunja.example.com",
     "mDone" : "mDone",
