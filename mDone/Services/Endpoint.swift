@@ -218,6 +218,14 @@ struct Endpoint {
         Endpoint(api: "/tasks/\(id)")
     }
 
+    /// Copies a task into the same project (#22). The server copies the
+    /// fields, labels, reminders and attachments, links the copy back with a
+    /// `copiedfrom` relation, and answers `{duplicated_task}`. That embedded
+    /// task comes back without its labels, so the caller reads it again.
+    static func duplicateTask(id: Int64) -> Endpoint {
+        Endpoint(api: "/tasks/\(id)/duplicate", method: .POST)
+    }
+
     // MARK: - Task Comments (#2)
 
     /// A task's comments, oldest first. Paginated.

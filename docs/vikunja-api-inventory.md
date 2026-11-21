@@ -71,6 +71,7 @@ Things that did **not** change, each checked on a live server:
 | Move card | PUT | `/projects/{id}/views/{view}/buckets/{bucket}/tasks` | Body `{task_id}`. |
 | Task | GET / PUT / DELETE | `/tasks/{id}` | |
 | Create task | POST | `/projects/{id}/tasks` | |
+| Duplicate task | POST | `/tasks/{id}/duplicate` | Body `{}`. Answers `{duplicated_task}` in the same project, linked by `copiedfrom` / `copiedto`. The embedded copy has `labels: null` even when they were copied, so the app reads it back (#22). |
 | Task position | PUT | `/tasks/{id}/position` | Body `{position, project_view_id}`. |
 | Comments | GET / POST | `/tasks/{id}/comments` | Paginated, oldest first. Body `{comment}`, HTML; the server sets `author` (#2). |
 | Comment | PATCH / DELETE | `/tasks/{id}/comments/{comment}` | Only the author may change one. `created` and `updated` differ by microseconds on a new comment. |

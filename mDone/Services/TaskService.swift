@@ -50,6 +50,17 @@ actor TaskService {
         try await apiClient.delete(Endpoint.deleteTask(id: id))
     }
 
+    /// Duplicates a task and returns the copy from the server's answer. That
+    /// copy has no labels in it even when the server copied them, so read it
+    /// back with `fetchTask` before showing it.
+    func duplicateTask(id: Int64) async throws -> VTask {
+        let response: TaskDuplicateResponse = try await apiClient.send(
+            Endpoint.duplicateTask(id: id),
+            body: EmptyRequestBody()
+        )
+        return response.duplicatedTask
+    }
+
     func updatePosition(taskId: Int64, position: Double, viewId: Int64) async throws {
         let request = TaskPositionRequest(position: position, projectViewId: viewId)
         try await apiClient.sendExpectingEmpty(Endpoint.updateTaskPosition(taskId: taskId), body: request)
@@ -87,6 +98,14 @@ actor TaskService {
             body: request
         )
     }
+}
+
+/// `POST /tasks/{id}/duplicate` takes no fields; an empty object keeps the
+/// request a well-formed JSON body.
+struct EmptyRequestBody: Encodable {}
+
+struct TaskDuplicateResponse: Decodable {
+    let duplicatedTask: VTask
 }
 
 struct TaskAssigneesRequest: Encodable {

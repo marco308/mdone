@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - Task comments. A task's details now show its comments with who wrote each and when, and you can add one, or edit and delete your own, on iPhone, iPad and Mac. Comments use the same formatting as descriptions (**bold**, *italic*, links and lists), and tasks with comments show how many in the list (#2).
+- Duplicate a task from its context menu, in task lists and on the board. The copy lands in the same project with the same details, labels and reminders, and both tasks list each other under "Copied From" and "Copied To" (#22).
 
 ## [1.24.0] - 2026-11-17
 
