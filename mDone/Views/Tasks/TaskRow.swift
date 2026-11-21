@@ -189,6 +189,12 @@ struct TaskRow: View {
                     )
                 }
 
+                Button {
+                    Task { await appState.duplicateTask(task) }
+                } label: {
+                    Label("Duplicate", systemImage: "plus.square.on.square")
+                }
+
                 if appState.isCurrent(task) {
                     Menu {
                         ForEach(Self.progressSteps, id: \.self) { pct in

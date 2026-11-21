@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Duplicate a task from its context menu, in task lists and on the board. The copy lands in the same project with the same details, labels and reminders, and both tasks list each other under "Copied From" and "Copied To" (#22).
+
 ## [1.24.0] - 2026-11-17
 
 ### Added

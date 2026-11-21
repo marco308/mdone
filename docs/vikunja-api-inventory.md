@@ -71,6 +71,7 @@ Things that did **not** change, each checked on a live server:
 | Move card | PUT | `/projects/{id}/views/{view}/buckets/{bucket}/tasks` | Body `{task_id}`. |
 | Task | GET / PUT / DELETE | `/tasks/{id}` | |
 | Create task | POST | `/projects/{id}/tasks` | |
+| Duplicate task | POST | `/tasks/{id}/duplicate` | Body `{}`. Answers `{duplicated_task}` in the same project, linked by `copiedfrom` / `copiedto`. The embedded copy has `labels: null` even when they were copied, so the app reads it back (#22). |
 | Task position | PUT | `/tasks/{id}/position` | Body `{position, project_view_id}`. |
 | Relations | POST / DELETE | `/tasks/{id}/relations`, `/tasks/{id}/relations/{kind}/{other}` | |
 | Assignees | PUT | `/tasks/{id}/assignees/bulk` | Body `{assignees: [{id}]}`. |
