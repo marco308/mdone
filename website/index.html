@@ -5,19 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <!-- Mark JS as available so scroll-reveal only hides content when it can also reveal it (no-JS / crawlers see everything). -->
 <script>document.documentElement.classList.add('js');</script>
-<title>mDone: A native task manager for your self-hosted Vikunja</title>
-<meta name="description" content="mDone is a polished, native iPhone, iPad and Mac app for your self-hosted Vikunja server. Smart quick add, Kanban boards, subtasks, widgets, a focus timer, Siri hands-free and offline sync, with zero tracking." />
+<title>mDone: an iPhone and Mac app for Vikunja</title>
+<meta name="description" content="mDone is an iPhone, iPad and Mac app for your self-hosted Vikunja server: quick add, smart lists, Kanban boards, widgets, a focus timer, Siri and offline sync. Open source, no tracking." />
 <meta name="theme-color" content="#527AFA" />
 
 <!-- Social / link previews -->
 <meta property="og:type" content="website" />
-<meta property="og:title" content="mDone: beautifully done tasks for self-hosted Vikunja" />
-<meta property="og:description" content="A polished, native iOS & macOS client for your Vikunja server. Smart lists, widgets, focus timer, Siri hands-free, offline sync, zero tracking." />
+<meta property="og:title" content="mDone: an iPhone and Mac app for Vikunja" />
+<meta property="og:description" content="An iPhone, iPad and Mac app for your self-hosted Vikunja server: quick add, smart lists, Kanban boards, widgets, a focus timer, Siri and offline sync. Open source, no tracking." />
 <meta property="og:url" content="https://marco308.github.io/mdone/" />
 <meta property="og:image" content="https://marco308.github.io/mdone/assets/icon.png" />
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="mDone: beautifully done tasks for self-hosted Vikunja" />
-<meta name="twitter:description" content="A polished, native iOS & macOS client for your Vikunja server. Zero tracking." />
+<meta name="twitter:title" content="mDone: an iPhone and Mac app for Vikunja" />
+<meta name="twitter:description" content="An iPhone, iPad and Mac app for your self-hosted Vikunja server: quick add, smart lists, Kanban boards, widgets, a focus timer, Siri and offline sync. Open source, no tracking." />
 <meta name="twitter:image" content="https://marco308.github.io/mdone/assets/icon.png" />
 
 <link rel="icon" href="assets/icon.png" />
@@ -305,7 +305,7 @@ section{ padding:96px 0; }
 .privacy .eyebrow{ color:#8fa9ff; }
 .privacy h2{ color:#fff; max-width:14ch; }
 .privacy .lead{ color:#aeb4c6; font-size:19px; margin-top:18px; max-width:46ch; }
-.priv-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:20px; margin-top:48px; }
+.priv-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:20px; margin-top:48px; }
 .priv-card{ background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.10); border-radius:var(--r-md); padding:26px; }
 .priv-card .ic{ width:44px; height:44px; border-radius:12px; background:rgba(82,122,250,.18); color:#9db5ff;
   display:grid; place-items:center; margin-bottom:16px; }
@@ -444,9 +444,8 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
   <div class="glow" aria-hidden="true"></div>
   <div class="wrap hero-grid">
     <div class="hero-copy">
-      <span class="pill load d1"><span class="dot"></span> Native iPhone, iPad &amp; Mac · Privacy-first</span>
-      <h1 class="hero-title load d2">Your tasks. Your server.<br><em>Beautifully done.</em></h1>
-      <p class="hero-sub load d3">mDone is a polished, native app for your self-hosted <strong>Vikunja</strong> server: a quick add that understands you, smart lists, Kanban boards, widgets, a focus timer, Siri hands-free and offline sync, with absolutely zero tracking.</p>
+      <h1 class="hero-title load d2">An iPhone and Mac app for <em>Vikunja</em>.</h1>
+      <p class="hero-sub load d3"><strong>Vikunja</strong> is a self-hosted to-do server. I didn't find an app for it I liked, so I wrote one. mDone adds quick add, smart lists, Kanban boards, widgets, a focus timer, Siri and offline sync, on iPhone, iPad and Mac. No tracking.</p>
       <div class="hero-actions load d4">
         <a class="badge-apple" href="https://apps.apple.com/us/app/mdone/id6760613430" aria-label="Download mDone on the App Store">
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.36 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.02-1.5-2.62-1.71-3.19-1.73-1.36-.14-2.65.8-3.34.8-.68 0-1.75-.78-2.87-.76-1.48.02-2.84.86-3.6 2.18-1.53 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.25 2.74 2.21 1.1-.04 1.51-.71 2.85-.71 1.33 0 1.71.71 2.87.69 1.18-.02 1.94-1.08 2.66-2.14.84-1.23 1.19-2.42 1.21-2.48-.03-.01-2.32-.89-2.34-3.53zM14.2 5.83c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.55 1.31-.56.64-1.05 1.67-.92 2.66.97.07 1.96-.49 2.57-1.21z"/></svg>
@@ -454,12 +453,12 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
         </a>
         <a class="btn btn-ghost" href="https://github.com/marco308/mdone">
           <svg width="19" height="19" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-          View on GitHub
+          GitHub
         </a>
       </div>
       <div class="hero-note load d5">
         <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Open source (MIT)</span>
-        <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> No analytics, ever</span>
+        <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> No analytics</span>
         <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Works offline</span>
       </div>
     </div>
@@ -493,26 +492,24 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
 <section id="features">
   <div class="wrap">
     <div class="sec-head reveal">
-      <span class="eyebrow">Everything you need</span>
-      <h2 class="serif">A focused home for the work that matters.</h2>
-      <p>mDone brings your Vikunja tasks to life with the native iOS and macOS touches you'd expect, and nothing you wouldn't.</p>
+      <h2 class="serif">Features</h2>
     </div>
 
     <div class="bento">
       <div class="card col-3 reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8L12 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z" fill="currentColor"/></svg></div>
-        <h3>Quick Add That Understands You <span class="new-tag">New</span></h3>
-        <p>Type "Buy milk tomorrow at 5pm +Home !2" and mDone files it in Home, due tomorrow at five, priority 2. Each part shows as a chip before you add it, so nothing happens by surprise. Works in Siri and on the Mac too.</p>
+        <h3>Quick add <span class="new-tag">New</span></h3>
+        <p>Type "Buy milk tomorrow at 5pm +Home !2" and mDone files it in Home, due tomorrow at five, priority 2. Each part shows as a chip before you add it. Works in Siri and on the Mac too.</p>
       </div>
       <div class="card col-3 reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h10M4 12h16M4 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 5l1.4 1.4L22 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         <h3>Smart Lists</h3>
-        <p>Today, Upcoming, and Overdue views organise everything automatically, repeating tasks included, so you always know what to focus on next.</p>
+        <p>Today, Upcoming, and Overdue views organise everything automatically, repeating tasks included.</p>
       </div>
       <div class="card col-2 reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 3h6l-1 5 3 3v2H7v-2l3-3-1-5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 15v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
         <h3>Current</h3>
-        <p>Pin long-running tasks to a section above Today, each with a progress bar and an idle nudge when one stalls, so slow-burn projects actually get finished.</p>
+        <p>Pin long-running tasks to a section above Today, each with a progress bar and a nudge when one stalls.</p>
       </div>
       <div class="card col-2 reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 11l1.2 2.4 2.6.3-1.9 1.8.5 2.6L12 17l-2.4 1.1.5-2.6-1.9-1.8 2.6-.3L12 11z" fill="currentColor"/></svg></div>
@@ -536,18 +533,18 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
       </div>
       <div class="card col-2 reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" stroke-width="2"/><path d="M5 11a7 7 0 0014 0M12 18v3M9 21h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <h3>Siri, Hands-Free</h3>
+        <h3>Siri</h3>
         <p>Say "Add a task in mDone" and Siri asks what it is, adds it, and reads it back, without opening the app. Works in the car over CarPlay, on AirPods and on Apple Watch, even with no signal.</p>
       </div>
       <div class="card col-2 reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="13" r="7" stroke="currentColor" stroke-width="2"/><path d="M12 10v3l2 1.5M9 3h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
         <h3>Focus Timer</h3>
-        <p>Work through tasks with purpose. Live Activities keep the timer on your lock screen and Dynamic Island.</p>
+        <p>Live Activities keep the timer on your lock screen and in the Dynamic Island.</p>
       </div>
       <div class="card col-2 reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2.5" stroke="currentColor" stroke-width="2"/><path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
         <h3>Calendar View</h3>
-        <p>See your tasks across days and weeks. Spot the gaps, plan ahead, and keep your week in balance.</p>
+        <p>Your tasks across days and weeks, with your calendar events alongside.</p>
       </div>
       <div class="card col-2 reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 18a4 4 0 01-.5-7.97A6 6 0 0118 9.5a3.5 3.5 0 011 6.86" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 12v8m0 0l-2.5-2.5M12 20l2.5-2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
@@ -567,8 +564,7 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
         <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-smartadd.webp" width="660" height="1434" alt="mDone quick add turning a typed sentence into date, project and priority chips" loading="lazy" /></div></div>
       </div>
       <div class="show-copy reveal">
-        <span class="eyebrow">Quick add</span>
-        <h2 class="serif">Type it the way you'd say it.</h2>
+        <h2 class="serif">Quick add</h2>
         <p>Write "Call Mum tomorrow 6pm +Home !3" and mDone pulls out the date, the project and the priority as you type, leaving just "Call Mum" as the title.</p>
         <ul class="show-list">
           <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Every part shows as a chip: tap its X to keep the words</li>
@@ -583,9 +579,8 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
         <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-inbox.webp" width="660" height="1434" alt="mDone inbox with smart lists" loading="lazy" /></div></div>
       </div>
       <div class="show-copy reveal">
-        <span class="eyebrow">Stay on top of it</span>
-        <h2 class="serif">Today, front and centre.</h2>
-        <p>Open mDone and the right things are already in front of you. Smart lists pull your day together so nothing slips.</p>
+        <h2 class="serif">Today</h2>
+        <p>The home screen shows what's due today, what's coming up and what's overdue.</p>
         <ul class="show-list">
           <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Quick-add a task without leaving the list</li>
           <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Swipe to complete, postpone, or reschedule</li>
@@ -599,8 +594,7 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
         <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-board.webp" width="660" height="1434" alt="mDone Kanban board with To-Do and Doing columns" loading="lazy" /></div></div>
       </div>
       <div class="show-copy reveal">
-        <span class="eyebrow">Boards</span>
-        <h2 class="serif">When a list isn't enough.</h2>
+        <h2 class="serif">Kanban boards</h2>
         <p>Flip any project to its Kanban board and drag work from column to column. It is the same board you see in Vikunja's web app, and mDone remembers which view each project opens in.</p>
         <ul class="show-list">
           <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Drag cards between columns, or reorder within one</li>
@@ -615,9 +609,8 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
         <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-calendar.webp" width="660" height="1434" alt="mDone calendar view" loading="lazy" /></div></div>
       </div>
       <div class="show-copy reveal">
-        <span class="eyebrow">See the week</span>
-        <h2 class="serif">The shape of your time.</h2>
-        <p>An integrated calendar lays your tasks out across days and weeks, and folds in your device calendar events so you see the whole picture.</p>
+        <h2 class="serif">Calendar</h2>
+        <p>Your tasks laid out across days and weeks, alongside the events in your phone's calendars.</p>
         <ul class="show-list">
           <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Tasks and calendar events, side by side</li>
           <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Choose which calendars contribute</li>
@@ -631,9 +624,8 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
         <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-detail.webp" width="660" height="1434" alt="mDone task detail editor" loading="lazy" /></div></div>
       </div>
       <div class="show-copy reveal">
-        <span class="eyebrow">Every detail</span>
-        <h2 class="serif">Rich tasks, one tap away.</h2>
-        <p>Set due dates, priorities, repeats and labels, tick off a checklist in the description, and break the task into subtasks, in a detail view that feels native on every screen.</p>
+        <h2 class="serif">Task details</h2>
+        <p>Set due dates, priorities, repeats and labels, tick off a checklist in the description, and break the task into subtasks.</p>
         <ul class="show-list">
           <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Checklists you can tick, with a "2 of 4 done" bar</li>
           <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Add a focus session right from a task</li>
@@ -643,8 +635,7 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
     </div>
 
     <div class="macwrap reveal" style="text-align:center;">
-      <span class="eyebrow">Right at home on the Mac</span>
-      <h2 class="serif" style="margin-top:14px;">A real macOS app, not a port.</h2>
+      <h2 class="serif">Mac and iPad</h2>
       <p class="muted" style="max-width:46ch;margin:16px auto 0;">A proper sidebar layout, keyboard-friendly navigation, and the same data, synced through your own server. On iPad, tasks open right beside the list.</p>
       <div class="macframe">
         <div class="macbar"><i class="r"></i><i class="y"></i><i class="g"></i></div>
@@ -664,9 +655,8 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
         <div class="phone"><span class="island"></span><div class="screen"><img src="assets/shot-focus.webp" width="660" height="1431" alt="mDone Focus Timer counting up on a task" loading="lazy" /></div></div>
       </div>
       <div class="show-copy reveal">
-        <span class="eyebrow">Focus</span>
-        <h2 class="serif">One task. The clock. Nothing else.</h2>
-        <p>Start a focus session on any task and the rest fades away. A Live Activity keeps the timer on your Lock Screen and in the Dynamic Island, so you can set the phone down and keep going.</p>
+        <h2 class="serif">Focus timer</h2>
+        <p>Start a focus session on any task. A Live Activity keeps the timer on your Lock Screen and in the Dynamic Island. It's the bit that keeps me on track.</p>
         <ul class="show-list">
           <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Pause, resume, or finish without unlocking</li>
           <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Live Activity on the Lock Screen and Dynamic Island</li>
@@ -677,9 +667,8 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
 
     <div class="widgets-block">
       <div class="sec-head reveal" style="margin-bottom:44px;">
-        <span class="eyebrow">Home &amp; Lock Screen</span>
-        <h2 class="serif">Your day, before you open the app.</h2>
-        <p>Today, upcoming, and overdue right where you glance. Long-press to choose the size, what it shows, and the text scale.</p>
+        <h2 class="serif">Widgets</h2>
+        <p>Today, upcoming and overdue on your Home and Lock Screen. Long-press to choose the size, what it shows and the text size.</p>
       </div>
       <div class="widget-stage reveal">
         <figure class="widget-tile">
@@ -699,24 +688,18 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
 <!-- ================= PRIVACY ================= -->
 <section class="privacy" id="privacy">
   <div class="wrap">
-    <span class="eyebrow reveal">Privacy isn't a feature</span>
-    <h2 class="serif reveal" style="margin-top:14px;">It's the whole point.</h2>
-    <p class="lead reveal">Self-hosting means your data is yours. mDone respects that completely. It talks only to the Vikunja server you choose, and nothing else.</p>
+    <h2 class="serif reveal">Privacy</h2>
+    <p class="lead reveal">mDone only talks to the Vikunja server you sign in to.</p>
     <div class="priv-grid">
-      <div class="priv-card reveal">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <h3>Zero analytics</h3>
-        <p>No telemetry, no usage tracking, no "anonymous" data collection. None.</p>
-      </div>
       <div class="priv-card reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2" stroke="currentColor" stroke-width="2"/><path d="M8 10V8a4 4 0 018 0v2" stroke="currentColor" stroke-width="2"/></svg></div>
         <h3>No third-party SDKs</h3>
-        <p>Nothing bundled to phone home. Just your device and your server.</p>
+        <p>No third-party code that phones home.</p>
       </div>
       <div class="priv-card reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/></svg></div>
         <h3>Credentials in the Keychain</h3>
-        <p>Your token is stored securely on-device, never sent anywhere else.</p>
+        <p>Your token stays in the Keychain on your device.</p>
       </div>
     </div>
   </div>
@@ -726,19 +709,17 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
 <section id="opensource">
   <div class="wrap split">
     <div class="panel reveal">
-      <span class="eyebrow">Open source</span>
-      <h2 class="serif" style="margin-top:12px;">Built in the open, MIT-licensed.</h2>
-      <p>Pure Swift and SwiftUI, no external dependencies. Read the code, file an issue, or send a pull request. It's all on GitHub.</p>
+      <h2 class="serif">Open source</h2>
+      <p>MIT licensed. Pure Swift and SwiftUI, no external dependencies. Read the code, file an issue or send a pull request.</p>
       <div class="codeline"><span class="c"># clone &amp; build it yourself</span><br>git clone https://github.com/marco308/mdone</div>
       <div class="actions">
-        <a class="btn btn-ghost" href="https://github.com/marco308/mdone">View the source</a>
+        <a class="btn btn-ghost" href="https://github.com/marco308/mdone">GitHub</a>
         <a class="btn btn-ghost" href="https://github.com/marco308/mdone/issues/new/choose">Report an issue</a>
       </div>
     </div>
     <div class="panel tint reveal">
-      <span class="eyebrow">Support development</span>
-      <h2 class="serif" style="margin-top:12px;">Made by one person.</h2>
-      <p>mDone is built and maintained by a single developer. If it earns a place on your home screen, a tip or sponsorship helps keep it going.</p>
+      <h2 class="serif">Made by one person</h2>
+      <p>I build it on my own. If you use it, a tip or a sponsorship helps keep it going.</p>
       <div class="actions">
         <a class="btn btn-primary" href="https://github.com/sponsors/marco308">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7-4.35-9.5-8.5C1 9.5 2.5 6 6 6c2 0 3 1.2 4 2.5C11 7.2 12 6 14 6c3.5 0 5 3.5 3.5 6.5C19 16.65 12 21 12 21z"/></svg>
@@ -757,14 +738,14 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
 <section class="final">
   <div class="wrap">
     <div class="box reveal">
-      <h2 class="serif">Bring your Vikunja to life.</h2>
-      <p>Download mDone and connect to your server in seconds.</p>
+      <h2 class="serif">Get mDone</h2>
+      <p>Download it and sign in with your Vikunja server's address.</p>
       <div class="actions">
         <a class="badge-apple" href="https://apps.apple.com/us/app/mdone/id6760613430" aria-label="Download mDone on the App Store">
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.36 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.02-1.5-2.62-1.71-3.19-1.73-1.36-.14-2.65.8-3.34.8-.68 0-1.75-.78-2.87-.76-1.48.02-2.84.86-3.6 2.18-1.53 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.25 2.74 2.21 1.1-.04 1.51-.71 2.85-.71 1.33 0 1.71.71 2.87.69 1.18-.02 1.94-1.08 2.66-2.14.84-1.23 1.19-2.42 1.21-2.48-.03-.01-2.32-.89-2.34-3.53zM14.2 5.83c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.55 1.31-.56.64-1.05 1.67-.92 2.66.97.07 1.96-.49 2.57-1.21z"/></svg>
           <span class="b-txt"><small>Download on the</small><strong>App Store</strong></span>
         </a>
-        <a class="btn btn-ghost" href="https://github.com/marco308/mdone">View on GitHub</a>
+        <a class="btn btn-ghost" href="https://github.com/marco308/mdone">GitHub</a>
       </div>
       <p class="req">Requires iOS 18 / macOS 15 and your own <a href="https://vikunja.io">Vikunja</a> server (2.5.0 or newer).</p>
     </div>
@@ -782,7 +763,7 @@ footer{ background:var(--bg-2); border-top:1px solid var(--line); padding:56px 0
           <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4.5 12.5l4.2 4.2L19.5 6" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
           mDone
         </a>
-        <p>A native task manager for your self-hosted Vikunja server. Beautifully done, privacy first.</p>
+        <p>An iPhone, iPad and Mac app for your Vikunja server.</p>
       </div>
       <div class="foot-cols">
         <div class="foot-col">
